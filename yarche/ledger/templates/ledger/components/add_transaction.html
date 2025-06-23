@@ -1,0 +1,51 @@
+{% load components %}
+{% add_style 'css/modal-form.css' %}
+<form class="modal-form" id="transactions-form" method="post">
+    <div class="modal-form__content">
+        {% csrf_token %}
+        <input class="modal-form__input"
+               type="text"
+               id="type"
+               name="type"
+               value="{{ type }}"
+               hidden>
+        <div class="modal-form__group">
+            {% include "components/select.html" with id="bank_account" placeholder="Выберите счёт" %}
+        </div>
+        <div class="modal-form__group">
+            {% include "components/select.html" with id="category" placeholder="Выберите категорию" %}
+        </div>
+        <div class="modal-form__group">
+            <input class="modal-form__input {% if type == 'income' %}text-green{% else %}text-red{% endif %}"
+                   type="text"
+                   id="amount"
+                   name="amount"
+                   spellcheck="false"
+                   placeholder="Введите сумму">
+        </div>
+        <div class="modal-form__group">
+            <div class="input-container">
+                <textarea class="modal-form__textarea"
+                          type="text"
+                          id="comment"
+                          name="comment"
+                          placeholder="Комментарий"></textarea>
+                <i class="far fa-times clear-button"></i>
+            </div>
+        </div>
+        {% if type == 'expense' %}
+            <div class="modal-form__group modal-form__group--width-30">
+                <label class="modal-form__label" for="report_date">Месяц реализации</label>
+                <input class="modal-form__input"
+                       type="month"
+                       id="report_date"
+                       name="report_date"
+                       placeholder="Месяц реализации">
+            </div>
+        {% endif %}
+        <div class="modal-form__buttons">
+            <button class="button modal-form__button" type="submit">Сохранить</button>
+            <button class="button modal-form__button button--cancel" type="button">Отменить</button>
+        </div>
+    </div>
+</form>

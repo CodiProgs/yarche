@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+{% load static %}
+{% block extra_styles %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'ledger/css/transactions.css' %}">
+{% endblock extra_styles %}
+{% block content %}
+    <div class="page-table-container" id="current-shift-container">
+        <div class="current-shift-buttons">
+            <button class="button" id="income-button">Приход</button>
+            <button class="button" id="expense-button">Расход</button>
+            <button class="button" id="transfer-button">Перевод</button>
+            <button class="button" id="order-payment-button">Оплата заказа</button>
+            <button class="button" id="deposit-button">Внос на ЛС</button>
+            <button class="button" id="ls-payment-button">Оплата с ЛС</button>
+            <button class="button" id="close-shift-button">Закрыть</button>
+        </div>
+        <div class="current-shift-content">
+            <div class="current-shift-left" id="current-shift-left">
+                <div class="current-shift-title">Баланс</div>
+                <div id="bank-accounts-container">
+                    {% include "components/table.html" with id="bank-accounts-table" fields=fields.bank_accounts data=data.bank_accounts %}
+                </div>
+            </div>
+            <div class="current-shift-right">
+                {% include "components/table.html" with id="transactions-table" fields=fields.transactions data=data.transactions %}
+            </div>
+        </div>
+    </div>
+{% endblock content %}
+{% block extra_scripts %}
+    {{ block.super }}
+    <script src="{% static 'ledger/js/ledger.js' %}" type="module"></script>
+    <script src="https://cdn.jsdelivr.net/npm/autonumeric@4.8.1/dist/autoNumeric.min.js"></script>
+    {{ transaction_ids|json_script:"transaction-ids-data" }}
+{% endblock extra_scripts %}

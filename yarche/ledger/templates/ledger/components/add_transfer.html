@@ -1,0 +1,35 @@
+{% load components %}
+{% add_style 'css/modal-form.css' %}
+<form class="modal-form" id="transactions-form" method="post">
+    <div class="modal-form__content">
+        {% csrf_token %}
+        <div class="modal-form__group">
+            {% include "components/select.html" with id="source_bank_account" placeholder="Счет источник" %}
+        </div>
+        <div class="modal-form__group">
+            {% include "components/select.html" with id="destination_bank_account" placeholder="Счет назначения" %}
+        </div>
+        <div class="modal-form__group">
+            <input class="modal-form__input"
+                   type="text"
+                   id="amount"
+                   name="amount"
+                   spellcheck="false"
+                   placeholder="Введите сумму">
+        </div>
+        <div class="modal-form__group">
+            <div class="input-container">
+                <textarea class="modal-form__textarea"
+                          type="text"
+                          id="comment"
+                          name="comment"
+                          placeholder="Комментарий"></textarea>
+                <i class="far fa-times clear-button"></i>
+            </div>
+        </div>
+        <div class="modal-form__buttons">
+            <button class="button modal-form__button" type="submit">Сохранить</button>
+            <button class="button modal-form__button button--cancel" type="button">Отменить</button>
+        </div>
+    </div>
+</form>

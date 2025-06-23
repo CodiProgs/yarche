@@ -1,0 +1,61 @@
+{% extends "layout-without-menu.html" %}
+{% block title %}
+    Вход в систему
+{% endblock title %}
+{% load static %}
+{% block extra_styles %}
+    <link rel="stylesheet" href="{% static 'css/login.css' %}" />
+{% endblock extra_styles %}
+{% block content %}
+    <div class="login">
+        <h1 class="login__heading">Вход</h1>
+        <div class="login__content">
+            <div class="login__logo">
+                <img src="{% static 'images/logo.svg' %}"
+                     alt="Логотип"
+                     class="login__logo-image"
+                     width="280"
+                     height="90"
+                     style="width: 280px;
+                            height: 90px;
+                            max-width: 100%;
+                            max-height: 100%"
+                     loading="lazy">
+            </div>
+            <form method="post" class="login__form">
+                {% csrf_token %}
+                <div class="login__field">
+                    <div class="input-container">
+                        <input type="text"
+                               name="username"
+                               required
+                               id="username"
+                               class="login__input"
+                               placeholder="Имя пользователя"
+                               value="{{ form.username.value|default:'' }}">
+                        <i class="far fa-times clear-button"></i>
+                    </div>
+                    {% if form.username.errors %}<div class="login__error">{{ form.username.errors }}</div>{% endif %}
+                </div>
+                <div class="login__field">
+                    <div class="input-container">
+                        <input type="password"
+                               name="password"
+                               required
+                               id="password"
+                               class="login__input"
+                               placeholder="Пароль">
+                        <i class="far fa-times clear-button"></i>
+                    </div>
+                    {% if form.password.errors %}<div class="login__error">{{ form.password.errors }}</div>{% endif %}
+                </div>
+                <div class="login__footer">
+                    {% if form.non_field_errors %}<p class="login__error">Ошибка входа</p>{% endif %}
+                    <div class="login__actions">
+                        <button type="submit" class="button login__submit">Войти</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock content %}

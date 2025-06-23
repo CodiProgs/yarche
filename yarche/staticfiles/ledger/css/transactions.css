@@ -1,0 +1,452 @@
+.date-filter {
+	display: flex;
+	align-items: center;
+	padding: 30px;
+	border: 1px solid var(--color-border-window);
+	border-bottom: none;
+	flex-wrap: wrap;
+	gap: 10px;
+}
+
+.date-filter__label {
+	margin-right: 10px;
+}
+
+.date-filter__inputs {
+	display: flex;
+	align-items: center;
+	gap: 30px;
+	margin-right: 20px;
+}
+
+.date-filter__buttons {
+	display: flex;
+	align-items: center;
+	gap: 20px;
+}
+
+.date-filter__input {
+	padding: 4px !important;
+	border: 1px solid var(--color-border-window);
+	background-color: var(--color-background-window);
+	box-sizing: border-box;
+	width: 100px;
+	appearance: none;
+	height: 30px;
+	-webkit-appearance: none;
+	-moz-appearance: textfield;
+}
+
+.date-filter__input:focus {
+	outline: none;
+	border: 1px solid var(--color-primary);
+}
+
+[type='date']::-webkit-calendar-picker-indicator {
+	display: none;
+}
+
+.date-filter__wrapper {
+	position: relative;
+	display: inline-block;
+}
+
+.date-filter__icon {
+	position: absolute;
+	height: 100%;
+	aspect-ratio: 1 / 1;
+	right: 0;
+	top: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 16px;
+	pointer-events: auto;
+	cursor: pointer;
+	color: var(--color-text-secondary);
+}
+
+div.flatpickr-calendar,
+div.flatpickr-days {
+	width: 200px;
+}
+
+div.dayContainer {
+	width: 200px;
+	min-width: 200px;
+	max-width: 200px;
+}
+
+span.flatpickr-weekday {
+	transform: translateX(0px);
+}
+
+.flatpickr-weekdays div.flatpickr-weekdaycontainer {
+	padding: 0;
+}
+
+.flatpickr-months div.flatpickr-month {
+	margin-left: 0;
+}
+div.flatpickr-current-month {
+	position: relative;
+	left: 0;
+	font-size: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	gap: 10px;
+}
+
+.flatpickr-current-month select.flatpickr-monthDropdown-months {
+	padding: 0;
+	height: 24px;
+}
+
+div.flatpickr-current-month input.cur-year {
+	padding: 0;
+}
+
+.flatpickr-current-month div.numInputWrapper {
+	border-radius: 0;
+	display: flex;
+	align-items: center;
+	/* margin-left: 20px; */
+}
+.flatpickr-months span.flatpickr-prev-month,
+.flatpickr-months span.flatpickr-next-month {
+	padding: 0;
+	width: 20px;
+	height: 20px;
+	border-radius: 9999px;
+	margin: 10px 6px;
+}
+
+.flatpickr-months span.flatpickr-prev-month svg,
+.flatpickr-months span.flatpickr-next-month svg {
+	width: 10px;
+	height: 10px;
+}
+
+div.flatpickr-months {
+	padding: 0;
+}
+
+.dayContainer span.flatpickr-day.today:not(.selected),
+.dayContainer span.flatpickr-day.prevMonthDay.today:not(.selected),
+.dayContainer span.flatpickr-day.nextMonthDay.today:not(.selected) {
+	border-bottom-color: var(--color-primary);
+	border-top: 1px solid var(--color-table-border);
+}
+
+.dayContainer span.flatpickr-day.today:not(.selected):hover,
+.dayContainer span.flatpickr-day.prevMonthDay.today:not(.selected):hover,
+.dayContainer span.flatpickr-day.nextMonthDay.today:not(.selected):hover {
+	border: 1px solid var(--color-primary);
+	color: var(--color-text-primary);
+}
+
+.dayContainer .flatpickr-day.today:hover,
+.dayContainer .flatpickr-day.today:focus {
+	background: var(--color-button-primary-hover);
+}
+
+.dayContainer {
+	.flatpickr-day.selected,
+	.flatpickr-day.startRange,
+	.flatpickr-day.endRange,
+	.flatpickr-day.selected.inRange,
+	.flatpickr-day.startRange.inRange,
+	.flatpickr-day.endRange.inRange,
+	.flatpickr-day.selected:focus,
+	.flatpickr-day.startRange:focus,
+	.flatpickr-day.endRange:focus,
+	.flatpickr-day.selected:hover,
+	.flatpickr-day.startRange:hover,
+	.flatpickr-day.endRange:hover,
+	.flatpickr-day.selected.prevMonthDay,
+	.flatpickr-day.startRange.prevMonthDay,
+	.flatpickr-day.endRange.prevMonthDay,
+	.flatpickr-day.selected.nextMonthDay,
+	.flatpickr-day.startRange.nextMonthDay,
+	.flatpickr-day.endRange.nextMonthDay {
+		background-color: var(--color-primary);
+		border-color: var(--color-primary);
+	}
+
+	span.flatpickr-day,
+	span.flatpickr-day.prevMonthDay,
+	span.flatpickr-day.nextMonthDay {
+		border: 1px solid var(--color-table-border);
+		border-right-color: transparent;
+	}
+
+	span.flatpickr-day {
+		height: 28px;
+		line-height: 28px;
+	}
+}
+
+.pagination-controls {
+	display: flex;
+	align-items: center;
+	padding: 3px 10px;
+	border: 1px solid var(--color-border-window);
+	border-top: none;
+}
+
+.pagination-input-container {
+	padding: 0 5px;
+}
+
+.pagination-button {
+	padding: 5px 6px;
+	color: var(--color-primary);
+
+	i {
+		font-size: 22px;
+		width: 16px;
+	}
+}
+
+.pagination-input {
+	margin-left: 4px;
+	width: 30px;
+	padding: 4px;
+	border: 1px solid var(--color-border-window);
+}
+
+.pagination-input:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.pagination-button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.pagination-button:not([disabled]):hover {
+	background: var(--color-button-primary-hover);
+}
+
+.pagination-line {
+	width: 1px;
+	height: 80%;
+	background: var(--color-border-window);
+	margin: 0 5px;
+}
+
+.pagination-button:last-child {
+	height: 100%;
+
+	i {
+		font-size: 14px;
+	}
+}
+
+.current-shift-buttons {
+	flex-wrap: wrap;
+	display: flex;
+	align-items: center;
+	padding: 30px 15px;
+	gap: 10px;
+
+	.button {
+		flex: 1;
+		height: 40px;
+		font-size: 14px;
+	}
+}
+
+.current-shift-content {
+	height: auto;
+	flex-grow: 1;
+	display: flex;
+	overflow: auto;
+	max-height: 100%;
+	gap: 10px;
+}
+
+.current-shift-left {
+	height: 100%;
+	width: 450px;
+	display: flex;
+	flex-direction: column;
+}
+
+.current-shift-right {
+	height: 100%;
+	flex: 1;
+	overflow: auto;
+}
+
+.current-shift-title {
+	height: 28px;
+	background-color: var(--color-primary);
+	color: white;
+	display: flex;
+	align-items: center;
+	padding: 0 10px;
+}
+
+#bank-accounts-container {
+	height: 100%;
+	flex: 1;
+}
+
+#clients-table--container {
+	max-height: 100px;
+	height: 100px;
+	margin-bottom: 15px;
+	background-color: var(--color-background-window);
+}
+
+#income-button {
+	color: #218838;
+}
+
+#expense-button {
+	color: #ff0033;
+}
+
+#transfer-button {
+	color: #004085;
+}
+
+#order-payment-button {
+	color: #9c27b0;
+}
+
+#deposit-button {
+	color: #3f51b5;
+}
+
+#ls-payment-button {
+	color: #3f51b5;
+}
+
+#close-shift-button {
+	color: #795548;
+}
+
+@media (max-width: 1024px) {
+	.current-shift-left {
+		width: 40%;
+	}
+
+	.date-filter {
+		padding: 10px;
+	}
+
+	.current-shift-buttons {
+		padding: 20px 15px;
+	}
+
+	.current-shift-buttons .button {
+		min-width: 120px;
+		max-width: 120px;
+	}
+}
+
+@media (max-width: 768px) {
+	.current-shift-content {
+		gap: 1rem;
+	}
+
+	.date-filter__input {
+		width: 110px;
+	}
+
+	.date-filter__buttons .button {
+		height: 30px;
+		width: 110px;
+	}
+
+	.date-filter__input-container {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.date-filter__inputs {
+		gap: 20px;
+	}
+
+	.date-filter {
+		align-items: flex-end;
+	}
+
+	.current-shift-buttons {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 1rem;
+		margin-bottom: 15px;
+	}
+
+	.current-shift-buttons .button {
+		width: 100%;
+		min-width: 0;
+		max-width: 100%;
+	}
+}
+
+@media (max-width: 560px) {
+	#current-shift-container.page-table-container {
+		overflow: auto;
+		height: auto;
+	}
+
+	.current-shift-content {
+		display: grid;
+		grid-template-rows: auto auto;
+		overflow: hidden;
+	}
+
+	.current-shift-right {
+		grid-row: 1;
+		width: 100%;
+		min-height: 50vh;
+		max-height: 50vh;
+		overflow: auto;
+	}
+
+	.current-shift-left {
+		grid-row: 2;
+		width: 100%;
+		overflow-x: auto;
+	}
+
+	.current-shift-buttons {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 0.75rem;
+		padding: 0.5rem;
+	}
+}
+
+@media (max-width: 340px) {
+	.pagination-controls {
+		display: grid;
+		grid-template-rows: auto auto;
+		gap: 1rem;
+	}
+
+	.pagination-input-container {
+		grid-row: 1;
+		grid-column-start: 1;
+		grid-column-end: 6;
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.pagination-controls > :not(.pagination-input-container) {
+		grid-row: 2;
+	}
+
+	.pagination-line {
+		display: none;
+	}
+}

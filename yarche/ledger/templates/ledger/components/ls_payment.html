@@ -1,0 +1,51 @@
+{% load components %}
+{% add_style 'css/modal-form.css' %}
+<form class="modal-form" id="transactions-form" method="post">
+    <div class="modal-form__content">
+        <div id="clients-table--container"></div>
+        {% csrf_token %}
+        <input class="modal-form__input"
+               type="text"
+               id="client"
+               name="client"
+               hidden>
+        <div class="modal-form__row modal-form__row--column">
+            <div class="modal-form__group modal-form__group--width-30">
+                <label class="modal-form__label" for="order">Заказ №</label>
+                {% include "components/select.html" with id="order" placeholder="№ заказа" %}
+            </div>
+            <div class="modal-form__group modal-form__group--width-30">
+                <label class="modal-form__label" for="debt_amount">Долг по заказу</label>
+                <input class="modal-form__input"
+                       type="text"
+                       id="debt_amount"
+                       readonly
+                       spellcheck="false"
+                       name="debt_amount">
+            </div>
+            <div class="modal-form__group modal-form__group--width-30">
+                <label class="modal-form__label" for="amount">Сумма</label>
+                <input class="modal-form__input"
+                       type="text"
+                       id="amount"
+                       name="amount"
+                       spellcheck="false"
+                       placeholder="Введите сумму">
+            </div>
+        </div>
+        <div class="modal-form__group">
+            <div class="input-container">
+                <textarea class="modal-form__textarea"
+                          type="text"
+                          id="comment"
+                          name="comment"
+                          placeholder="Комментарий"></textarea>
+                <i class="far fa-times clear-button"></i>
+            </div>
+        </div>
+        <div class="modal-form__buttons">
+            <button class="button modal-form__button" type="submit">Сохранить</button>
+            <button class="button modal-form__button button--cancel" type="button">Отменить</button>
+        </div>
+    </div>
+</form>

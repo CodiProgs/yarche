@@ -1,0 +1,91 @@
+{% extends "layout.html" %}
+{% load static %}
+{% block extra_styles %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'ledger/css/transactions.css' %}">
+    <link href="https://cdn.jsdelivr.net/gh/djibe/material@4.6.2-1.0/css/material-plugins.min.css"
+          rel="stylesheet"
+          crossorigin>
+    <link rel="stylesheet" href="{% static 'css/flatpickr.css' %}">
+{% endblock extra_styles %}
+{% block content %}
+    <div class="page-table-container" id="transaction-container">
+        <div class="date-filter">
+            <div class="date-filter__inputs">
+                <div class="date-filter__input-container">
+                    <label for="start-date" class="date-filter__label">Начало</label>
+                    <div class="date-filter__wrapper">
+                        <input type="text"
+                               id="start-date"
+                               name="start-date"
+                               class="date-filter__input">
+                        <i class="fal fa-calendar-alt date-filter__icon"
+                           data-target="start-date"></i>
+                    </div>
+                </div>
+                <div class="date-filter__input-container">
+                    <label for="end-date" class="date-filter__label">Окончание</label>
+                    <div class="date-filter__wrapper">
+                        <input type="text" id="end-date" name="end-date" class="date-filter__input">
+                        <i class="fal fa-calendar-alt date-filter__icon" data-target="end-date"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="date-filter__buttons">
+                <button id="load-data" class="button">Загрузить</button>
+                <button id="edit-transaction" class="button">Редактор</button>
+            </div>
+        </div>
+        {% include "components/table.html" with id="transactions-table" fields=fields data=data %}
+        <div class="pagination-controls">
+            <button class="pagination-button"
+                    id="first-page"
+                    title="Первая страница"
+                    disabled>
+                <i class="fal fa-angle-double-left"></i>
+            </button>
+            <button class="pagination-button"
+                    id="prev-page"
+                    title="Предыдущая страница"
+                    disabled>
+                <i class="fal fa-angle-left"></i>
+            </button>
+            <div class="pagination-line"></div>
+            <div class="pagination-input-container">
+                <span>Страница</span>
+                <input type="text"
+                       id="current-page"
+                       class="pagination-input"
+                       value="0"
+                       disabled>
+                <span>из</span>
+                <span id="total-pages">0</span>
+            </div>
+            <div class="pagination-line"></div>
+            <button class="pagination-button"
+                    id="next-page"
+                    title="Следующая страница"
+                    disabled>
+                <i class="fal fa-angle-right"></i>
+            </button>
+            <button class="pagination-button"
+                    id="last-page"
+                    title="Последняя страница"
+                    disabled>
+                <i class="fal fa-angle-double-right"></i>
+            </button>
+            <div class="pagination-line"></div>
+            <button class="pagination-button" id="refresh" title="Обновить">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+        </div>
+    </div>
+{% endblock content %}
+{% block extra_scripts %}
+    {{ block.super }}
+    <script src="{% static 'ledger/js/ledger.js' %}" type="module"></script>
+    <script src="{% static 'js/flatpickr.js' %}" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ru.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/autonumeric@4.8.1/dist/autoNumeric.min.js"></script>
+    {{ transaction_ids|json_script:"transaction-ids-data" }}
+{% endblock extra_scripts %}
