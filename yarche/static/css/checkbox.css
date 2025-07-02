@@ -175,6 +175,9 @@
 
 .checkbox .checkbox__text {
 	margin-left: 8px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .table__row--selected .checkbox .checkbox__label .checkbox__box::before {

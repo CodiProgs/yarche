@@ -682,7 +682,7 @@ const editTransaction = async (transactionId, row, tableId) => {
 			break
 		case 'Внос на ЛС клиента':
 			config.dataUrls = [
-				{ id: 'client', url: '/commerce/clients/' },
+				{ id: 'client', url: '/commerce/clients/list/' },
 				{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/` },
 			]
 			config.modalConfig.url = '/components/ledger/deposit_client_balance/'
@@ -918,7 +918,7 @@ const initPaymentsPage = async () => {
 	await TableManager.createColumnsForTable('payments-table', [
 		{ name: 'manager', url: '/users/managers/' },
 		{ name: 'product', url: '/commerce/products/' },
-		{ name: 'client', url: '/commerce/clients/' },
+		{ name: 'client', url: '/commerce/clients/list/' },
 		{ name: 'legal_name' },
 		{ name: 'comment' },
 	])
@@ -955,7 +955,7 @@ const initTransactionsPage = () => {
 			{ name: 'category', url: `/ledger/${TRANSACTION_CATEGORIES}/` },
 			{ name: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/` },
 			{ name: 'amount' },
-			{ name: 'client', url: '/commerce/clients/' },
+			{ name: 'client', url: '/commerce/clients/list/' },
 			{ name: 'orderId' },
 			{ name: 'type', url: '/ledger/transaction-types/' },
 			{ name: 'comment' },
@@ -1217,7 +1217,7 @@ const initCurrentShiftPage = () => {
 			{ name: 'category', url: `/ledger/${TRANSACTION_CATEGORIES}/` },
 			{ name: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/` },
 			{ name: 'amount' },
-			{ name: 'client', url: '/commerce/clients/' },
+			{ name: 'client', url: '/commerce/clients/list/' },
 			{ name: 'orderId' },
 			{ name: 'type', url: '/ledger/transaction-types/' },
 			{ name: 'comment' },
@@ -1459,7 +1459,7 @@ const initCurrentShiftPage = () => {
 
 	setupTransactionButton('deposit-button', {
 		dataUrls: [
-			{ id: 'client', url: '/commerce/clients/' },
+			{ id: 'client', url: '/commerce/clients/list/' },
 			{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/` },
 		],
 		submitUrl: '/ledger/client-balance/deposit/',

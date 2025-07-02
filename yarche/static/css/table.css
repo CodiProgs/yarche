@@ -41,6 +41,14 @@
 	overflow: visible;
 }
 
+.table__filter-cell .create-form__input {
+	height: 24px;
+}
+
+.table__filter-cell .select__control {
+	height: 24px;
+}
+
 .table__resize-handle {
 	position: absolute;
 	top: 0;

@@ -63,6 +63,11 @@ class Order(models.Model):
         blank=True,
         null=True,
     )
+    documents_required = models.BooleanField(
+        verbose_name="Док-ты",
+        default=False,
+        help_text="Отметьте, если для заказа требуются документы"
+    )
     comment = models.TextField(verbose_name="Комментарий", blank=True, null=True)
     additional_info = models.TextField(
         verbose_name="Дополнительная информация", blank=True, null=True

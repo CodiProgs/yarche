@@ -13,10 +13,19 @@ from django.db.models import (
 from django.db.models.functions import Coalesce
 from django.template.loader import render_to_string
 from yarche.utils import get_model_fields
-
-from .models import Product, Client, Order
+from django.shortcuts import render, get_object_or_404
+from .models import Product, Client, Order, OrderStatus
 from ledger.models import Transaction, BankAccount
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.forms.models import model_to_dict
+from django.views.decorators.http import require_http_methods
+from django.db import transaction
 
+def check_permission(user, codename):
+    if hasattr(user, "user_type") and user.user_type:
+        return user.user_type.permissions.filter(codename=codename).exists()
+    return False
 
 # region Helpers
 def get_base_order_queryset():
@@ -248,6 +257,224 @@ def client_balances(request):
             "ids": [{"id": c.id, "name": c.name} for c in clients],
         }
     )
-
-
 # endregion
+
+
+@login_required
+def orders(request):
+    user = request.user
+    has_perm = check_permission(user, "view_all_orders")
+
+    orders = Order.objects.all().select_related("client", "manager", "product")
+
+    if not has_perm:
+        orders = orders.filter(manager=user)
+
+    fields = get_order_fields()
+    data = prepare_order_data(orders)
+
+    context = {
+        "fields": fields,
+        "data": data,
+        "restricted_user": user.last_name if not has_perm else None,
+    }
+
+    return render(request, "commerce/orders.html", context)
+
+def get_order_fields():
+    excluded = [
+        "documents",
+        "comment",
+    ]
+    field_order = [
+        "id",
+        "status",
+        "manager",
+        "client",
+        "client_legal_name",
+        "product",
+        "amount",
+        "created",
+        "deadline",
+        "documents_required",
+        "paid_amount",
+        "paid_percent",
+        "additional_info"
+    ]
+    verbose_names = {
+        "paid_amount": "Оплачено",
+    }
+
+    fields = get_model_fields(
+        Order,
+        excluded_fields=excluded,
+        custom_verbose_names=verbose_names,
+        field_order=field_order,
+    )
+
+    insertions = [
+        (4, {"name": "client_legal_name", "verbose_name": "Юрлицо"}),
+        (10, {"name": "paid_percent", "verbose_name": "Погашен %", "is_number": True})
+    ]
+
+    for pos, field in insertions:
+        fields.insert(pos, field)
+
+    return fields
+
+def prepare_order_data(orders):
+    data = []
+    for order in orders:
+        if order.client:
+            order.client_legal_name = order.client.legal_name
+        else:
+            order.client_legal_name = None
+        
+        if order.manager:
+            order.manager_name = order.manager.last_name or order.manager.username
+        else:
+            order.manager_name = None
+            
+        if order.amount and order.amount > 0:
+            order.paid_percent = int((order.paid_amount / order.amount) * 100)
+        else:
+            order.paid_percent = 0
+            
+        data.append(order)
+    return data
+
+def order_statuses(request):
+    return entity_list(request, OrderStatus)
+
+@login_required
+def clients(request):
+    clients_queryset = Client.objects.all().order_by('name')
+
+    page_number = request.GET.get("page", 1)
+    paginator = Paginator(list(clients_queryset), 25)
+    page_obj = paginator.get_page(page_number)
+    
+    fields = get_client_detail_fields()
+    client_data = page_obj.object_list
+
+    context = {
+        "fields": fields,
+        "data": client_data,
+        "pagination": {
+            "total_pages": paginator.num_pages,
+            "current_page": page_obj.number,
+        }
+    }
+
+    return render(request, "commerce/clients.html", context)
+
+@login_required
+def client_table(request):
+    clients_queryset = Client.objects.all().order_by('name')
+
+    page_number = request.GET.get("page", 1)
+    paginator = Paginator(list(clients_queryset), 25)
+    page_obj = paginator.get_page(page_number)
+
+    transaction_ids = [tr.id for tr in page_obj.object_list]
+
+    html = "".join(
+        render_to_string(
+            "components/table_row.html",
+            {"item": tr, "fields": get_client_detail_fields()},
+        )
+        for tr in page_obj.object_list
+    )
+
+    return JsonResponse(
+        {
+            "html": html,
+            "context": {
+                "total_pages": paginator.num_pages,
+                "current_page": page_obj.number,
+                "transaction_ids": transaction_ids,
+            },
+        }
+    )
+
+
+def get_client_detail_fields():
+    excluded_fields = [
+        "comment",
+        "inn",
+        "director",
+        "ogrn",
+        "basis",
+        "legal_address",
+        "actual_address",
+        "balance",
+    ]
+
+    field_order = [
+        "id",
+        "name",
+        "legal_name",
+    ]
+
+    fields = get_model_fields(
+        model=Client, 
+        excluded_fields=excluded_fields, 
+        field_order=field_order,
+    )
+
+    return fields
+
+
+@login_required
+def client_detail(request, pk: int):
+    tr = get_object_or_404(Client, id=pk)
+    data = model_to_dict(tr)
+
+    return JsonResponse({"data": data})
+
+@login_required
+@require_http_methods(["POST"])
+def client_add(request):
+    try:
+        with transaction.atomic():
+            data = {
+                "name": request.POST.get("name", ""),
+                "comment": request.POST.get("comment", ""),
+                "inn": request.POST.get("inn", "") or None,
+                "legal_name": request.POST.get("legal_name", "") or None,
+                "director": request.POST.get("director", "") or None,
+                "ogrn": request.POST.get("ogrn", "") or None,
+                "basis": request.POST.get("basis", "") or None,
+                "legal_address": request.POST.get("legal_address", "") or None,
+                "actual_address": request.POST.get("actual_address", "") or None,
+            }
+
+            if not data["name"]:
+                return JsonResponse(
+                    {"status": "error", "message": "Название клиента не может быть пустым"}, 
+                    status=400
+                )
+
+            client = Client.objects.create(**data)
+
+            fields = get_client_detail_fields()
+            context = {"item": client, "fields": fields}
+
+            return JsonResponse(
+                {
+                    "html": render_to_string("components/table_row.html", context),
+                    "id": client.id,
+                }
+            )
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+#transaction_update
+@login_required
+def client_edit(request, pk: int):
+    return JsonResponse({"status": "ok", "message": "ok"}, status=200)
+
+#transaction_delete
+@login_required
+def client_delete(request, pk: int):
+    return JsonResponse({"status": "ok", "message": "ok"}, status=200)

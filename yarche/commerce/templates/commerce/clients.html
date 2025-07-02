@@ -1,0 +1,187 @@
+{% extends "layout.html" %}
+{% load static %}
+{% block extra_styles %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'commerce/css/commerce.css' %}">
+{% endblock extra_styles %}
+{% block content %}
+    <div class="clients">
+        <div class="page-table-container" id="clients-container">
+            <div class="action-buttons">
+                <button id="add-button" class="button">
+                    <i class="far fa-plus-circle"></i>
+                </button>
+                <button id="edit-button" class="button">
+                    <i class="far fa-edit"></i>
+                </button>
+                <button id="cancel-button" class="button">
+                    <i class="far fa-undo"></i>
+                </button>
+                <button id="delete-button" class="button">
+                    <i class="far fa-trash-alt"></i>
+                </button>
+                <button id="refresh-button" class="button">
+                    <i class="far fa-sync-alt"></i>
+                </button>
+            </div>
+            {% include "components/table.html" with id="clients-table" fields=fields data=data %}
+            <div class="pagination-controls">
+                <button class="pagination-button"
+                        id="first-page"
+                        title="Первая страница"
+                        disabled>
+                    <i class="fal fa-angle-double-left"></i>
+                </button>
+                <button class="pagination-button"
+                        id="prev-page"
+                        title="Предыдущая страница"
+                        disabled>
+                    <i class="fal fa-angle-left"></i>
+                </button>
+                <div class="pagination-line"></div>
+                <div class="pagination-input-container">
+                    <span>Страница</span>
+                    <input type="text"
+                           id="current-page"
+                           class="pagination-input"
+                           value="0"
+                           disabled>
+                    <span>из</span>
+                    <span id="total-pages">0</span>
+                </div>
+                <div class="pagination-line"></div>
+                <button class="pagination-button"
+                        id="next-page"
+                        title="Следующая страница"
+                        disabled>
+                    <i class="fal fa-angle-right"></i>
+                </button>
+                <button class="pagination-button"
+                        id="last-page"
+                        title="Последняя страница"
+                        disabled>
+                    <i class="fal fa-angle-double-right"></i>
+                </button>
+                <div class="pagination-line"></div>
+                <button class="pagination-button" id="refresh" title="Обновить">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </div>
+        <div class="clients-right">
+            <div class="client-edit-form">
+                <div class="client-section">
+                    <h2>Клиентская информация</h2>
+                    <div class="form-row">
+                        <label for="name">Клиент:</label>
+                        <div class="input-container">
+                            <input type="text" class="create-form__input" name="name" id="name">
+                            <i class="far fa-times clear-button" style="display: none;"></i>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <label for="comment">Комментарий:</label>
+                        <div class="input-container">
+                            <textarea class="create-form__input"
+                                      name="comment"
+                                      id="comment"
+                                      rows="4"
+                                      style="resize: none;
+                                             height: max-content"></textarea>
+                            <i class="far fa-times clear-button" style="display: none;"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="client-section">
+                    <h2>Юридическая информация</h2>
+                    <div class="form-row">
+                        <label for="inn">ИНН:</label>
+                        <div class="input-container">
+                            <input type="text" class="create-form__input" name="inn" id="inn">
+                            <i class="far fa-times clear-button" style="display: none;"></i>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <label for="legal_name">Юр. название:</label>
+                        <div class="input-container">
+                            <input type="text"
+                                   class="create-form__input"
+                                   name="legal_name"
+                                   id="legal_name">
+                            <i class="far fa-times clear-button" style="display: none;"></i>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <label for="director">Директор:</label>
+                        <div class="input-container">
+                            <input type="text" class="create-form__input" name="director" id="director">
+                            <i class="far fa-times clear-button" style="display: none;"></i>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <label for="ogrn">ОГРН:</label>
+                        <div class="input-container">
+                            <input type="text" class="create-form__input" name="ogrn" id="ogrn">
+                            <i class="far fa-times clear-button" style="display: none;"></i>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <label for="basis">Основание:</label>
+                        <div class="input-container">
+                            <input type="text" class="create-form__input" name="basis" id="basis">
+                            <i class="far fa-times clear-button" style="display: none;"></i>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <label for="legal_address">Адрес юридический:</label>
+                        <div class="input-container">
+                            <input type="text"
+                                   class="create-form__input"
+                                   name="legal_address"
+                                   id="legal_address">
+                            <i class="far fa-times clear-button" style="display: none;"></i>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <label for="actual_address">Адрес фактический:</label>
+                        <div class="input-container">
+                            <input type="text"
+                                   class="create-form__input"
+                                   name="actual_address"
+                                   id="actual_address">
+                            <i class="far fa-times clear-button" style="display: none;"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="client-section">
+                    <h2>Контакты</h2>
+                    <div class="page-table-container" id="client-contacts-container">
+                        <div class="action-buttons">
+                            <button id="add-contacts-button" class="button">
+                                <i class="far fa-plus-circle"></i>
+                            </button>
+                            <button id="edit-contacts-button" class="button">
+                                <i class="far fa-edit"></i>
+                            </button>
+                            <button id="cancel-contacts-button" class="button">
+                                <i class="far fa-undo"></i>
+                            </button>
+                            <button id="delete-contacts-button" class="button">
+                                <i class="far fa-trash-alt"></i>
+                            </button>
+                            <button id="refresh-contacts-button" class="button">
+                                <i class="far fa-sync-alt"></i>
+                            </button>
+                        </div>
+                        {% include "components/table.html" with id="client-contacts-table" fields=fields data=data %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}
+{% block extra_scripts %}
+    {{ block.super }}
+    <script src="{% static 'commerce/js/commerce.js' %}" type="module"></script>
+    {{ pagination|json_script:"pagination-data" }}
+{% endblock extra_scripts %}

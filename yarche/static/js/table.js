@@ -22,9 +22,10 @@ const DOM_HELPER = {
 class ColumnSizeCalculator {
 	static CONFIG = {
 		select: { min: 150, max: 200 },
-		number: { min: 60, max: 90 },
-		default: { min: 50, max: 200 },
+		number: { min: 40, max: 90 },
+		default: { min: 50, max: 180 },
 		sign: { min: 50, max: 80 },
+		date: { min: 50, max: 80 },
 	}
 
 	constructor(tableElement, headerCells, initialWidths) {
@@ -54,6 +55,32 @@ class ColumnSizeCalculator {
 
 		if (tableWidth <= 560 && visibleColumnsCount <= 4) {
 			this.handleSmallContainer(computedWidths, tableWidth, visibleHeaders)
+		}
+		if (
+			tableWidth > 1440 &&
+			visibleColumnsCount >= 10 &&
+			visibleColumnsCount <= 14
+		) {
+			const totalWidth = computedWidths.reduce((a, b) => a + b, 0)
+			const scaleFactor = tableWidth / totalWidth
+
+			computedWidths = computedWidths.map((width, index) => {
+				const header = this.headerCells[index]
+				if (!header || header.classList.contains('hidden')) return 0
+
+				const type = header.getAttribute('data-column-type') || 'default'
+				const { min, max } =
+					ColumnSizeCalculator.CONFIG[type] ||
+					ColumnSizeCalculator.CONFIG.default
+
+				let newWidth = width * scaleFactor
+				return Math.max(min, Math.min(newWidth, max))
+			})
+
+			const currentTotal = computedWidths.reduce((a, b) => a + b, 0)
+			const widthDiff = tableWidth - currentTotal
+			const lastIndex = computedWidths.length - 1
+			computedWidths[lastIndex] += widthDiff
 		}
 
 		this.applyColumnWidths(computedWidths)
