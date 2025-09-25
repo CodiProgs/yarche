@@ -10,30 +10,52 @@ export function createLoader() {
 	return loader
 }
 
+// export async function showError(error) {
+// 	const loader = createLoader()
+// 	document.body.appendChild(loader)
+
+// 	try {
+// 		const errorModal = new Modal()
+// 		const content = `
+// 		<div class='modal__message'>
+// 			<div class='modal__message-content'>
+// 				<i class="fas fa-exclamation-circle modal__message-icon modal__message-icon--error"></i>
+// 				<p>${error}</p>
+// 			</div>
+// 			<div class='modal__message-buttons'>
+// 				<button class='button button--cancel'>Ок</button>
+// 			</div>
+// 		</div>
+// 	`
+
+// 		await errorModal.open(content, 'Ошибка')
+// 	} catch (error) {
+// 		console.error('Ошибка при открытии модального окна:', error)
+// 	} finally {
+// 		loader.remove()
+// 	}
+// }
+
 export async function showError(error) {
-	const loader = createLoader()
-	document.body.appendChild(loader)
+	const oldToast = document.querySelector('.toast.toast--error')
+	if (oldToast) oldToast.remove()
 
-	try {
-		const errorModal = new Modal()
-		const content = `
-		<div class='modal__message'>
-			<div class='modal__message-content'>
-				<i class="fas fa-exclamation-circle modal__message-icon modal__message-icon--error"></i>
-				<p>${error}</p>
-			</div>
-			<div class='modal__message-buttons'>
-				<button class='button button--cancel'>Ок</button>
-			</div>
-		</div>
-	`
+	const toast = document.createElement('div')
+	toast.className = 'toast toast--error'
+	toast.innerHTML = `
+        <img src="/static/images/exclamation-circle.svg" alt="exclamation-circle" class="toast__icon">
+        <span class="toast__message">${error}</span>
+        <button class="toast__close" title="Закрыть">&times;</button>
+    `
 
-		await errorModal.open(content, 'Ошибка')
-	} catch (error) {
-		console.error('Ошибка при открытии модального окна:', error)
-	} finally {
-		loader.remove()
-	}
+	const closeBtn = toast.querySelector('.toast__close')
+	closeBtn.onclick = () => toast.remove()
+
+	document.body.appendChild(toast)
+
+	setTimeout(() => {
+		toast.remove()
+	}, 4000)
 }
 
 export async function showQuestion(question, title, onConfirm) {
@@ -45,7 +67,7 @@ export async function showQuestion(question, title, onConfirm) {
 		const content = `
 		<div class='modal__message'>
 			<div class='modal__message-content'>
-				<i class="fas fa-question-circle modal__message-icon modal__message-icon--question"></i>
+				<img src="/static/images/question-circle.svg" alt="question-circle" class="toast__icon modal__message-icon modal__message-icon--question">
 				<p>${question}</p>
 			</div>
 			<div class='modal__message-buttons'>
@@ -70,30 +92,52 @@ export async function showQuestion(question, title, onConfirm) {
 	}
 }
 
+// export async function showSuccess(success = 'Успешно') {
+// 	const loader = createLoader()
+// 	document.body.appendChild(loader)
+
+// 	try {
+// 		const successModal = new Modal()
+// 		const content = `
+// 		<div class='modal__message'>
+// 			<div class='modal__message-content'>
+// 				<i class="fas fa-check-circle modal__message-icon modal__message-icon--success"></i>
+// 				<p>${success}</p>
+// 			</div>
+// 			<div class='modal__message-buttons'>
+// 				<button class='button button--cancel'>Ок</button>
+// 			</div>
+// 		</div>
+// 	`
+
+// 		successModal.open(content, 'Ошибка')
+// 	} catch (error) {
+// 		console.error('Ошибка при открытии модального окна:', error)
+// 	} finally {
+// 		loader.remove()
+// 	}
+// }
+
 export async function showSuccess(success = 'Успешно') {
-	const loader = createLoader()
-	document.body.appendChild(loader)
+	const oldToast = document.querySelector('.toast.toast--success')
+	if (oldToast) oldToast.remove()
 
-	try {
-		const successModal = new Modal()
-		const content = `
-		<div class='modal__message'>
-			<div class='modal__message-content'>
-				<i class="fas fa-check-circle modal__message-icon modal__message-icon--success"></i>
-				<p>${success}</p>
-			</div>
-			<div class='modal__message-buttons'>
-				<button class='button button--cancel'>Ок</button>
-			</div>
-		</div>
-	`
+	const toast = document.createElement('div')
+	toast.className = 'toast toast--success'
+	toast.innerHTML = `
+        <img src="/static/images/check-circle.svg" alt="check-circle" class="toast__icon">
+        <span class="toast__message">${success}</span>
+        <button class="toast__close" title="Закрыть">&times;</button>
+    `
 
-		successModal.open(content, 'Ошибка')
-	} catch (error) {
-		console.error('Ошибка при открытии модального окна:', error)
-	} finally {
-		loader.remove()
-	}
+	const closeBtn = toast.querySelector('.toast__close')
+	closeBtn.onclick = () => toast.remove()
+
+	document.body.appendChild(toast)
+
+	setTimeout(() => {
+		toast.remove()
+	}, 4000)
 }
 
 export function getCSRFToken() {
@@ -116,14 +160,15 @@ export function collapseContainer(containerId, title) {
 	const collapsedContent = document.createElement('div')
 
 	collapseBtn.className = 'collapse-btn'
-	collapseBtn.innerHTML = '<i class="fas fa-chevron-left"></i>'
+	collapseBtn.innerHTML =
+		'<img src="/static/images/angle-left-white.svg" alt="exclamation-circle" class="icon">'
 
 	collapsedContent.className = 'collapsed-content'
 	collapsedContent.style.opacity = '0'
 	collapsedContent.innerHTML = `
         <span class="vertical-text">${title}</span>
         <button class="collapse-btn expand-btn">
-            <i class="fas fa-chevron-right"></i>
+            <img src="/static/images/angle-right-white.svg" alt="exclamation-circle" class="icon">
         </button>
     `
 

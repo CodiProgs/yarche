@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.contrib.auth.views import LoginView
 from django.urls import reverse_lazy
 from users.forms import CustomAuthForm
@@ -17,6 +17,11 @@ class CustomLoginView(LoginView):
 
 
 def index(request):
+    user = request.user
+    if user.is_authenticated and user.user_type:
+        first_link = user.user_type.type_menu_items.order_by("order").select_related("menu_item").first()
+        if first_link and first_link.menu_item:
+            return redirect(first_link.menu_item.full_url)
     return render(request, "index.html")
 
 

@@ -5,7 +5,7 @@
            id="{{ id }}"
            class="checkbox__input"
            name="{{ name|default:id }}"
-           {% if value %}checked{% endif %}
+           {% if value and value != "false" and value != "False" %}checked{% endif %}
            {% if disabled %}disabled{% endif %}>
     <label for="{{ id }}" class="checkbox__label">
         <span class="checkbox__box" {% if not disabled %}tabindex="0"{% endif %}></span>

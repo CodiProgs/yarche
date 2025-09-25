@@ -13,9 +13,10 @@ from django.db.models import (
 from django.db.models.functions import Coalesce
 from django.template.loader import render_to_string
 from yarche.utils import get_model_fields
-
-from .models import Product, Client, Order
+from django.contrib.auth.decorators import login_required
+from .models import Product, Client, Order, OrderStatus
 from ledger.models import Transaction, BankAccount
+from django.shortcuts import render
 
 
 # region Helpers
@@ -168,7 +169,6 @@ def order_debt(request, pk):
             {"status": "error", "message": "Заказ не найден"}, status=404
         )
 
-
 def order_ids(request):
     client_id = request.GET.get("client")
     order_id_param = request.GET.get("order")
@@ -251,3 +251,114 @@ def client_balances(request):
 
 
 # endregion
+
+
+@login_required
+def works(request):
+    clients = Client.objects.prefetch_related('client_objects').all()
+    products = Product.objects.all()
+
+    context = {
+        "clients": clients,
+        "products": products,
+    }
+
+    return render(request, "commerce/works.html", context)
+
+@login_required
+def product_orders(request):
+    product_id = request.GET.get("product_id")
+    client_id = request.GET.get("client_id")
+    object_id = request.GET.get("object_id")
+    orders = Order.objects.filter(
+        product_id=product_id,
+        client_id=client_id,
+        client_object_id=object_id,
+    )
+    html = ""
+    for order in orders:
+        html += f'<li class="debtors-office-list__item"><div class="debtors-office-list__row" style="border-left-width: 52px;">Заказ №{order.id} — {order.amount} р.</div></li>'
+    if not html:
+        html = "<li class='debtors-office-list__item'><div class='debtors-office-list__row' style='border-left-width: 52px;'>Нет заказов</div></li>"
+    return JsonResponse({"html": html})
+
+@login_required
+def orders(request):
+
+    orders = Order.objects.all()
+
+    fields = get_order_fields()
+    data = prepare_orders_data(orders)
+
+    context = {
+        "fields": fields,
+        "data": data,
+    }
+    return render(request, "commerce/orders.html", context)
+
+
+def get_order_fields():
+    excluded = [
+        "client_object",
+        "amount",
+        "created",
+        "deadline",
+        "documents",
+        "paid_amount",
+        "comment",
+    ]
+    field_order = [
+        "id",
+        "status",
+        "manager",
+        "client",
+        "legal_name",
+        "product",
+        "amount",
+        "created",
+        "deadline",
+        "documents",
+        "paid_amount",
+        "paid_percent",
+        "additional_info"
+    ]
+    verbose_names = {
+        
+    }
+
+    fields = get_model_fields(
+        Order,
+        excluded_fields=excluded,
+        custom_verbose_names=verbose_names,
+        field_order=field_order,
+    )
+
+    insertions = [
+        (4, {"name": "legal_name", "verbose_name": "Юрлицо"}),
+        (6, {"name": "amount", "verbose_name": "Сумма заказа", "is_amount": True}),
+        (7, {"name": "created", "verbose_name": "Создан", "is_date": True}),
+        (8, {"name": "deadline", "verbose_name": "Срок сдачи", "is_date": True}),
+        (9, {"name": "documents", "verbose_name": "Документы", "is_boolean": True}),
+        (10, {"name": "paid_amount", "verbose_name": "Оплачено", "is_amount": True}),
+        (11, {"name": "paid_percent", "verbose_name": "% Оплаты", "is_percent": True}),
+    ]
+
+    for pos, field in insertions:
+        fields.insert(pos, field)
+
+    return fields
+
+def prepare_orders_data(orders):
+    data = []
+    for tr in orders:
+        tr.legal_name = tr.client.legal_name if tr.client else None
+        tr.paid_percent = int(tr.paid_amount / tr.amount * 100) if tr.amount else 0
+        data.append(tr)
+    return data
+
+@login_required
+def order_statuses(request):
+    statuses = [
+        {"id": acc.id, "name": acc.name} for acc in OrderStatus.objects.all()
+    ]
+    return JsonResponse(statuses, safe=False)

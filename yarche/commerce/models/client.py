@@ -31,3 +31,14 @@ class Client(models.Model):
     class Meta:
         verbose_name = "Клиент"
         verbose_name_plural = "Клиенты"
+
+class ClientObject(models.Model):
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='client_objects')
+    name = models.CharField(max_length=255, verbose_name="Название объекта")
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Объект клиента"
+        verbose_name_plural = "Объекты клиентов"

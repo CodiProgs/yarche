@@ -1,0 +1,82 @@
+{% extends "layout.html" %}
+{% load static %}
+{% block content %}
+    <div class="page-table-container" id="debtors-container">
+        <div id="context-menu" class="dropdown-menu">
+            <a class="dropdown-item context-action"
+               id="add-button"
+               data-action="add">Добавить</a>
+            <a class="dropdown-item context-action"
+                id="edit-button"
+                data-action="edit">Изменить</a>
+            <a class="dropdown-item context-action"
+                id="delete-button"
+                data-action="delete">Удалить</a>
+            <div class="dropdown-divider">
+            </div>
+            <a class="dropdown-item context-action"
+               id="hide-button"
+               data-action="hide">Скрыть</a>
+            <a class="dropdown-item context-action"
+               id="hide-all-button"
+               data-action="hide-all">Скрыть все</a>
+            <a class="dropdown-item context-action"
+               id="show-all-button"
+               data-action="show-all">Показать все</a>
+        </div>
+        <div class="debtors-data">
+            <ul class="debtors-office-list">
+                {% for client in clients %}
+                    <li class="debtors-office-list__item">
+                        <div class="debtors-office-list__row" data-target="branch-{{ forloop.counter }}">
+                            <button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
+                            <span class="debtors-office-list__title">{{ client.legal_name|default:client.name }}</span>
+                        </div>
+                        <div class="debtors-office-list__details" id="branch-{{ forloop.counter }}">
+                            <ul>
+                                {% for obj in client.client_objects.all %}
+                                    <li class="debtors-office-list__item">
+                                        <div class="debtors-office-list__row" data-target="object-{{ forloop.parentloop.counter }}-{{ forloop.counter }}" style="border-left-width: 16px;">
+                                            <button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
+                                            <h4>{{ obj.name }}</h4>
+                                        </div>
+                                        <div class="debtors-office-list__details" id="object-{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
+                                            <ul>
+                                                {% for product in products %}
+                                                    <li class="debtors-office-list__item">
+                                                        <div class="debtors-office-list__row"
+                                                            data-target="product-{{ forloop.parentloop.parentloop.counter }}-{{ forloop.parentloop.counter }}-{{ forloop.counter }}"
+                                                            data-product-id="{{ product.id }}"
+                                                            data-client-id="{{ client.id }}"
+                                                            data-object-id="{{ obj.id }}"
+                                                            style="border-left-width: 24px;">
+                                                            <button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
+                                                            <span class="debtors-office-list__title">{{ product.name }}</span>
+                                                        </div>
+                                                        <div class="debtors-office-list__details"
+                                                            id="product-{{ forloop.parentloop.parentloop.counter }}-{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
+                                                        </div>
+                                                    </li>
+                                                {% empty %}
+                                                    <li>Нет продукции</li>
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                    </li>
+                                {% empty %}
+                                    <li>Нет объектов</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+{% endblock content %}
+{% block extra_scripts %}
+    {{ block.super }}
+    <script src="{% static 'commerce/js/commerce.js' %}" type="module"></script>
+    <script src="{% static 'js/autonumeric.js' %}" defer></script>
+{% endblock extra_scripts %}
+

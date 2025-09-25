@@ -18,13 +18,33 @@
         <div class="current-shift-content">
             <div class="current-shift-left" id="current-shift-left">
                 <div class="current-shift-title">Баланс</div>
-                <div id="bank-accounts-container">
-                    {% include "components/table.html" with id="bank-accounts-table" fields=fields.bank_accounts data=data.bank_accounts %}
+                <div id="transactions-bank-accounts-container">
+                    {% include "components/table.html" with id="transactions-bank-accounts-table" fields=fields.bank_accounts data=data.bank_accounts %}
                 </div>
             </div>
             <div class="current-shift-right">
                 {% include "components/table.html" with id="transactions-table" fields=fields.transactions data=data.transactions %}
             </div>
+        </div>
+        <div id="context-menu"
+            class="dropdown-menu"
+            data-is-admin="{% if request.user.user_type and request.user.user_type.name == 'Администратор' %}true{% else %}false{% endif %}">
+            {% if request.user.user_type.name == 'Администратор' %}
+                <a class="dropdown-item context-action"
+                id="edit-button"
+                data-action="edit">Редактировать</a>
+                <a class="dropdown-item context-action"
+                id="delete-button"
+                data-action="delete">Удалить</a>
+            {% endif %}
+            <div class="dropdown-divider">
+            </div>
+            <a class="dropdown-item context-action"
+               id="hide-button"
+               data-action="hide">Скрыть</a>
+            <a class="dropdown-item context-action"
+               id="show-all-button"
+               data-action="show-all">Показать все</a>
         </div>
     </div>
 {% endblock content %}

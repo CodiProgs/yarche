@@ -7,18 +7,19 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>
             {% block title %}
-                Фабрика рекламы ЯРЧЕ
+                Ярче - завод рекламы
             {% endblock title %}
         </title>
-        <meta name="description" content="Фабрика рекламы ЯРЧЕ">
-        <meta name="keywords" content="ЯРЧЕ, Фабрика рекламы">
+        <meta name="description"
+        content="Ярче — завод по производству рекламы, баннеров и вывесок в городе Киров. Полный цикл изготовления наружной рекламы для вашего бизнеса." />
+        <meta name="keywords"
+              content="Реклама, Наружная реклама, Баннеры, Вывески, Печать, Рекламное агентство, Рекламные услуги, Рекламные материалы, Рекламные конструкции, Рекламные кампании" />
         <link rel="stylesheet" href="{% static 'css/style.css' %}" />
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap"
-              rel="stylesheet">
-        <link rel="stylesheet" href="{% static 'awesome/css/all.min.css' %}">
-        <script src="{% static 'js/main.js' %}" defer></script>
+        <link rel="stylesheet" href="{% static 'css/modal.css' %}">
+        <link rel="stylesheet" href="{% static 'css/loader.css' %}">
+        <link rel="icon"
+              href="{% static 'images/favicon.ico' %}"
+              type="image/x-icon">
         {% block extra_styles %}
             {% render_styles %}
         {% endblock extra_styles %}

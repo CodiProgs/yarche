@@ -3,6 +3,16 @@
 {% block content %}
     <div class="page-table-container" id="payments-container">
         {% include "components/table.html" with id="payments-table" fields=fields data=data %}
+        <div id="context-menu"
+            class="dropdown-menu"
+            data-is-admin="{% if request.user.user_type and request.user.user_type.name == 'Администратор' %}true{% else %}false{% endif %}">
+            <a class="dropdown-item context-action"
+               id="hide-button"
+               data-action="hide">Скрыть</a>
+            <a class="dropdown-item context-action"
+               id="show-all-button"
+               data-action="show-all">Показать все</a>
+        </div>
     </div>
 {% endblock content %}
 {% block extra_scripts %}

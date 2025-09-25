@@ -17,6 +17,8 @@ class CustomUserManager(UserManager):
         user.save(using=self._db)
         return user
 
+class SiteBlock(models.Model):
+    is_blocked = models.BooleanField(default=False)
 
 class User(AbstractUser):
     username = models.CharField(max_length=255, unique=True, verbose_name="Логин")

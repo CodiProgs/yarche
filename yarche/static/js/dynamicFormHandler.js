@@ -25,14 +25,15 @@ export class DynamicFormHandler {
 
 		try {
 			this.currentEditId = editId ?? null
-
 			await this.initializeForm()
+
 			const modalContent = await this.fetchModalContent()
 
 			if (modalContent) await this.openModal(modalContent)
 
 			if (Array.isArray(this.config.dataUrls)) {
-				for (const { id, url } of this.config.dataUrls) {
+				for (const { id, url, includeValuesInSearch = false } of this.config
+					.dataUrls) {
 					const select = document.getElementById(id)
 
 					if (select) {
@@ -43,7 +44,10 @@ export class DynamicFormHandler {
 								data: url,
 								select: selectParent,
 							})
-						} else if (this.currentEditId && url) {
+						} else if (
+							(this.currentEditId || this.currentEditId === 0) &&
+							url
+						) {
 							const response = await fetch(url, {
 								headers: { 'X-Requested-With': 'XMLHttpRequest' },
 							})
@@ -53,19 +57,23 @@ export class DynamicFormHandler {
 								await SelectHandler.setupSelects({
 									data: data,
 									select: selectParent,
+									includeValuesInSearch,
 								})
 							} else {
 								throw new Error('Failed to load select data')
 							}
 						} else {
-							await SelectHandler.setupSelects({ url, select: selectParent })
+							await SelectHandler.setupSelects({
+								url,
+								select: selectParent,
+								includeValuesInSearch,
+							})
 						}
 					} else {
 						console.warn(`Select with id "${id}" not found.`)
 					}
 				}
 			}
-
 			if (this.shouldLoadEditData()) await this.loadEditData()
 
 			this.setupForm()
@@ -111,6 +119,7 @@ export class DynamicFormHandler {
 			if (!response.ok) throw new Error('Failed to load edit data')
 
 			const { data } = await response.json()
+
 			this.fillFormFields(data)
 		} catch (error) {
 			console.error('Data loading error:', error)
@@ -120,6 +129,7 @@ export class DynamicFormHandler {
 
 	fillFormFields(data) {
 		const form = document.getElementById(this.config.formId)
+
 		if (!form) return
 
 		for (const [fieldName, value] of Object.entries(data)) {
@@ -147,7 +157,16 @@ export class DynamicFormHandler {
 				}
 			}
 
-			element.value = value ?? ''
+			if (element.type === 'date' && value) {
+				value = value.split(' ')[0]
+				if (/^\d{2}\.\d{2}\.\d{4}$/.test(value)) {
+					const [day, month, year] = value.split('.')
+					value = `${year}-${month}-${day}`
+				}
+				element.value = value
+			} else {
+				element.value = value ?? ''
+			}
 
 			if (element.type === 'hidden' || element.hasAttribute('hidden')) {
 				element.setAttribute('value', value)
@@ -157,19 +176,58 @@ export class DynamicFormHandler {
 
 	setSelectValue(selectInput, value) {
 		const selectContainer = selectInput.closest('.select')
-		const option = selectContainer?.querySelector(
-			`.select__option[data-value="${value}"]`
-		)
-		if (option) {
+		const multiple = selectContainer?.dataset.multiple === 'true'
+
+		if (multiple) {
+			let values = Array.isArray(value)
+				? value
+				: String(value)
+						.split(',')
+						.map(v => v.trim())
+						.filter(Boolean)
 			const textElement = selectContainer.querySelector('.select__text')
+			let selectedNames = []
+
+			values.forEach(val => {
+				const option = selectContainer.querySelector(
+					`.select__option[data-value="${val}"]`
+				)
+				if (option) {
+					const checkbox = option.querySelector('.select__checkbox')
+					if (checkbox) checkbox.innerHTML = '✔️'
+					selectedNames.push(option.textContent)
+				}
+			})
+
+			selectInput.value = values.join(',')
 			if (textElement) {
-				textElement.textContent = option.textContent
-				textElement.classList.remove('select__placeholder')
+				textElement.textContent = selectedNames.length
+					? `Выбрано: ${selectedNames.length}`
+					: selectInput.getAttribute('placeholder') || ''
+				textElement.classList.toggle(
+					'select__placeholder',
+					selectedNames.length === 0
+				)
 			}
-			selectInput.value = value
+			selectContainer.classList.toggle('has-value', selectedNames.length > 0)
 		} else {
-			if (selectInput.type === 'hidden' || selectInput.hasAttribute('hidden')) {
-				selectInput.setAttribute('value', value)
+			const option = selectContainer?.querySelector(
+				`.select__option[data-value="${value}"]`
+			)
+			if (option) {
+				const textElement = selectContainer.querySelector('.select__text')
+				if (textElement) {
+					textElement.textContent = option.textContent
+					textElement.classList.remove('select__placeholder')
+				}
+				selectInput.value = value
+			} else {
+				if (
+					selectInput.type === 'hidden' ||
+					selectInput.hasAttribute('hidden')
+				) {
+					selectInput.setAttribute('value', value)
+				}
 			}
 		}
 	}
@@ -201,20 +259,14 @@ export class DynamicFormHandler {
 				? `${this.config.submitUrl}${this.currentEditId}/`
 				: this.config.submitUrl
 
-			const method = this.currentEditId ? 'PUT' : 'POST'
 			let requestOptions = {
-				method: method,
+				method: 'POST',
 				headers: {
 					'X-CSRFToken': csrfToken,
 				},
 			}
 
-			if (method === 'PUT') {
-				requestOptions.headers['Content-Type'] = 'application/json'
-				requestOptions.body = JSON.stringify(Object.fromEntries(formData))
-			} else {
-				requestOptions.body = formData
-			}
+			requestOptions.body = formData
 
 			const response = await fetch(url, requestOptions)
 

@@ -1,3 +1,4 @@
+{% load static %}
 {% load components %}
 {% add_style 'css/modal-form.css' %}
 <form class="modal-form" id="transactions-form" method="post">
@@ -24,7 +25,7 @@
                           id="comment"
                           name="comment"
                           placeholder="Комментарий"></textarea>
-                <i class="far fa-times clear-button"></i>
+                <img src="{% static 'images/close.svg' %}" alt="Clear" class="clear-button">
             </div>
         </div>
         <div class="modal-form__buttons">

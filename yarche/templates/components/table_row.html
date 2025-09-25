@@ -18,6 +18,8 @@
                 <td class="table__cell{% if field.is_number %} table__cell-number{% endif %}{% if field.is_currency %}{% if value > 0 %} text-green{% elif value < 0 %} text-red{% endif %}{% endif %}">
                     {% if field.is_currency %}
                         {{ value|default:"0"|floatformat:2 }}
+                    {% elif field.is_percent %}
+                        {{ value|default:"0" }}
                     {% elif field.is_number %}
                         {% if value is not None %}
                             {% if field.is_float %}

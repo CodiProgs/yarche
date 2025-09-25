@@ -20,6 +20,11 @@ export class FormBuilder {
 		this.insertForm(formContainer)
 		this.setFormPosition(formContainer, targetRow)
 
+		const firstInput = formContainer.querySelector(
+			'input:not([type="hidden"]):not([disabled]):not([readonly]):not(.hidden)'
+		)
+		if (firstInput) firstInput.focus()
+
 		return formContainer
 	}
 
@@ -99,8 +104,13 @@ export class FormBuilder {
 		input.className = 'create-form__input'
 		input.name = th.dataset.name || `field_${index}`
 
-		const clearButton = document.createElement('i')
-		clearButton.className = 'far fa-times clear-button'
+		// 		const clearButton = document.createElement('i')
+		// 		clearButton.className = 'far fa-times clear-button'
+
+		const clearButton = document.createElement('img')
+		clearButton.src = '/static/images/close.svg'
+		clearButton.alt = 'Close'
+		clearButton.className = 'clear-button'
 
 		container.appendChild(input)
 		container.appendChild(clearButton)

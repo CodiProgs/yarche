@@ -53,11 +53,30 @@
 
 .login__footer {
 	display: flex;
-	align-items: center;
+	flex-direction: column;
 }
 
 .login__actions {
-	margin-left: auto;
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+}
+
+.login__actions .button {
+	width: 100%;
+	padding: 6px 10px;
+	margin-top: 10px;
+}
+
+.login__fingerprint {
+	display: flex;
+	flex-direction: column;
+	margin-top: 10px;
+}
+
+.login__btn {
+	width: max-content;
+	padding: 6px 10px;
 }
 
 .login__error {
@@ -79,11 +98,13 @@
 @media (max-width: 768px) {
 	.login {
 		max-width: 60%;
+		transform: translate(-50%, -30%);
 	}
 }
 
 @media (max-width: 425px) {
 	.login {
 		max-width: 90%;
+		transform: translate(-50%, -20%);
 	}
 }

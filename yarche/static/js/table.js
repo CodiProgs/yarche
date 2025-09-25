@@ -19,12 +19,47 @@ const DOM_HELPER = {
 	applyStyles: (element, styles) => Object.assign(element.style, styles),
 }
 
+const CookieUtils = {
+	setCookie(name, value, days = 30) {
+		const expires = new Date()
+		expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000)
+		document.cookie = `${name}=${encodeURIComponent(
+			JSON.stringify(value)
+		)};expires=${expires.toUTCString()};path=/`
+	},
+
+	getCookie(name) {
+		const nameEQ = `${name}=`
+		const ca = document.cookie.split(';')
+		for (let i = 0; i < ca.length; i++) {
+			let c = ca[i]
+			while (c.charAt(0) === ' ') c = c.substring(1, c.length)
+			if (c.indexOf(nameEQ) === 0) {
+				try {
+					return JSON.parse(
+						decodeURIComponent(c.substring(nameEQ.length, c.length))
+					)
+				} catch (e) {
+					console.error('Error parsing cookie value:', e)
+					return null
+				}
+			}
+		}
+		return null
+	},
+}
+
 class ColumnSizeCalculator {
 	static CONFIG = {
 		select: { min: 150, max: 200 },
 		number: { min: 60, max: 90 },
 		default: { min: 50, max: 200 },
 		sign: { min: 50, max: 80 },
+		amount: { min: 60, max: 90 },
+		checkbox: { min: 50, max: 100 },
+		percent: { min: 50, max: 80 },
+		boolean: { min: 50, max: 80 },
+		date: { min: 80, max: 80 },
 	}
 
 	constructor(tableElement, headerCells, initialWidths) {
@@ -67,7 +102,12 @@ class ColumnSizeCalculator {
 	handleSmallContainer(computedWidths, containerWidth, visibleHeaders) {
 		const fixedColumns = visibleHeaders.filter(header => {
 			const type = header.getAttribute('data-column-type') || 'default'
-			return type === 'fixed' || type === 'checkbox' || type === 'icon'
+			return (
+				type === 'fixed' ||
+				type === 'checkbox' ||
+				type === 'icon' ||
+				type === 'percent'
+			)
 		})
 
 		const flexibleColumns = visibleHeaders.filter(
@@ -90,6 +130,7 @@ class ColumnSizeCalculator {
 		flexibleColumns.forEach(header => {
 			const index = this.headerCells.indexOf(header)
 			const type = header.getAttribute('data-column-type') || 'default'
+
 			const { min, max } =
 				ColumnSizeCalculator.CONFIG[type] || ColumnSizeCalculator.CONFIG.default
 
@@ -169,15 +210,20 @@ class ResizeHandler {
 
 		const handler = e => this.startResize(e, header)
 		handle.addEventListener('mousedown', handler)
-		handle.addEventListener('touchstart', e => {
-			e.preventDefault()
-			handler(e.touches[0])
-		})
+		handle.addEventListener(
+			'touchstart',
+			e => {
+				handler(e.touches[0])
+			},
+			{ passive: false }
+		)
 		this.table.resizeHandlers.set(handle, handler)
 	}
 
 	startResize(event, header) {
 		this.isResizing = true
+		if (!this.table.columnGroup || !this.table.headerCells) return
+
 		this.resizedColumn =
 			this.table.columnGroup.children[this.table.headerCells.indexOf(header)]
 		this.initialX = event.touches ? event.touches[0].clientX : event.clientX
@@ -289,6 +335,8 @@ class ResizeHandler {
 
 		this.table.columnWidths[columnIndex] = this.newWidth
 		this.table.updateTableWidth()
+
+		this.table.saveColumnWidths()
 	}
 
 	cleanupResize() {
@@ -326,9 +374,95 @@ class DropdownManager {
 				return
 			}
 
-			const dropdownContent = await this.fetchDropdownContent()
-			const dropdownElement = this.createDropdown(toggleButton, dropdownContent)
-			this.setupDropdownInteraction(dropdownElement, toggleButton)
+			const dropdown = document.createElement('div')
+			dropdown.className = 'table__dropdown'
+
+			const hideItem = document.createElement('div')
+			hideItem.className = 'table__dropdown-item'
+			hideItem.textContent = 'Скрыть'
+			hideItem.dataset.action = 'hide'
+
+			const sortItem = document.createElement('div')
+			sortItem.className = 'table__dropdown-item'
+			sortItem.textContent = 'Сортировать'
+			sortItem.dataset.action = 'sort'
+
+			dropdown.appendChild(hideItem)
+			dropdown.appendChild(sortItem)
+
+			this.positionDropdown(toggleButton, dropdown)
+			document.body.appendChild(dropdown)
+
+			hideItem.addEventListener('mouseenter', async () => {
+				const submenuContent = await this.fetchDropdownContent()
+				this.showSubmenu(hideItem, submenuContent)
+			})
+
+			hideItem.addEventListener('mouseleave', e => {
+				if (
+					this.currentSubmenu &&
+					!this.currentSubmenu.contains(e.relatedTarget)
+				) {
+					DOM_HELPER.removeElement(this.currentSubmenu)
+					this.currentSubmenu = null
+				}
+			})
+
+			sortItem.addEventListener('mouseenter', async () => {
+				if (this.sortSubmenu) {
+					DOM_HELPER.removeElement(this.sortSubmenu)
+				}
+
+				const sortSubmenu = document.createElement('div')
+				sortSubmenu.className = 'table__submenu'
+
+				const ascSort = document.createElement('div')
+				ascSort.className = 'table__dropdown-item'
+				ascSort.textContent = 'По возрастанию'
+				ascSort.dataset.sortDir = 'asc'
+
+				const descSort = document.createElement('div')
+				descSort.className = 'table__dropdown-item'
+				descSort.textContent = 'По убыванию'
+				descSort.dataset.sortDir = 'desc'
+
+				sortSubmenu.appendChild(ascSort)
+				sortSubmenu.appendChild(descSort)
+
+				const rect = sortItem.getBoundingClientRect()
+				DOM_HELPER.applyStyles(sortSubmenu, {
+					left: `${rect.right}px`,
+					top: `${rect.top}px`,
+				})
+
+				document.body.appendChild(sortSubmenu)
+				this.sortSubmenu = sortSubmenu
+
+				const columnIndex = this.table.headerCells.indexOf(
+					this.currentToggleButton.closest('th')
+				)
+
+				ascSort.addEventListener('click', () => {
+					this.table.sortColumn(columnIndex, 'asc')
+					this.removeDropdown()
+				})
+
+				descSort.addEventListener('click', () => {
+					this.table.sortColumn(columnIndex, 'desc')
+					this.removeDropdown()
+				})
+			})
+
+			sortItem.addEventListener('mouseleave', e => {
+				if (this.sortSubmenu && !this.sortSubmenu.contains(e.relatedTarget)) {
+					DOM_HELPER.removeElement(this.sortSubmenu)
+					this.sortSubmenu = null
+				}
+			})
+
+			this.currentDropdown = dropdown
+			this.currentToggleButton = toggleButton
+			DOM_HELPER.toggleElementClass(toggleButton, 'active', true)
 
 			document.addEventListener('click', this.documentClickHandler)
 		} catch (error) {
@@ -336,11 +470,48 @@ class DropdownManager {
 		}
 	}
 
+	async showSubmenu(parentItem, submenuContent) {
+		if (this.currentSubmenu) {
+			DOM_HELPER.removeElement(this.currentSubmenu)
+		}
+
+		const submenu = submenuContent.cloneNode(true)
+		submenu.className = 'table__submenu'
+
+		const rect = parentItem.getBoundingClientRect()
+		DOM_HELPER.applyStyles(submenu, {
+			left: `${rect.right}px`,
+			top: `${rect.top}px`,
+		})
+
+		document.body.appendChild(submenu)
+		this.currentSubmenu = submenu
+
+		submenu.addEventListener('mouseleave', e => {
+			if (
+				!e.relatedTarget ||
+				!e.relatedTarget.closest('.table__dropdown-item[data-action="hide"]')
+			) {
+				DOM_HELPER.removeElement(this.currentSubmenu)
+				this.currentSubmenu = null
+			}
+		})
+
+		this.populateDropdownItems(submenu)
+	}
+
 	handleDocumentClick(event) {
-		if (
-			this.currentDropdown &&
-			!this.currentDropdown.contains(event.target) &&
+		const isOutsideDropdown =
+			this.currentDropdown && !this.currentDropdown.contains(event.target)
+		const isOutsideSubmenu =
+			this.currentSubmenu && !this.currentSubmenu.contains(event.target)
+		const isOutsideButton =
+			this.currentToggleButton &&
 			!this.currentToggleButton.contains(event.target)
+
+		if (
+			(isOutsideDropdown && isOutsideSubmenu && isOutsideButton) ||
+			(isOutsideDropdown && !this.currentSubmenu)
 		) {
 			this.removeDropdown()
 		}
@@ -359,26 +530,12 @@ class DropdownManager {
 		).body.firstElementChild
 	}
 
-	createDropdown(toggleButton, template) {
-		const dropdown = template.cloneNode(true)
-		this.positionDropdown(toggleButton, dropdown)
-		document.body.appendChild(dropdown)
-		return dropdown
-	}
-
 	positionDropdown(toggleButton, dropdown) {
 		const rect = toggleButton.getBoundingClientRect()
 		DOM_HELPER.applyStyles(dropdown, {
 			left: `${rect.left}px`,
 			top: `${rect.bottom}px`,
 		})
-	}
-
-	setupDropdownInteraction(dropdownElement, toggleButton) {
-		this.currentDropdown = dropdownElement
-		this.currentToggleButton = toggleButton
-		DOM_HELPER.toggleElementClass(toggleButton, 'active', true)
-		this.populateDropdownItems(dropdownElement)
 	}
 
 	populateDropdownItems(dropdownElement) {
@@ -434,11 +591,17 @@ class DropdownManager {
 		document.removeEventListener('click', this.documentClickHandler)
 
 		DOM_HELPER.removeElement(this.currentDropdown)
+		DOM_HELPER.removeElement(this.currentSubmenu)
+		DOM_HELPER.removeElement(this.sortSubmenu)
+
 		if (this.currentToggleButton) {
 			DOM_HELPER.toggleElementClass(this.currentToggleButton, 'active', false)
 		}
+
 		this.currentDropdown = null
 		this.currentToggleButton = null
+		this.currentSubmenu = null
+		this.sortSubmenu = null
 	}
 }
 
@@ -472,10 +635,24 @@ class ColumnVisibilityController {
 	updateColumnState(index) {
 		const isHidden =
 			this.table.columnGroup.children[index].classList.contains('hidden')
-		this.table.columnWidths[index] = isHidden
-			? 0
-			: this.table.columnGroup.children[index].offsetWidth
+
+		if (isHidden && this.table.columnWidths[index] > 0) {
+			this.table.columnGroup.children[index].dataset.savedWidth =
+				this.table.columnWidths[index]
+			this.table.columnWidths[index] = 0
+		} else if (!isHidden && this.table.columnWidths[index] === 0) {
+			const savedWidth = parseInt(
+				this.table.columnGroup.children[index].dataset.savedWidth || '0'
+			)
+			this.table.columnWidths[index] =
+				savedWidth > 0 ? savedWidth : this.table.minColumnWidth
+		} else if (!isHidden) {
+			this.table.columnWidths[index] =
+				this.table.columnGroup.children[index].offsetWidth
+		}
+
 		this.table.updateTableWidth()
+		this.table.saveColumnWidths()
 	}
 }
 
@@ -483,9 +660,13 @@ class ResizableTable {
 	constructor(tableElement, initialColumnWidths = []) {
 		this.tableElement = tableElement
 		this.minColumnWidth = 50
-		this.columnWidths = Array.isArray(initialColumnWidths)
-			? initialColumnWidths
-			: []
+
+		const savedWidths = this.loadColumnWidths()
+
+		this.columnWidths =
+			savedWidths ||
+			(Array.isArray(initialColumnWidths) ? initialColumnWidths : [])
+
 		this.resizeHandlers = new Map()
 
 		this.resizeHandler = new ResizeHandler(this)
@@ -493,6 +674,71 @@ class ResizableTable {
 		this.visibilityController = new ColumnVisibilityController(this)
 
 		this.initializeTable()
+	}
+
+	applyColumnVisibility(hiddenState) {
+		if (
+			!hiddenState ||
+			!Array.isArray(hiddenState) ||
+			hiddenState.length !== this.headerCells.length
+		) {
+			return
+		}
+
+		hiddenState.forEach((isHidden, index) => {
+			if (isHidden) {
+				const elements = [
+					this.columnGroup.children[index],
+					this.headerCells[index],
+					...this.tableElement.querySelectorAll(`td:nth-child(${index + 1})`),
+				]
+
+				elements.forEach(element => {
+					if (element) element.classList.add('hidden')
+				})
+			}
+		})
+
+		this.updateLastColumnHighlight()
+		this.updateTableWidth()
+	}
+
+	saveColumnWidths() {
+		const tableId = this.tableElement.id
+		if (!tableId) return
+
+		if (this.columnWidths && this.columnWidths.length > 0) {
+			const columnData = {
+				widths: this.columnWidths,
+				hidden: Array.from(this.columnGroup.children).map(col =>
+					col.classList.contains('hidden')
+				),
+			}
+
+			CookieUtils.setCookie(`table_widths_${tableId}`, columnData, 365)
+		}
+	}
+
+	loadColumnWidths() {
+		const tableId = this.tableElement.id
+		if (!tableId) return null
+
+		try {
+			const columnData = CookieUtils.getCookie(`table_widths_${tableId}`)
+
+			if (!columnData) return null
+
+			if (Array.isArray(columnData)) {
+				return columnData
+			}
+
+			this.hiddenState = columnData.hidden
+
+			return columnData.widths || null
+		} catch (e) {
+			console.error('Ошибка при загрузке ширин столбцов:', e)
+			return null
+		}
 	}
 
 	initializeTable() {
@@ -518,13 +764,36 @@ class ResizableTable {
 	}
 
 	setupInitialLayout() {
+		if (
+			this.columnWidths &&
+			this.columnWidths.length > 0 &&
+			this.columnWidths.length !== this.headerCells.length
+		) {
+			console.warn(
+				`Количество сохраненных ширин (${this.columnWidths.length}) не соответствует количеству столбцов (${this.headerCells.length}). Будут вычислены новые значения.`
+			)
+			this.columnWidths = []
+		}
+
 		const calculator = new ColumnSizeCalculator(
 			this.tableElement,
 			this.headerCells,
 			this.columnWidths
 		)
-		this.columnWidths = calculator.calculateInitialWidths()
+
+		if (!this.columnWidths || this.columnWidths.length === 0) {
+			this.columnWidths = calculator.calculateInitialWidths()
+			this.saveColumnWidths()
+		} else {
+			calculator.applyColumnWidths(this.columnWidths)
+			this.tableElement.style.visibility = 'visible'
+		}
+
 		this.applyColumnSizes()
+
+		if (this.hiddenState) {
+			this.applyColumnVisibility(this.hiddenState)
+		}
 	}
 
 	applyColumnSizes() {
@@ -550,9 +819,9 @@ class ResizableTable {
 		this.headerCells.forEach(header => {
 			const button = DOM_HELPER.createElement('div', 'table__column-toggle')
 			header.appendChild(button)
-			button.addEventListener('click', e =>
+			button.addEventListener('click', e => {
 				this.handleToggleButtonClick(e, button)
-			)
+			})
 		})
 	}
 
@@ -566,7 +835,12 @@ class ResizableTable {
 	}
 
 	updateTableWidth() {
-		const totalWidth = this.columnWidths.reduce((sum, width) => sum + width, 0)
+		const totalWidth = this.columnWidths.reduce((sum, width, index) => {
+			const isHidden =
+				this.columnGroup.children[index].classList.contains('hidden')
+			return sum + (isHidden ? 0 : width)
+		}, 0)
+
 		DOM_HELPER.applyStyles(this.tableElement, { width: `${totalWidth}px` })
 	}
 
@@ -630,6 +904,40 @@ class ResizableTable {
 		this.columnGroup = null
 		this.tableElement = null
 	}
+
+	sortColumn(columnIndex, direction) {
+		if (columnIndex < 0 || columnIndex >= this.headerCells.length) {
+			console.error('Invalid column index for sorting:', columnIndex)
+			return
+		}
+
+		const headerCell = this.headerCells[columnIndex]
+		const columnType = headerCell.dataset.columnType || 'default'
+		const columnName = headerCell.dataset.name || ''
+
+		this.updateSortingIndicator(columnIndex, direction)
+
+		TableManager.sortTable(
+			this.tableElement.id,
+			columnIndex,
+			direction,
+			columnType
+		)
+	}
+
+	updateSortingIndicator(columnIndex, direction) {
+		this.headerCells.forEach(header => {
+			header.classList.remove('table__cell-header--sorted-asc')
+			header.classList.remove('table__cell-header--sorted-desc')
+		})
+
+		const header = this.headerCells[columnIndex]
+		if (direction === 'asc') {
+			header.classList.add('table__cell-header--sorted-asc')
+		} else {
+			header.classList.add('table__cell-header--sorted-desc')
+		}
+	}
 }
 
 export const TableManager = {
@@ -648,8 +956,81 @@ export const TableManager = {
 		this.attachGlobalCellClickHandler()
 	},
 
+	initTable(tableId) {
+		const tableEl = document.getElementById(tableId)
+		if (tableEl) {
+			this.tables.set(tableId, new ResizableTable(tableEl))
+			this.formatCurrencyValues(tableId)
+			this.setInitialSelectionForTable(tableId)
+		}
+	},
+
+	sortTable(tableId, columnIndex, direction, columnType = 'default') {
+		const table = document.getElementById(tableId)
+		if (!table) {
+			console.error(`Table with id "${tableId}" not found.`)
+			return
+		}
+
+		const tbody = table.querySelector('tbody')
+		if (!tbody) return
+
+		const rows = Array.from(
+			tbody.querySelectorAll('tr:not(.table__row--summary)')
+		)
+		const summaryRow = tbody.querySelector('.table__row--summary')
+
+		const compareFunction = (a, b) => {
+			const cellA = a.cells[columnIndex]
+			const cellB = b.cells[columnIndex]
+
+			if (!cellA || !cellB) return 0
+
+			let valueA, valueB
+
+			switch (columnType) {
+				case 'amount':
+					valueA = this.extractNumericValue(cellA.textContent)
+					valueB = this.extractNumericValue(cellB.textContent)
+					break
+				case 'percent':
+					valueA = parseFloat(cellA.textContent.replace('%', ''))
+					valueB = parseFloat(cellB.textContent.replace('%', ''))
+					break
+				case 'date':
+					valueA = new Date(cellA.textContent)
+					valueB = new Date(cellB.textContent)
+					break
+				default:
+					valueA = cellA.textContent.toLowerCase()
+					valueB = cellB.textContent.toLowerCase()
+			}
+
+			if (valueA < valueB) return direction === 'asc' ? -1 : 1
+			if (valueA > valueB) return direction === 'asc' ? 1 : -1
+			return 0
+		}
+
+		rows.sort(compareFunction)
+
+		rows.forEach(row => tbody.appendChild(row))
+
+		if (summaryRow) {
+			tbody.appendChild(summaryRow)
+		}
+	},
+
+	extractNumericValue(text) {
+		const numStr = text.replace(/[^\d.,]/g, '').replace(',', '.')
+		return parseFloat(numStr) || 0
+	},
+
 	attachGlobalCellClickHandler() {
 		document.addEventListener('click', event => this.onTableCellClick(event))
+		document.addEventListener('contextmenu', event => {
+			event.preventDefault()
+			this.onTableCellClick(event, true)
+		})
 	},
 
 	onTableCellClick(event) {
@@ -659,32 +1040,34 @@ export const TableManager = {
 		document.querySelectorAll('.table__cell--selected').forEach(el => {
 			el.classList.remove('table__cell--selected')
 		})
-
-		const table = cell.closest('.table')
-		if (table) {
-			table.querySelectorAll('.table__row--selected').forEach(row => {
-				row.classList.remove('table__row--selected')
-			})
-		}
+		document.querySelectorAll('.table__row--selected').forEach(row => {
+			row.classList.remove('table__row--selected')
+		})
 
 		cell.classList.add('table__cell--selected')
-
 		cell.parentElement.classList.add('table__row--selected')
 	},
 
 	setInitialCellSelection() {
-		const alreadySelected = document.querySelector('.table__cell--selected')
-		document.querySelectorAll('.table').forEach((table, index) => {
-			if (!table.querySelector('.table__row--selected')) {
-				const firstRow = table.querySelector('.table__row')
+		document.querySelectorAll('.table__cell--selected').forEach(cell => {
+			cell.classList.remove('table__cell--selected')
+		})
+
+		const firstTable = document.querySelector('.table')
+		if (firstTable) {
+			if (!firstTable.querySelector('.table__row--selected')) {
+				const firstRow = Array.from(
+					firstTable.querySelectorAll('.table__row')
+				).find(row => !row.classList.contains('hidden-row'))
 				if (firstRow) firstRow.classList.add('table__row--selected')
 			}
-			if (!alreadySelected && index === 0) {
-				const firstRow = table.querySelector('.table__row')
-				const firstCell = firstRow?.querySelector('.table__cell')
-				if (firstCell) firstCell.classList.add('table__cell--selected')
-			}
-		})
+
+			const firstRow = Array.from(
+				firstTable.querySelectorAll('.table__row')
+			).find(row => !row.classList.contains('hidden-row'))
+			const firstCell = firstRow?.querySelector('.table__cell')
+			if (firstCell) firstCell.classList.add('table__cell--selected')
+		}
 	},
 
 	setInitialSelectionForTable(tableId) {
@@ -705,64 +1088,187 @@ export const TableManager = {
 
 		const headers = Array.from(table.querySelectorAll('thead th'))
 		const amountColumnIndexes = headers
-			.map((header, index) => (header.dataset.name === 'amount' ? index : -1))
+			.map((header, index) =>
+				header.dataset.columnType === 'amount' ? index : -1
+			)
 			.filter(index => index !== -1)
 
-		if (amountColumnIndexes.length === 0) return
+		if (amountColumnIndexes.length !== 0) {
+			amountColumnIndexes.forEach(colIndex => {
+				const cells = table.querySelectorAll(
+					`tbody td:nth-child(${colIndex + 1})`
+				)
+				cells.forEach(cell => {
+					if (cell.classList.contains('table__cell--summary')) return
+					if (cell.parentElement.classList.contains('table__row--summary'))
+						return
 
-		amountColumnIndexes.forEach(colIndex => {
-			const cells = table.querySelectorAll(
-				`tbody td:nth-child(${colIndex + 1})`
-			)
-			cells.forEach(cell => {
-				if (cell.classList.contains('table__cell--summary')) return
+					cell.style.textAlign = 'right'
 
-				const text = cell.textContent.trim()
-				if (text && /^[\d\s,.-]+(\s?р\.)?$/.test(text)) {
-					const numText = text.replace(/\s?р\.$/, '').trim()
+					const text = cell.textContent.trim()
 
-					const number = parseFloat(
-						numText.replace(/\s/g, '').replace(',', '.')
-					)
-					if (!isNaN(number)) {
-						cell.textContent = this.formatNumber(
-							number.toFixed(2).replace('.', ',')
+					if (text && /^[\d\s,.-]+(\s?р\.)?$/.test(text)) {
+						const numText = text.replace(/\s?р\.$/, '').trim()
+						const number = parseFloat(
+							numText.replace(/\s/g, '').replace(',', '.')
 						)
+						if (!isNaN(number)) {
+							const hadSuffix = /\s?р\.$/.test(text)
+							cell.textContent =
+								number === 0
+									? hadSuffix
+										? '0 р.'
+										: '0'
+									: this.formatNumber(number) + ' р.'
+						}
+					} else {
+						if (text !== null && text !== '') {
+							try {
+								const textData = cell.textContent
+									.trim()
+									.replace(/'/g, '"')
+									.replace(/Decimal\("([-]?[\d.]+)"\)/g, '$1')
+
+								const data = JSON.parse(textData)
+								const amountFormat = this.formatNumber(data.amount)
+
+								cell.textContent = amountFormat + data.currency
+								cell.classList.add(data.amount < 0 ? 'back-red' : 'back-green')
+							} catch (err) {
+								console.error(err)
+							}
+						} else {
+							cell.textContent = 0
+						}
 					}
-				}
+				})
 			})
-		})
+		}
+
+		const percentColumnIndexes = headers
+			.map((header, index) =>
+				header.dataset.columnType === 'percent' ? index : -1
+			)
+			.filter(index => index !== -1)
+
+		if (percentColumnIndexes.length !== 0) {
+			percentColumnIndexes.forEach(colIndex => {
+				const cells = table.querySelectorAll(
+					`tbody td:nth-child(${colIndex + 1})`
+				)
+				const header = table.querySelector(
+					`thead th:nth-child(${colIndex + 1})`
+				)
+				cells.forEach(cell => {
+					if (cell.classList.contains('table__cell--summary')) return
+
+					cell.style.textAlign = 'center'
+					let text = cell.textContent.trim()
+
+					text = text.replace(/%/g, '').trim()
+
+					if (text) {
+						cell.textContent = text + '%'
+					}
+
+					if (header.dataset.name === 'bonus_percentage') {
+						if (cell.textContent !== '0%') {
+							cell.classList.add('table__cell--changed')
+						}
+					}
+				})
+			})
+		}
 	},
 
 	formatCurrencyValuesForRow(tableId, row) {
 		const table = document.getElementById(tableId)
+
 		if (!table || !row) return
 
 		const headers = Array.from(table.querySelectorAll('thead th'))
+
 		const amountColumnIndexes = headers
-			.map((header, index) => (header.dataset.name === 'amount' ? index : -1))
+			.map((header, index) =>
+				header.dataset.columnType === 'amount' ? index : -1
+			)
 			.filter(index => index !== -1)
 
-		if (amountColumnIndexes.length === 0) return
+		if (amountColumnIndexes.length !== 0) {
+			amountColumnIndexes.forEach(colIndex => {
+				const cell = row.querySelector(`td:nth-child(${colIndex + 1})`)
+				if (cell && !cell.classList.contains('table__cell--summary')) {
+					cell.style.textAlign = 'right'
+					const text = cell.textContent.trim()
 
-		amountColumnIndexes.forEach(colIndex => {
-			const cell = row.querySelector(`td:nth-child(${colIndex + 1})`)
-			if (cell && !cell.classList.contains('table__cell--summary')) {
-				const text = cell.textContent.trim()
-				if (text && /^[\d\s,.-]+(\s?р\.)?$/.test(text)) {
-					const numText = text.replace(/\s?р\.$/, '').trim()
-
-					const number = parseFloat(
-						numText.replace(/\s/g, '').replace(',', '.')
-					)
-					if (!isNaN(number)) {
-						cell.textContent = this.formatNumber(
-							number.toFixed(2).replace('.', ',')
+					if (text && /^[\d\s,.-]+(\s?р\.)?$/.test(text)) {
+						const numText = text.replace(/\s?р\.$/, '').trim()
+						const number = parseFloat(
+							numText.replace(/\s/g, '').replace(',', '.')
 						)
+						if (!isNaN(number)) {
+							const hadSuffix = /\s?р\.$/.test(text)
+							cell.textContent =
+								number === 0
+									? hadSuffix
+										? '0 р.'
+										: '0'
+									: this.formatNumber(number) + ' р.'
+						}
+					} else if (text !== null && text !== '') {
+						try {
+							const textData = cell.textContent
+								.trim()
+								.replace(/'/g, '"')
+								.replace(/Decimal\("([-]?[\d.]+)"\)/g, '$1')
+
+							const data = JSON.parse(textData)
+							const amountFormat = this.formatNumber(data.amount)
+
+							cell.textContent = amountFormat + data.currency
+
+							cell.classList.add(data.amount < 0 ? 'back-red' : 'back-green')
+						} catch (err) {
+							console.error('Ошибка форматирования ячейки:', err)
+						}
+					} else {
+						cell.textContent = '0'
 					}
 				}
-			}
-		})
+			})
+		}
+
+		const percentColumnIndexes = headers
+			.map((header, index) =>
+				header.dataset.columnType === 'percent' ? index : -1
+			)
+			.filter(index => index !== -1)
+
+		if (percentColumnIndexes.length !== 0) {
+			percentColumnIndexes.forEach(colIndex => {
+				const cell = row.querySelector(`td:nth-child(${colIndex + 1})`)
+				const header = table.querySelector(
+					`thead th:nth-child(${colIndex + 1})`
+				)
+
+				if (cell && !cell.classList.contains('table__cell--summary')) {
+					cell.style.textAlign = 'center'
+
+					let text = cell.textContent.trim()
+					text = text.replace(/%/g, '').trim()
+
+					if (text) {
+						cell.textContent = text + '%'
+					}
+
+					if (header.dataset.name === 'bonus_percentage') {
+						if (cell.textContent !== '0%') {
+							cell.classList.add('table__cell--changed')
+						}
+					}
+				}
+			})
+		}
 	},
 
 	async refresh(url, tableId) {
@@ -854,10 +1360,10 @@ export const TableManager = {
 		}
 
 		if (data.html) {
-			table.querySelectorAll('.table__row--selected').forEach(row => {
+			document.querySelectorAll('.table__row--selected').forEach(row => {
 				row.classList.remove('table__row--selected')
 			})
-			table.querySelectorAll('.table__cell--selected').forEach(cell => {
+			document.querySelectorAll('.table__cell--selected').forEach(cell => {
 				cell.classList.remove('table__cell--selected')
 			})
 
@@ -903,9 +1409,9 @@ export const TableManager = {
 			if (updatedRow) {
 				updatedRow.setAttribute('data-id', data.id)
 
-				const table = document.getElementById(tableId)
-
-				const allSelectedRows = table.querySelectorAll('.table__row--selected')
+				const allSelectedRows = document.querySelectorAll(
+					'.table__row--selected'
+				)
 				allSelectedRows.forEach(row => {
 					row.classList.remove('table__row--selected')
 					const selectedCells = row.querySelectorAll('.table__cell--selected')
@@ -921,6 +1427,8 @@ export const TableManager = {
 					firstCell.classList.add('table__cell--selected')
 				}
 
+				this.formatCurrencyValuesForRow(tableId, updatedRow)
+
 				return updatedRow
 			}
 		}
@@ -932,14 +1440,17 @@ export const TableManager = {
 
 		try {
 			const response = await fetch(`${url}${id}/`, {
-				method: 'DELETE',
+				method: 'POST',
 				headers: {
 					'X-CSRFToken': getCSRFToken(),
 					'Content-Type': 'application/json',
 				},
 			})
-			if (!response.ok)
-				throw new Error(`HTTP error! status: ${response.status}`)
+
+			if (!response.ok) {
+				const error = await response.json()
+				throw new Error(error.message || 'Form submission failed')
+			}
 
 			const row = this.getRowById(id, tableId)
 
@@ -1056,8 +1567,15 @@ export const TableManager = {
 	getSelectedRowId(tableId) {
 		const table = document.getElementById(tableId)
 		if (!table) return
+
 		const selectedRow = table.querySelector('.table__row--selected')
 		if (!selectedRow) return
+
+		const data_id = selectedRow.getAttribute('data-id')
+		if (data_id !== null) {
+			return data_id
+		}
+
 		const idCell = selectedRow.querySelector('td:first-child')
 		return idCell?.textContent.trim()
 	},
@@ -1170,7 +1688,6 @@ export const TableManager = {
 				)
 
 				const inputElement = await formBuilder.createColumnInput(th, i)
-
 				if (columnConfig.url) {
 					SelectHandler.setupSelects({
 						url: columnConfig.url,
@@ -1322,7 +1839,7 @@ export const TableManager = {
 	calculateTableSummary(
 		tableId,
 		columnsToSum,
-		options = { grouped: false, total: true, className: null }
+		options = { grouped: false, total: true, className: null, ids: null }
 	) {
 		if (
 			!columnsToSum ||
@@ -1346,6 +1863,12 @@ export const TableManager = {
 
 		const groupRows = Array.from(tbody.querySelectorAll('.table__group-row'))
 
+		const filterRowsByIds = (rows, ids) => {
+			if (!Array.isArray(ids) || ids.length === 0) return rows
+			const idsStr = ids.map(String)
+			return rows.filter(row => idsStr.includes(row.getAttribute('data-id')))
+		}
+
 		if (options.grouped && groupRows.length > 0) {
 			groupRows.forEach(groupRow => {
 				let currentRow = groupRow.nextElementSibling
@@ -1364,9 +1887,11 @@ export const TableManager = {
 					currentRow = currentRow.nextElementSibling
 				}
 
-				if (rows.length > 0) {
+				const filteredRows = filterRowsByIds(rows, options.ids)
+
+				if (filteredRows.length > 0) {
 					const summaryData = this.calculateSums(
-						rows,
+						filteredRows,
 						columnsToSum,
 						columnNames
 					)
@@ -1376,7 +1901,7 @@ export const TableManager = {
 						summaryData,
 						'text-blue'
 					)
-					const lastRow = rows[rows.length - 1]
+					const lastRow = filteredRows[filteredRows.length - 1]
 					this.applyColumnWidthsForRow(tableId, summaryRow)
 
 					tbody.insertBefore(summaryRow, lastRow.nextElementSibling)
@@ -1385,11 +1910,13 @@ export const TableManager = {
 		}
 
 		if (!options.grouped || options.total) {
-			const rows = Array.from(
+			let rows = Array.from(
 				tbody.querySelectorAll(
 					'tr:not(.table__row--summary):not(.table__group-row)'
 				)
 			).filter(row => row.style.display !== 'none')
+
+			rows = filterRowsByIds(rows, options.ids)
 
 			if (rows.length > 0) {
 				const summaryData = this.calculateSums(rows, columnsToSum, columnNames)
@@ -1436,15 +1963,22 @@ export const TableManager = {
 		const row = document.createElement('tr')
 		row.className = 'table__row table__row--summary'
 
-		headers.forEach((_, colIndex) => {
+		headers.forEach((header, colIndex) => {
+			const isHidden = header.classList.contains('hidden')
+
 			const cell = document.createElement('td')
 			cell.className = 'table__cell'
+
+			if (isHidden) {
+				cell.classList.add('hidden')
+			}
 
 			const columnName = columnNames[colIndex]
 			if (summaryData[columnName] !== undefined) {
 				cell.classList.add('table__cell--summary')
 
 				const formattedValue = this.formatNumber(summaryData[columnName])
+
 				cell.textContent = `${formattedValue} р.`
 
 				if (className) {
@@ -1570,3 +2104,134 @@ export const TableManager = {
 		return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 	},
 }
+
+document.addEventListener('keydown', function (event) {
+	const selectedCell = document.querySelector('.table__cell--selected')
+	if (!selectedCell) return
+
+	if (
+		event.ctrlKey &&
+		(event.key === 'c' ||
+			event.key === 'C' ||
+			event.key === 'с' ||
+			event.key === 'С' ||
+			event.code === 'KeyC')
+	) {
+		const text = selectedCell.textContent.trim()
+
+		if (text) {
+			navigator.clipboard.writeText(text).catch(() => {
+				const textarea = document.createElement('textarea')
+				textarea.value = text
+				document.body.appendChild(textarea)
+				textarea.select()
+				document.execCommand('copy')
+				document.body.removeChild(textarea)
+			})
+		}
+		event.preventDefault()
+		return
+	}
+
+	const row = selectedCell.parentElement
+	const table = row.closest('.table')
+	if (!table) return
+
+	const cells = Array.from(row.querySelectorAll('.table__cell'))
+	const rows = Array.from(table.querySelectorAll('tbody tr'))
+	const rowIndex = rows.indexOf(row)
+	const cellIndex = cells.indexOf(selectedCell)
+
+	let targetCell = null
+
+	switch (event.key) {
+		case 'ArrowRight':
+			if (cellIndex < cells.length - 1) {
+				targetCell = cells[cellIndex + 1]
+			}
+			break
+		case 'ArrowLeft':
+			if (cellIndex > 0) {
+				targetCell = cells[cellIndex - 1]
+			}
+			break
+		case 'ArrowDown':
+			if (rowIndex < rows.length - 1) {
+				const nextRowCells = Array.from(
+					rows[rowIndex + 1].querySelectorAll('.table__cell')
+				)
+				targetCell =
+					nextRowCells[cellIndex] || nextRowCells[nextRowCells.length - 1]
+			}
+			break
+		case 'ArrowUp':
+			if (rowIndex > 0) {
+				const prevRowCells = Array.from(
+					rows[rowIndex - 1].querySelectorAll('.table__cell')
+				)
+				targetCell =
+					prevRowCells[cellIndex] || prevRowCells[prevRowCells.length - 1]
+			}
+			break
+		default:
+			return
+	}
+
+	if (targetCell) {
+		document
+			.querySelectorAll('.table__cell--selected')
+			.forEach(cell => cell.classList.remove('table__cell--selected'))
+		document
+			.querySelectorAll('.table__row--selected')
+			.forEach(r => r.classList.remove('table__row--selected'))
+		targetCell.classList.add('table__cell--selected')
+		targetCell.parentElement.classList.add('table__row--selected')
+		targetCell.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+		event.preventDefault()
+	}
+})
+
+document.addEventListener('DOMContentLoaded', function () {
+	const navList = document.querySelector('.nav-list')
+	if (navList) {
+		const itemsCount = navList.children.length
+		if (itemsCount === 8) {
+			navList.style.gridTemplateColumns = 'repeat(4, minmax(0, 1fr))'
+		} else {
+			navList.style.gridTemplateColumns = 'repeat(5, minmax(0, 1fr))'
+		}
+	}
+
+	// function resizeCharts() {
+	// 	const statsChart = document.getElementById('statsChart')
+	// 	const profitChart = document.getElementById('profitChart')
+	// 	if (!statsChart || !profitChart) return
+	// 	const w = statsChart.parentElement.offsetWidth
+	// 	let h = 264
+	// 	let profitW = 40
+	// 	if (window.innerWidth <= 600) {
+	// 		h = 200
+	// 		profitW = 35
+	// 	} else if (window.innerWidth <= 1024) {
+	// 		h = 180
+	// 	}
+	// 	statsChart.width = w
+	// 	statsChart.height = h
+	// 	profitChart.width = profitW
+	// 	profitChart.height = h
+
+	// 	if (window.capitalChart) {
+	// 		window.capitalChart.destroy()
+	// 		window.capitalChart = null
+	// 	}
+	// 	if (window.profitChartInstance) {
+	// 		window.profitChartInstance.destroy()
+	// 		window.profitChartInstance = null
+	// 	}
+	// 	if (window.drawCharts) {
+	// 		window.drawCharts()
+	// 	}
+	// }
+	// window.addEventListener('resize', resizeCharts)
+	// resizeCharts()
+})

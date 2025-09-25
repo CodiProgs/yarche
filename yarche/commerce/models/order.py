@@ -67,9 +67,17 @@ class Order(models.Model):
     additional_info = models.TextField(
         verbose_name="Дополнительная информация", blank=True, null=True
     )
+    client_object = models.ForeignKey(
+        'ClientObject',
+        on_delete=models.PROTECT,
+        verbose_name="Объект клиента",
+        related_name="orders",
+        blank=True,
+        null=True,
+    )
 
     def __str__(self):
-        return f"{self.client} - {self.product}"
+        return f"{self.id}"
 
     class Meta:
         verbose_name = "Заказ"

@@ -13,27 +13,31 @@
         <div class="date-filter">
             <div class="date-filter__inputs">
                 <div class="date-filter__input-container">
-                    <label for="start-date" class="date-filter__label">Начало</label>
+                    <div class="date-filter__label">Начало</div>
                     <div class="date-filter__wrapper">
                         <input type="text"
                                id="start-date"
                                name="start-date"
                                class="date-filter__input">
-                        <i class="fal fa-calendar-alt date-filter__icon"
-                           data-target="start-date"></i>
+                        <img src="{% static 'images/calendar.svg' %}"
+                             class="date-filter__icon"
+                             data-target="start-date"
+                             >
                     </div>
                 </div>
                 <div class="date-filter__input-container">
-                    <label for="end-date" class="date-filter__label">Окончание</label>
+                    <div class="date-filter__label">Окончание</div>
                     <div class="date-filter__wrapper">
                         <input type="text" id="end-date" name="end-date" class="date-filter__input">
-                        <i class="fal fa-calendar-alt date-filter__icon" data-target="end-date"></i>
+                        <img src="{% static 'images/calendar.svg' %}"
+                             class="date-filter__icon"
+                             data-target="end-date"
+                             >
                     </div>
                 </div>
             </div>
             <div class="date-filter__buttons">
                 <button id="load-data" class="button">Загрузить</button>
-                <button id="edit-transaction" class="button">Редактор</button>
             </div>
         </div>
         {% include "components/table.html" with id="transactions-table" fields=fields data=data %}
@@ -42,13 +46,13 @@
                     id="first-page"
                     title="Первая страница"
                     disabled>
-                <i class="fal fa-angle-double-left"></i>
+                <img src="{% static 'images/angle-double-left.svg' %}" alt="First" class="icon">
             </button>
             <button class="pagination-button"
                     id="prev-page"
                     title="Предыдущая страница"
                     disabled>
-                <i class="fal fa-angle-left"></i>
+                <img src="{% static 'images/angle-left.svg' %}" alt="Previous" class="icon">
             </button>
             <div class="pagination-line"></div>
             <div class="pagination-input-container">
@@ -66,18 +70,35 @@
                     id="next-page"
                     title="Следующая страница"
                     disabled>
-                <i class="fal fa-angle-right"></i>
+                <img src="{% static 'images/angle-right.svg' %}" alt="Next" class="icon">
             </button>
             <button class="pagination-button"
                     id="last-page"
                     title="Последняя страница"
                     disabled>
-                <i class="fal fa-angle-double-right"></i>
+                <img src="{% static 'images/angle-double-right.svg' %}" alt="Last" class="icon">
             </button>
             <div class="pagination-line"></div>
             <button class="pagination-button" id="refresh" title="Обновить">
-                <i class="fas fa-sync-alt"></i>
+                <img src="{% static 'images/arrows-rotate.svg' %}" alt="Refresh" class="icon">
             </button>
+        </div>
+        <div id="context-menu"
+            class="dropdown-menu"
+            data-is-admin="{% if request.user.user_type and request.user.user_type.name == 'Администратор' %}true{% else %}false{% endif %}">
+            {% if request.user.user_type.name == 'Администратор' %}
+                <a class="dropdown-item context-action"
+                id="edit-button"
+                data-action="edit">Редактировать</a>
+            {% endif %}
+            <div class="dropdown-divider">
+            </div>
+            <a class="dropdown-item context-action"
+               id="hide-button"
+               data-action="hide">Скрыть</a>
+            <a class="dropdown-item context-action"
+               id="show-all-button"
+               data-action="show-all">Показать все</a>
         </div>
     </div>
 {% endblock content %}
@@ -85,7 +106,7 @@
     {{ block.super }}
     <script src="{% static 'ledger/js/ledger.js' %}" type="module"></script>
     <script src="{% static 'js/flatpickr.js' %}" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ru.js" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/autonumeric@4.8.1/dist/autoNumeric.min.js"></script>
+    <script src="{% static 'js/flatpickr-ru.js' %}" defer></script>
+    <script src="{% static 'js/autonumeric.js' %}" defer></script>
     {{ transaction_ids|json_script:"transaction-ids-data" }}
 {% endblock extra_scripts %}

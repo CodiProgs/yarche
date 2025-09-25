@@ -53,10 +53,11 @@
 
 .date-filter__icon {
 	position: absolute;
-	height: 100%;
+	height: 20px;
 	aspect-ratio: 1 / 1;
-	right: 0;
-	top: 0;
+	right: 4px;
+	top: 50%;
+	transform: translateY(-50%);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -203,6 +204,9 @@ div.flatpickr-months {
 .pagination-button {
 	padding: 5px 6px;
 	color: var(--color-primary);
+	display: flex;
+	align-items: center;
+	justify-content: center;
 
 	i {
 		font-size: 22px;
@@ -250,7 +254,7 @@ div.flatpickr-months {
 	flex-wrap: wrap;
 	display: flex;
 	align-items: center;
-	padding: 30px 15px;
+	padding: 20px 15px;
 	gap: 10px;
 
 	.button {
@@ -267,6 +271,11 @@ div.flatpickr-months {
 	overflow: auto;
 	max-height: 100%;
 	gap: 10px;
+}
+
+.date-filter__input-container {
+	display: flex;
+	align-items: center;
 }
 
 .current-shift-left {
@@ -346,7 +355,6 @@ div.flatpickr-months {
 
 	.current-shift-buttons .button {
 		min-width: 120px;
-		max-width: 120px;
 	}
 }
 
@@ -367,6 +375,7 @@ div.flatpickr-months {
 	.date-filter__input-container {
 		display: flex;
 		flex-direction: column;
+		align-items: flex-start;
 	}
 
 	.date-filter__inputs {
@@ -427,9 +436,10 @@ div.flatpickr-months {
 
 @media (max-width: 340px) {
 	.pagination-controls {
-		display: grid;
+		/* display: grid;
 		grid-template-rows: auto auto;
-		gap: 1rem;
+		gap: 1rem; */
+		padding: 3px 0;
 	}
 
 	.pagination-input-container {

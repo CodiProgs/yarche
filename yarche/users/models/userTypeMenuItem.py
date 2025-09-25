@@ -9,10 +9,6 @@ class UserTypeMenuItem(models.Model):
     )
     menu_item = models.ForeignKey(MenuItem, on_delete=models.CASCADE)
     name = models.CharField("Название", max_length=255, blank=True, null=True)
-    category = models.CharField("Папка в меню", max_length=255, blank=True, null=True)
-    category_slug = models.SlugField(
-        "Slug категории", max_length=255, blank=True, null=True
-    )
     order = models.PositiveIntegerField("Порядок", default=0)
 
     class Meta:

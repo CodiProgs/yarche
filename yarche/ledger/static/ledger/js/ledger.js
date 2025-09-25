@@ -11,6 +11,7 @@ import {
 	showQuestion,
 	showSuccess,
 } from '/static/js/ui-utils.js'
+
 const BASE_URL = '/ledger/'
 const BANK_ACCOUNTS = 'bank-accounts'
 const TRANSACTION_CATEGORIES = 'transaction-categories'
@@ -50,6 +51,183 @@ const configs = {
 	},
 }
 
+const addMenuHandler = () => {
+	const menu = document.getElementById('context-menu')
+	const addButton = document.getElementById('add-button')
+	const editButton = document.getElementById('edit-button')
+	const deleteButton = document.getElementById('delete-button')
+	const paymentButton = document.getElementById('payment-button')
+	const hideButton = document.getElementById('hide-button')
+	const settleDebtButton = document.getElementById('settle-debt-button')
+	const settleDebtAllButton = document.getElementById('settle-debt-all-button')
+	const repaymentsEditButton = document.getElementById('repayment-edit-button')
+
+	function showMenu(x, y) {
+		menu.style.display = 'block'
+		menu.style.left = `${x + 10}px`
+		menu.style.top = `${y}px`
+	}
+
+	if (menu) {
+		document.addEventListener('contextmenu', function (e) {
+			const row = e.target.closest(
+				'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+			)
+
+			const table = e.target.closest('table')
+			if (row && table) {
+				e.preventDefault()
+
+				if (addButton) {
+					if (table.id === 'transactions-bank-accounts-table') {
+						addButton.style.display = 'none'
+					} else {
+						addButton.style.display = 'block'
+					}
+				}
+				if (editButton) {
+					if (table.id === 'transactions-bank-accounts-table') {
+						editButton.style.display = 'none'
+					} else {
+						editButton.style.display = 'block'
+					}
+				}
+				if (deleteButton) {
+					if (table.id === 'transactions-bank-accounts-table') {
+						deleteButton.style.display = 'none'
+					} else {
+						deleteButton.style.display = 'block'
+					}
+				}
+				if (paymentButton) paymentButton.style.display = 'block'
+				if (hideButton) {
+					if (table.id === 'transactions-bank-accounts-table') {
+						hideButton.style.display = 'none'
+					} else {
+						hideButton.style.display = 'block'
+					}
+				}
+				if (settleDebtButton) {
+					if (
+						(table.id && table.id.startsWith('branch-repayments-')) ||
+						table.id === 'investor-operations-table'
+					) {
+						settleDebtButton.style.display = 'none'
+					} else if (table.id === 'investors-table') {
+						const selectedCell = document.querySelector(
+							'td.table__cell--selected'
+						)
+						if (selectedCell) {
+							const cellIndex = Array.from(
+								selectedCell.parentNode.children
+							).indexOf(selectedCell)
+							const th = table.querySelectorAll('thead th')[cellIndex]
+							const colName = th ? th.dataset.name : null
+
+							if (colName === 'initial_balance') {
+								settleDebtButton.style.display = 'block'
+								settleDebtButton.textContent = 'Изменить сумму'
+								settleDebtButton.dataset.type = 'initial'
+							} else if (colName === 'balance') {
+								settleDebtButton.style.display = 'block'
+								settleDebtButton.textContent = 'Изменить сумму'
+								settleDebtButton.dataset.type = 'balance'
+							} else {
+								settleDebtButton.style.display = 'none'
+								settleDebtButton.dataset.type = ''
+							}
+						} else {
+							settleDebtButton.style.display = 'none'
+							settleDebtButton.dataset.type = ''
+						}
+					} else {
+						settleDebtButton.style.display = 'block'
+						settleDebtButton.textContent = 'Погасить долг'
+						settleDebtButton.dataset.type = ''
+					}
+				}
+				if (settleDebtAllButton) {
+					if (table.id === 'summary-profit') {
+						settleDebtAllButton.style.display = 'block'
+					} else {
+						settleDebtAllButton.style.display = 'none'
+					}
+				}
+				if (repaymentsEditButton) {
+					if (table.id && table.id.startsWith('branch-repayments-')) {
+						repaymentsEditButton.style.display = 'block'
+					} else {
+						repaymentsEditButton.style.display = 'none'
+					}
+				}
+
+				if (table.id === 'cash_flow-table') {
+					const headers = table.querySelectorAll('thead th')
+					let purposeIndex = -1
+					headers.forEach((th, idx) => {
+						if (th.dataset.name === 'purpose') purposeIndex = idx
+					})
+					if (purposeIndex !== -1) {
+						const cells = row.querySelectorAll('td')
+						const purposeCell = cells[purposeIndex]
+						if (
+							purposeCell &&
+							(purposeCell.textContent.trim() === 'Перевод' ||
+								purposeCell.textContent.trim() === 'Инкассация' ||
+								purposeCell.textContent.trim() === 'Погашение долга поставщика')
+						) {
+							e.preventDefault()
+
+							if (editButton) editButton.style.display = 'none'
+							if (deleteButton) deleteButton.style.display = 'none'
+						}
+					}
+				}
+
+				showMenu(e.pageX, e.pageY)
+				return
+			}
+
+			if (e.target.closest('.content')) {
+				e.preventDefault()
+
+				if (addButton) addButton.style.display = 'block'
+				if (editButton) editButton.style.display = 'none'
+				if (deleteButton) deleteButton.style.display = 'none'
+				if (paymentButton) paymentButton.style.display = 'none'
+				if (hideButton) hideButton.style.display = 'none'
+				if (settleDebtButton) settleDebtButton.style.display = 'none'
+				if (settleDebtAllButton) settleDebtAllButton.style.display = 'none'
+				if (repaymentsEditButton) repaymentsEditButton.style.display = 'none'
+
+				showMenu(e.pageX, e.pageY)
+			}
+
+			const item = e.target.closest('.debtors-office-list__row-item')
+			if (item) {
+				const h4 = item.querySelector('h4')
+				const settleDebtButton = document.getElementById('settle-debt-button')
+				if (
+					h4 &&
+					['Оборудование', 'Кредит', 'Краткосрочные обязательства'].includes(
+						h4.textContent.trim()
+					)
+				) {
+					if (settleDebtButton) {
+						settleDebtButton.style.display = 'block'
+						settleDebtButton.textContent = 'Изменить сумму'
+						settleDebtButton.dataset.type = h4.textContent.trim()
+					}
+				}
+			}
+		})
+
+		document.addEventListener('click', () => {
+			menu.style.display = 'none'
+		})
+	}
+}
+
 const parseNumeric = text => {
 	if (text === null || typeof text === 'undefined') return 0
 	const cleaned = String(text)
@@ -58,15 +236,14 @@ const parseNumeric = text => {
 	return parseFloat(cleaned) || 0
 }
 
-const formatCurrency = value => {
+const formatCurrency = (value, withSuffix = true) => {
 	const numericValue =
 		typeof value === 'string' ? parseNumeric(value) : Number(value)
-	return (
-		(numericValue || 0)
-			.toFixed(2)
-			.replace('.', ',')
-			.replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + CURRENCY_SUFFIX
-	)
+	const formatted = (numericValue || 0)
+		.toFixed(2)
+		.replace('.', ',')
+		.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+	return withSuffix ? formatted + CURRENCY_SUFFIX : formatted
 }
 
 const formatDate = date => {
@@ -123,13 +300,18 @@ const initDatePicker = (inputSelector, iconSelector, defaultDateStr) => {
 	return datePickerInstance
 }
 
-function setupCurrencyInput(inputId) {
+const setupCurrencyInput = inputId => {
 	const input = document.getElementById(inputId)
 	if (!input) {
 		console.error(`Input with id "${inputId}" not found`)
-		return
+		return null
 	}
-	new AutoNumeric(input, {
+
+	if (input.autoNumeric) {
+		input.autoNumeric.remove()
+	}
+
+	const anElement = new AutoNumeric(input, {
 		allowDecimalPadding: true,
 		alwaysAllowDecimalCharacter: true,
 		currencySymbol: CURRENCY_SUFFIX,
@@ -137,14 +319,22 @@ function setupCurrencyInput(inputId) {
 		decimalCharacter: ',',
 		decimalCharacterAlternative: '.',
 		decimalPlacesRawValue: 2,
+		decimalPlaces: 2,
 		digitGroupSeparator: ' ',
-		emptyInputBehavior: 'zero',
+		emptyInputBehavior: 'null',
 		minimumValue: '0',
+		allowEmpty: true,
 	})
+
+	input.autoNumeric = anElement
+
+	return anElement
 }
 
 const findAndUpdateBankAccountRow = (accountName, amountChange) => {
-	const bankAccountsTable = document.getElementById('bank-accounts-table')
+	const bankAccountsTable = document.getElementById(
+		'transactions-bank-accounts-table'
+	)
 	if (!bankAccountsTable) return
 
 	const accountRow = Array.from(
@@ -157,50 +347,108 @@ const findAndUpdateBankAccountRow = (accountName, amountChange) => {
 	if (!accountRow) return
 
 	const accountCells = accountRow.querySelectorAll('td')
-
 	if (accountCells.length < 4) return
 
-	const currentBalance = parseNumeric(accountCells[1]?.textContent)
-	const currentShift = parseNumeric(accountCells[2]?.textContent)
+	let baseBalance = parseNumeric(accountRow.dataset.baseBalance)
+	if (isNaN(baseBalance)) {
+		const displayedShift = parseNumeric(accountCells[2]?.textContent) || 0
+		const displayedTotal = parseNumeric(accountCells[3]?.textContent) || 0
+		baseBalance = displayedTotal - displayedShift
+		accountRow.dataset.baseBalance = baseBalance
+	}
 
-	const newShift = currentShift + amountChange
-	accountCells[2].textContent = formatCurrency(newShift)
-	accountCells[3].textContent = formatCurrency(currentBalance + newShift)
+	const currentShift = parseNumeric(accountCells[2]?.textContent) || 0
+	const newShift = currentShift + (Number(amountChange) || 0)
+	accountCells[2].textContent = formatCurrency(newShift, false)
+	accountCells[3].textContent = formatCurrency(baseBalance + newShift, false)
 }
 
-const updateBankAccountSummaryAfterAdd = (isTransfer = false) => {
+const recomputeBankAccountsFromTransactions = () => {
+	const bankAccountsTable = document.getElementById(
+		'transactions-bank-accounts-table'
+	)
+	if (!bankAccountsTable) return
+
+	const accountRows = Array.from(
+		bankAccountsTable.querySelectorAll('tbody tr:not(.table__row--summary)')
+	)
+
+	const baseMap = {}
+	const shiftMap = {}
+
+	accountRows.forEach(row => {
+		const cells = row.querySelectorAll('td')
+		const accountName = cells[0]?.textContent?.trim()
+		if (!accountName) return
+
+		let base = parseNumeric(row.dataset.baseBalance)
+		const displayedShift = parseNumeric(cells[2]?.textContent) || 0
+		const displayedTotal = parseNumeric(cells[3]?.textContent)
+		if (isNaN(base)) {
+			base = (isNaN(displayedTotal) ? 0 : displayedTotal) - displayedShift
+			row.dataset.baseBalance = base
+		}
+		baseMap[accountName] = base
+		shiftMap[accountName] = 0
+	})
+
 	const transactionsTable = document.getElementById('transactions-table')
-	if (!transactionsTable) return
+	if (!transactionsTable) {
+		accountRows.forEach(row => {
+			const cells = row.querySelectorAll('td')
+			const accountName = cells[0]?.textContent?.trim()
+			const base = baseMap[accountName] || 0
+			cells[2].textContent = formatCurrency(0, false)
+
+			cells[3].textContent = formatCurrency(base, false)
+		})
+		TableManager.calculateTableSummary(
+			'transactions-bank-accounts-table',
+			['balance', 'shift_amount', 'total_amount'],
+			{ grouped: true, total: true }
+		)
+		return
+	}
 
 	const transactionRows = Array.from(
 		transactionsTable.querySelectorAll('tbody tr:not(.table__row--summary)')
 	)
-	if (transactionRows.length === 0) return
-
-	const targetRows = isTransfer
-		? transactionRows.slice(-2)
-		: transactionRows.length > 0
-		? [transactionRows[transactionRows.length - 1]]
-		: []
-
-	targetRows.forEach(transactionRow => {
-		const cells = transactionRow.querySelectorAll('td')
-
+	transactionRows.forEach(tr => {
+		const cells = tr.querySelectorAll('td')
 		if (cells.length < 3) return
+		const account = cells[1]?.textContent?.trim()
+		if (!account) return
+		const amount = parseNumeric(cells[2]?.textContent) || 0
+		if (!(account in shiftMap)) {
+			shiftMap[account] = 0
+			baseMap[account] = baseMap[account] || 0
+		}
+		shiftMap[account] += amount
+	})
 
-		const accountName = cells[1]?.textContent?.trim()
-		const transactionAmount = parseNumeric(cells[2]?.textContent)
-
-		if (accountName && !isNaN(transactionAmount)) {
-			findAndUpdateBankAccountRow(accountName, transactionAmount)
+	accountRows.forEach(row => {
+		const cells = row.querySelectorAll('td')
+		const accountName = cells[0]?.textContent?.trim()
+		const base = baseMap[accountName] || 0
+		const shift = shiftMap[accountName] || 0
+		if (cells[2] && cells[3]) {
+			cells[2].textContent = formatCurrency(shift, false)
+			cells[3].textContent = formatCurrency(
+				shift + parseNumeric(cells[1].textContent),
+				false
+			)
 		}
 	})
 
 	TableManager.calculateTableSummary(
-		'bank-accounts-table',
+		'transactions-bank-accounts-table',
 		['balance', 'shift_amount', 'total_amount'],
 		{ grouped: true, total: true }
 	)
+}
+
+const updateBankAccountSummaryAfterAdd = (isTransfer = false) => {
+	recomputeBankAccountsFromTransactions()
 }
 
 const updateBankAccountSummaryAfterEdit = (
@@ -211,92 +459,16 @@ const updateBankAccountSummaryAfterEdit = (
 	incomingPreviousAccountName = null,
 	incomingPreviousAmount = null
 ) => {
-	const transactionsTable = document.getElementById('transactions-table')
-	if (!transactionsTable) return
-
-	if (outgoingPreviousAccountName && outgoingPreviousAmount !== null) {
-		findAndUpdateBankAccountRow(
-			outgoingPreviousAccountName,
-			-outgoingPreviousAmount
-		)
-	}
-
-	if (
-		incomingTransactionId &&
-		incomingPreviousAccountName &&
-		incomingPreviousAmount !== null
-	) {
-		findAndUpdateBankAccountRow(
-			incomingPreviousAccountName,
-			-incomingPreviousAmount
-		)
-	}
-
-	const outgoingRow = transactionsTable.querySelector(
-		`tr[data-id="${outgoingTransactionId}"]`
-	)
-	if (outgoingRow) {
-		const outgoingCells = outgoingRow.querySelectorAll('td')
-		if (outgoingCells.length >= 3) {
-			const newAccountName = outgoingCells[1]?.textContent?.trim()
-			const newAmount = parseNumeric(outgoingCells[2]?.textContent)
-			if (newAccountName && !isNaN(newAmount)) {
-				findAndUpdateBankAccountRow(newAccountName, newAmount)
-			}
-		}
-	}
-
-	if (incomingTransactionId) {
-		const incomingRow = transactionsTable.querySelector(
-			`tr[data-id="${incomingTransactionId}"]`
-		)
-		if (incomingRow) {
-			const incomingCells = incomingRow.querySelectorAll('td')
-			if (incomingCells.length >= 3) {
-				const newAccountName = incomingCells[1]?.textContent?.trim()
-				const newAmount = parseNumeric(incomingCells[2]?.textContent)
-				if (newAccountName && !isNaN(newAmount)) {
-					findAndUpdateBankAccountRow(newAccountName, newAmount)
-				}
-			}
-		}
-	}
-
-	TableManager.calculateTableSummary(
-		'bank-accounts-table',
-		['balance', 'shift_amount', 'total_amount'],
-		{ grouped: true, total: true }
-	)
+	recomputeBankAccountsFromTransactions()
 }
 
 const updateBankAccountSummaryAfterDelete = (
 	transactionRow,
 	relatedTransactionRow = null
 ) => {
-	const updateForRowDeletion = row => {
-		if (!row) return
-		const cells = row.querySelectorAll('td')
-
-		if (cells.length >= 3) {
-			const accountName = cells[1]?.textContent?.trim()
-			const transactionAmount = parseNumeric(cells[2]?.textContent)
-			if (accountName && !isNaN(transactionAmount)) {
-				findAndUpdateBankAccountRow(accountName, -transactionAmount)
-			}
-		}
-
-		row.remove()
-	}
-
-	updateForRowDeletion(transactionRow)
-
-	updateForRowDeletion(relatedTransactionRow)
-
-	TableManager.calculateTableSummary(
-		'bank-accounts-table',
-		['balance', 'shift_amount', 'total_amount'],
-		{ grouped: true, total: true }
-	)
+	if (transactionRow) transactionRow.remove()
+	if (relatedTransactionRow) relatedTransactionRow.remove()
+	recomputeBankAccountsFromTransactions()
 	TableManager.calculateTableSummary('transactions-table', ['amount'])
 }
 
@@ -324,7 +496,15 @@ const initTransactionForm = async (config, editId = null) => {
 	return formHandler
 }
 
-const handleTransactionSuccess = async (result, tableId, isEdit = false) => {
+const handleTransactionSuccess = async (
+	result,
+	tableId,
+	isEdit = false,
+	outgoingPreviousAccountName = null,
+	outgoingPreviousAmount = null,
+	incomingPreviousAccountName = null,
+	incomingPreviousAmount = null
+) => {
 	const processTableRow = async (transactionData, targetTableId, wasEdit) => {
 		const method = wasEdit ? 'updateTableRow' : 'addTableRow'
 
@@ -334,12 +514,7 @@ const handleTransactionSuccess = async (result, tableId, isEdit = false) => {
 		)
 		if (processedRow) {
 			processedRow.setAttribute('data-id', transactionData.id)
-			TableManager.addActionsToRow(
-				processedRow,
-				transactionData.id,
-				editTransaction,
-				deleteTransaction
-			)
+			processedRow.setAttribute('data-id', transactionData.id)
 		} else {
 			console.warn(
 				`TableManager.${method} did not return a row for data:`,
@@ -356,8 +531,8 @@ const handleTransactionSuccess = async (result, tableId, isEdit = false) => {
 				updateBankAccountSummaryAfterEdit(
 					result.id,
 					null,
-					result.outgoingPreviousAccountName,
-					result.outgoingPreviousAmount
+					outgoingPreviousAccountName,
+					outgoingPreviousAmount
 				)
 			} else {
 				updateBankAccountSummaryAfterAdd(false)
@@ -369,10 +544,10 @@ const handleTransactionSuccess = async (result, tableId, isEdit = false) => {
 				updateBankAccountSummaryAfterEdit(
 					result.outgoing_transaction.id,
 					result.incoming_transaction.id,
-					result.outgoingPreviousAccountName,
-					result.outgoingPreviousAmount,
-					result.incomingPreviousAccountName,
-					result.incomingPreviousAmount
+					outgoingPreviousAccountName,
+					outgoingPreviousAmount,
+					incomingPreviousAccountName,
+					incomingPreviousAmount
 				)
 			} else {
 				updateBankAccountSummaryAfterAdd(true)
@@ -388,8 +563,8 @@ const handleTransactionSuccess = async (result, tableId, isEdit = false) => {
 				updateBankAccountSummaryAfterEdit(
 					result.id,
 					null,
-					result.outgoingPreviousAccountName,
-					result.outgoingPreviousAmount
+					outgoingPreviousAccountName,
+					outgoingPreviousAmount
 				)
 			} else {
 				updateBankAccountSummaryAfterAdd(false)
@@ -542,6 +717,22 @@ const updateClientOrdersList = async (
 	}
 }
 
+const setIds = (ids, tableId) => {
+	const tableRows = document.querySelectorAll(
+		`#${tableId} tbody tr:not(.table__row--summary)`
+	)
+	if (!tableRows || tableRows.length === 0 || !ids || ids.length === 0) {
+		return
+	}
+	if (tableRows.length !== ids.length) {
+		console.error('Количество строк не совпадает с количеством ID')
+	} else {
+		tableRows.forEach((row, index) => {
+			row.setAttribute('data-id', ids[index])
+		})
+	}
+}
+
 const deleteTransaction = (transactionId, row) => {
 	showQuestion(
 		'Вы действительно хотите удалить запись?',
@@ -556,8 +747,7 @@ const deleteTransaction = (transactionId, row) => {
 					'/ledger/transactions/delete/',
 					'transactions-table'
 				)
-
-				if (data?.success) {
+				if (data?.status === 'success') {
 					const relatedTransactionId = data.related_transaction_id
 					if (relatedTransactionId) {
 						relatedRow = TableManager.getRowById(
@@ -585,7 +775,7 @@ const deleteTransaction = (transactionId, row) => {
 	)
 }
 
-const editTransaction = async (transactionId, row, tableId) => {
+const editTransaction = async (transactionId, row, tableId, closed = false) => {
 	const table = document.getElementById(tableId)
 	if (!table) {
 		console.error(`Таблица с id "${tableId}" не найдена`)
@@ -605,6 +795,9 @@ const editTransaction = async (transactionId, row, tableId) => {
 	}
 
 	const cells = row.querySelectorAll('td')
+	const outgoingPreviousAccountName = cells[1]?.textContent?.trim()
+	const outgoingPreviousAmount = parseNumeric(cells[2]?.textContent)
+
 	const typeCell = cells[typeHeaderIndex]
 	if (!typeCell) {
 		console.error('Не найдена ячейка с типом транзакции в строке.')
@@ -616,8 +809,29 @@ const editTransaction = async (transactionId, row, tableId) => {
 
 	const typeValue = typeCell.dataset.value || typeCell.textContent.trim()
 
+	let incomingPreviousAccountName = null
+	let incomingPreviousAmount = null
+
+	if (typeValue === 'Перевод между счетами') {
+		const transactionsTable = document.getElementById('transactions-table')
+		const rows = Array.from(
+			transactionsTable.querySelectorAll('tbody tr:not(.table__row--summary)')
+		)
+		const incomingRow = rows.find(
+			r =>
+				r !== row &&
+				r.querySelector('td[data-name="type"]')?.textContent?.trim() ===
+					'Перевод между счетами'
+		)
+		if (incomingRow) {
+			const incomingCells = incomingRow.querySelectorAll('td')
+			incomingPreviousAccountName = incomingCells[1]?.textContent?.trim()
+			incomingPreviousAmount = parseNumeric(incomingCells[2]?.textContent)
+		}
+	}
+	const closed_url = closed ? 'closed/' : ''
 	let config = {
-		submitUrl: `/ledger/transactions/edit/`,
+		submitUrl: `/ledger/transactions/${closed_url}edit/`,
 		getUrl: `${BASE_URL}transactions/`,
 		tableId: 'transactions-table',
 		formId: 'transactions-form',
@@ -628,17 +842,25 @@ const editTransaction = async (transactionId, row, tableId) => {
 		},
 
 		onSuccess: async result =>
-			handleTransactionSuccess(result, 'transactions-table', true),
+			handleTransactionSuccess(
+				result,
+				'transactions-table',
+				true,
+				outgoingPreviousAccountName,
+				outgoingPreviousAmount,
+				incomingPreviousAccountName,
+				incomingPreviousAmount
+			),
 		dataUrls: [],
 	}
 
 	switch (typeValue) {
 		case 'Приход':
 			config.dataUrls = [
-				{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/` },
+				{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
 				{
 					id: 'category',
-					url: `/ledger/${TRANSACTION_CATEGORIES}/?type=income`,
+					url: `/ledger/${TRANSACTION_CATEGORIES}/list/?type=income`,
 				},
 			]
 			config.modalConfig.url = '/components/ledger/add_transaction/'
@@ -648,10 +870,10 @@ const editTransaction = async (transactionId, row, tableId) => {
 			break
 		case 'Расход':
 			config.dataUrls = [
-				{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/` },
+				{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
 				{
 					id: 'category',
-					url: `/ledger/${TRANSACTION_CATEGORIES}/?type=expense`,
+					url: `/ledger/${TRANSACTION_CATEGORIES}/list/?type=expense`,
 				},
 			]
 			config.modalConfig.url = '/components/ledger/add_transaction/'
@@ -665,7 +887,7 @@ const editTransaction = async (transactionId, row, tableId) => {
 					id: 'order',
 					url: `/commerce/orders/ids/?transaction=${transactionId}`,
 				},
-				{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/` },
+				{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
 			]
 			config.modalConfig.url = '/components/ledger/add_order_payment/'
 			config.modalConfig.title = 'Редактирование оплаты заказа'
@@ -673,8 +895,11 @@ const editTransaction = async (transactionId, row, tableId) => {
 			break
 		case 'Перевод между счетами':
 			config.dataUrls = [
-				{ id: 'source_bank_account', url: `/ledger/${BANK_ACCOUNTS}/` },
-				{ id: 'destination_bank_account', url: `/ledger/${BANK_ACCOUNTS}/` },
+				{ id: 'source_bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
+				{
+					id: 'destination_bank_account',
+					url: `/ledger/${BANK_ACCOUNTS}/list/`,
+				},
 			]
 			config.modalConfig.url = '/components/ledger/add_transfer/'
 			config.modalConfig.title = 'Редактирование перевода'
@@ -682,8 +907,8 @@ const editTransaction = async (transactionId, row, tableId) => {
 			break
 		case 'Внос на ЛС клиента':
 			config.dataUrls = [
-				{ id: 'client', url: '/commerce/clients/' },
-				{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/` },
+				{ id: 'client', url: '/commerce/clients/list/' },
+				{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
 			]
 			config.modalConfig.url = '/components/ledger/deposit_client_balance/'
 			config.modalConfig.title = 'Редактирование зачисления на ЛС клиента'
@@ -916,9 +1141,13 @@ const initPaymentsPage = async () => {
 	await TableManager.init()
 
 	await TableManager.createColumnsForTable('payments-table', [
+		{ name: 'id' },
 		{ name: 'manager', url: '/users/managers/' },
-		{ name: 'product', url: '/commerce/products/' },
-		{ name: 'client', url: '/commerce/clients/' },
+		{ name: 'completed_date' },
+		{ name: 'product', url: '/commerce/products/list/' },
+		{ name: 'amount' },
+		{ name: 'order' },
+		{ name: 'client', url: '/commerce/clients/list/' },
 		{ name: 'legal_name' },
 		{ name: 'comment' },
 	])
@@ -952,11 +1181,11 @@ const initTransactionsPage = () => {
 		'transactions-table',
 		[
 			{ name: 'id' },
-			{ name: 'category', url: `/ledger/${TRANSACTION_CATEGORIES}/` },
-			{ name: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/` },
+			{ name: 'category', url: `/ledger/${TRANSACTION_CATEGORIES}/list/` },
+			{ name: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
 			{ name: 'amount' },
-			{ name: 'client', url: '/commerce/clients/' },
-			{ name: 'orderId' },
+			{ name: 'client', url: '/commerce/clients/list/' },
+			{ name: 'order' },
 			{ name: 'type', url: '/ledger/transaction-types/' },
 			{ name: 'comment' },
 			{ name: 'created' },
@@ -988,7 +1217,7 @@ const initTransactionsPage = () => {
 	const currentPageInput = document.getElementById('current-page')
 	const totalPagesSpan = document.getElementById('total-pages')
 	const refreshButton = document.getElementById('refresh')
-	const editTransactionButton = document.getElementById('edit-transaction')
+	const editTransactionButton = document.getElementById('edit-button')
 
 	const fetchAndUpdateTable = async page => {
 		if (!startDatePicker || !endDatePicker) {
@@ -1011,7 +1240,7 @@ const initTransactionsPage = () => {
 
 		try {
 			const response = await fetch(
-				`${BASE_URL}transactions/?start_date=${formattedStartDate}&end_date=${formattedEndDate}&page=${page}`,
+				`${BASE_URL}transactions/list/?start_date=${formattedStartDate}&end_date=${formattedEndDate}&page=${page}`,
 				{ headers: { 'X-Requested-With': 'XMLHttpRequest' } }
 			)
 			const data = await response.json()
@@ -1157,10 +1386,7 @@ const initTransactionsPage = () => {
 					if (response.ok) {
 						hasPermission = true
 					} else {
-						const data = await response.json()
-						showError(
-							data?.message || 'У вас нет прав на редактирование транзакций'
-						)
+						showError('У вас нет прав на редактирование транзакций')
 					}
 				} catch (error) {
 					console.error('Permission check failed:', error)
@@ -1170,7 +1396,12 @@ const initTransactionsPage = () => {
 				}
 
 				if (hasPermission) {
-					editTransaction(selectedRowId, selectedRow, 'transactions-table')
+					editTransaction(
+						selectedRowId,
+						selectedRow,
+						'transactions-table',
+						true
+					)
 				}
 			} else {
 				showError('Не удалось получить ID выбранной строки.')
@@ -1187,7 +1418,7 @@ const initCurrentShiftPage = () => {
 	TableManager.init()
 
 	TableManager.calculateTableSummary(
-		'bank-accounts-table',
+		'transactions-bank-accounts-table',
 		['balance', 'shift_amount', 'total_amount'],
 		{ grouped: true, total: true }
 	)
@@ -1198,12 +1429,7 @@ const initCurrentShiftPage = () => {
 		)?.textContent
 		if (transactionIdsData) {
 			const transactionIds = JSON.parse(transactionIdsData)
-			TableManager.addActionsColumn(
-				'transactions-table',
-				transactionIds,
-				editTransaction,
-				deleteTransaction
-			)
+			setIds(transactionIds, 'transactions-table')
 		} else {
 			console.warn("Element with ID 'transaction-ids-data' not found or empty.")
 		}
@@ -1211,14 +1437,55 @@ const initCurrentShiftPage = () => {
 		console.error('Error parsing transaction IDs data for actions column:', e)
 	}
 
+	const editButton = document.getElementById('edit-button')
+	const deleteButton = document.getElementById('delete-button')
+
+	if (editButton) {
+		editButton.addEventListener('click', () => {
+			const selectedRowId = TableManager.getSelectedRowId('transactions-table')
+			if (selectedRowId) {
+				const selectedRow = TableManager.getRowById(
+					selectedRowId,
+					'transactions-table'
+				)
+				if (selectedRow) {
+					editTransaction(selectedRowId, selectedRow, 'transactions-table')
+				} else {
+					showError('Не удалось найти выбранную строку в таблице.')
+				}
+			} else {
+				showError('Выберите строку для редактирования')
+			}
+		})
+	}
+
+	if (deleteButton) {
+		deleteButton.addEventListener('click', () => {
+			const selectedRowId = TableManager.getSelectedRowId('transactions-table')
+			if (selectedRowId) {
+				const selectedRow = TableManager.getRowById(
+					selectedRowId,
+					'transactions-table'
+				)
+				if (selectedRow) {
+					deleteTransaction(selectedRowId, selectedRow)
+				} else {
+					showError('Не удалось найти выбранную строку в таблице.')
+				}
+			} else {
+				showError('Выберите строку для удаления')
+			}
+		})
+	}
+
 	TableManager.createColumnsForTable(
 		'transactions-table',
 		[
-			{ name: 'category', url: `/ledger/${TRANSACTION_CATEGORIES}/` },
-			{ name: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/` },
+			{ name: 'category', url: `/ledger/${TRANSACTION_CATEGORIES}/list/` },
+			{ name: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
 			{ name: 'amount' },
-			{ name: 'client', url: '/commerce/clients/' },
-			{ name: 'orderId' },
+			{ name: 'client', url: '/commerce/clients/list/' },
+			{ name: 'order' },
 			{ name: 'type', url: '/ledger/transaction-types/' },
 			{ name: 'comment' },
 		],
@@ -1406,8 +1673,11 @@ const initCurrentShiftPage = () => {
 
 	setupTransactionButton('income-button', {
 		dataUrls: [
-			{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/` },
-			{ id: 'category', url: `/ledger/${TRANSACTION_CATEGORIES}/?type=income` },
+			{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
+			{
+				id: 'category',
+				url: `/ledger/${TRANSACTION_CATEGORIES}/list/?type=income`,
+			},
 		],
 		submitUrl: '/ledger/transactions/add/',
 		modalConfig: {
@@ -1419,10 +1689,10 @@ const initCurrentShiftPage = () => {
 
 	setupTransactionButton('expense-button', {
 		dataUrls: [
-			{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/` },
+			{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
 			{
 				id: 'category',
-				url: `/ledger/${TRANSACTION_CATEGORIES}/?type=expense`,
+				url: `/ledger/${TRANSACTION_CATEGORIES}/list/?type=expense`,
 			},
 		],
 		submitUrl: '/ledger/transactions/add/',
@@ -1435,8 +1705,8 @@ const initCurrentShiftPage = () => {
 
 	setupTransactionButton('transfer-button', {
 		dataUrls: [
-			{ id: 'source_bank_account', url: `/ledger/${BANK_ACCOUNTS}/` },
-			{ id: 'destination_bank_account', url: `/ledger/${BANK_ACCOUNTS}/` },
+			{ id: 'source_bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
+			{ id: 'destination_bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
 		],
 		submitUrl: '/ledger/transfers/add/',
 		modalConfig: {
@@ -1447,8 +1717,12 @@ const initCurrentShiftPage = () => {
 
 	setupTransactionButton('order-payment-button', {
 		dataUrls: [
-			{ id: 'order', url: '/commerce/orders/ids/' },
-			{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/` },
+			{
+				id: 'order',
+				url: '/commerce/orders/ids/',
+				includeValuesInSearch: true,
+			},
+			{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
 		],
 		submitUrl: '/ledger/order-payments/add/',
 		modalConfig: {
@@ -1459,8 +1733,8 @@ const initCurrentShiftPage = () => {
 
 	setupTransactionButton('deposit-button', {
 		dataUrls: [
-			{ id: 'client', url: '/commerce/clients/' },
-			{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/` },
+			{ id: 'client', url: '/commerce/clients/list/' },
+			{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
 		],
 		submitUrl: '/ledger/client-balance/deposit/',
 		modalConfig: {
@@ -1490,8 +1764,7 @@ const initCurrentShiftPage = () => {
 			if (permResponse.ok) {
 				hasPermission = true
 			} else {
-				const data = await permResponse.json()
-				showError(data?.message || 'У вас нет прав на закрытие смены')
+				showError('У вас нет прав на закрытие смены')
 			}
 		} catch (error) {
 			console.error('Permission check failed:', error)
@@ -1529,12 +1802,12 @@ const initCurrentShiftPage = () => {
 					if (data.html) {
 						TableManager.replaceEntireTable(
 							data.html,
-							'bank-accounts-container',
-							'bank-accounts-table'
+							'transactions-bank-accounts-container',
+							'transactions-bank-accounts-table'
 						)
 
 						TableManager.calculateTableSummary(
-							'bank-accounts-table',
+							'transactions-bank-accounts-table',
 							['balance', 'shift_amount', 'total_amount'],
 							{ grouped: true, total: true }
 						)
@@ -1577,6 +1850,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 	const urlName = match ? match[1].replace(/-/g, '_') : null
 
+	TableManager.init()
+	addMenuHandler()
+
 	if (urlName) {
 		if (urlName === 'bank_accounts' || urlName === 'transaction_categories') {
 			if (configs[urlName]) {
@@ -1597,5 +1873,27 @@ document.addEventListener('DOMContentLoaded', () => {
 		}
 	} else {
 		console.log('Could not determine page context from URL pathname:', pathname)
+	}
+
+	const hideButton = document.getElementById('hide-button')
+	const showAllButton = document.getElementById('show-all-button')
+
+	if (hideButton) {
+		hideButton.addEventListener('click', () => {
+			const selectedRow = document.querySelector('.table__row--selected')
+			if (selectedRow) {
+				selectedRow.classList.add('hidden-row')
+				selectedRow.style.display = 'none'
+			}
+		})
+	}
+
+	if (showAllButton) {
+		showAllButton.addEventListener('click', () => {
+			document.querySelectorAll('tr.hidden-row').forEach(row => {
+				row.classList.remove('hidden-row')
+				row.style.display = ''
+			})
+		})
 	}
 })

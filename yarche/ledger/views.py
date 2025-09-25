@@ -12,6 +12,7 @@ from django.core.exceptions import ValidationError
 from django.db.models import Sum
 import locale
 import json
+from decimal import Decimal
 
 from commerce.models import Order, Client
 from yarche.utils import get_model_fields
@@ -31,9 +32,8 @@ def parse_amount(amount_str: str) -> float:
 
 
 def format_currency(amount: float) -> str:
-
-    sum = locale.format_string("%.2f", amount, grouping=True)
-    return sum
+    sum_str = locale.format_string("%.2f", amount, grouping=True)
+    return sum_str.replace('\xa0', ' ')
 
 
 def check_permission(user, codename):
@@ -85,7 +85,7 @@ def get_transaction_fields():
         },
     )
 
-    fields.insert(4, {"name": "orderId", "verbose_name": "Заказ №", "is_number": True})
+    fields.insert(4, {"name": "order", "verbose_name": "Заказ №", "is_number": True})
 
     return fields
 
@@ -94,6 +94,16 @@ def handle_transaction_update(tr, data):
     trans_type = tr.type
     comment = data.get("comment", "").strip()
     amount_str = data.get("amount")
+
+    report_date_value = data.get("report_date", "")
+
+    if report_date_value and len(report_date_value) == 7:
+        report_date_value = f"{report_date_value}-01"
+    elif not report_date_value and not tr.report_date:
+        now = timezone.now()
+        report_date_value = now.strftime("%Y-%m-01")
+    else:
+        report_date_value = tr.report_date
 
     if not amount_str:
         return JsonResponse(
@@ -162,6 +172,9 @@ def handle_transaction_update(tr, data):
             else -abs(amount)
         )
         tr.comment = comment
+
+        tr.report_date = report_date_value
+        
         tr.save()
         return tr, None
 
@@ -271,7 +284,7 @@ def bank_account_update(request, pk: int):
 
 
 @login_required
-@require_http_methods(["DELETE"])
+@require_http_methods(["POST"])
 def bank_account_delete(request, pk: int):
     try:
         with transaction.atomic():
@@ -280,7 +293,15 @@ def bank_account_delete(request, pk: int):
                 return JsonResponse(
                     {
                         "status": "error",
-                        "message": "Нельзя удалить счет с транзакциями",
+                        "message": "Нельзя удалить счет у которого есть связанные транзакции",
+                    },
+                    status=400,
+                )
+            if account.balance != 0:
+                return JsonResponse(
+                    {
+                        "status": "error",
+                        "message": "На счете есть средства, нельзя удалить счет",
                     },
                     status=400,
                 )
@@ -417,7 +438,7 @@ def transaction_category_update(request, pk: int):
 
 
 @login_required
-@require_http_methods(["DELETE"])
+@require_http_methods(["POST"])
 def transaction_category_delete(request, pk: int):
     try:
         with transaction.atomic():
@@ -516,6 +537,9 @@ def transaction_create(request):
 
             if report_date_value and len(report_date_value) == 7:
                 report_date_value = f"{report_date_value}-01"
+            elif not report_date_value:
+                now = timezone.now()
+                report_date_value = now.strftime("%Y-%m-01")
 
             data = {
                 "bank_account_id": request.POST.get("bank_account"),
@@ -524,7 +548,7 @@ def transaction_create(request):
                 "type": request.POST.get("type"),
                 "comment": request.POST.get("comment", ""),
                 "created_by": request.user,
-                "report_date": report_date_value or None,
+                "report_date": report_date_value,
             }
 
             if not data["type"]:
@@ -544,14 +568,14 @@ def transaction_create(request):
 
             if data["amount"] <= 0:
                 return JsonResponse(
-                    {"status": "error", "message": "Неверная сумма"}, status=400
+                    {"status": "error", "message": "Сумма должна быть больше нуля"}, status=400
                 )
 
             if data["type"] == "expense":
                 data["amount"] = -data["amount"]
 
             tr = Transaction.objects.create(**data)
-            tr.orderId = tr.order.id if tr.order else None
+            tr.order = tr.order.id if tr.order else None
 
             context = {"item": tr, "fields": get_transaction_fields()}
 
@@ -586,7 +610,7 @@ def transfer_create(request):
                 )
             if amount <= 0:
                 return JsonResponse(
-                    {"status": "error", "message": "Неверная сумма"}, status=400
+                    {"status": "error", "message": "Сумма должна быть больше нуля"}, status=400
                 )
 
             outgoing = Transaction.objects.create(
@@ -670,6 +694,37 @@ def transaction_update(request, pk: int):
                 else request.POST.dict()
             )
 
+            if tr.type == "client_account_payment":
+                client = tr.client
+                if client:
+                    deposits = (
+                        Transaction.objects.filter(
+                            client=client,
+                            type="client_account_deposit",
+                            completed_date__isnull=True
+                        ).exclude(id=tr.id).aggregate(total=Sum("amount"))["total"]
+                        or 0
+                    )
+                    payments = (
+                        Transaction.objects.filter(
+                            client=client,
+                            type="client_account_payment",
+                            completed_date__isnull=True
+                        ).exclude(id=tr.id).aggregate(total=Sum("amount"))["total"]
+                        or 0
+                    )
+                    current_balance = client.balance + deposits + payments
+                    amount_str = data.get("amount")
+                    amount = parse_amount(amount_str)
+                    if abs(amount) > current_balance:
+                        return JsonResponse(
+                            {
+                                "status": "error",
+                                "message": f"Недостаточно средств: {format_currency(current_balance)} р.",
+                            },
+                            status=400,
+                        )
+
             result = handle_transaction_update(tr, data)
             if isinstance(result, JsonResponse):
                 return result
@@ -715,7 +770,130 @@ def transaction_update(request, pk: int):
 
 
 @login_required
-@require_http_methods(["DELETE"])
+@require_http_methods(["PUT", "PATCH", "POST"])
+def closed_transaction_update(request, pk: int):
+    try:
+        with transaction.atomic():
+            tr = Transaction.objects.select_for_update().get(id=pk)
+
+            old_amount = tr.amount
+            old_bank_account = tr.bank_account
+
+            related_tr = tr.related_transaction
+            old_related_amount = related_tr.amount if related_tr else None
+            old_related_bank_account = related_tr.bank_account if related_tr else None
+
+            old_order = tr.order if hasattr(tr, "order") else None
+
+            data = (
+                json.loads(request.body)
+                if request.method in ["PUT", "PATCH"]
+                else request.POST.dict()
+            )
+
+            result = handle_transaction_update(tr, data)
+            if isinstance(result, JsonResponse):
+                return result
+
+            updated_tr, related_tr = result
+            fields = get_transaction_fields()
+
+            if tr.type != "transfer":
+                if old_bank_account:
+                    old_bank_account.balance -= Decimal(str(old_amount))
+                    old_bank_account.save()
+                if updated_tr and updated_tr.bank_account:
+                    updated_tr.bank_account.balance += Decimal(str(updated_tr.amount))
+                    updated_tr.bank_account.save()
+
+                if old_related_bank_account:
+                    old_related_bank_account.balance -= Decimal(str(old_related_amount))
+                    old_related_bank_account.save()
+                if related_tr and related_tr.bank_account:
+                    related_tr.bank_account.balance += Decimal(str(related_tr.amount))
+                    related_tr.bank_account.save()
+
+            if old_order and tr.type == "order_payment":
+                old_order.paid_amount -= abs(Decimal(str(old_amount)))
+                old_order.save()
+            if updated_tr and updated_tr.type == "order_payment" and updated_tr.order:
+                updated_tr.order.paid_amount += abs(Decimal(str(updated_tr.amount)))
+                updated_tr.order.save()
+
+            if old_order and tr.type == "client_account_payment":
+                old_order.paid_amount -= abs(Decimal(str(old_amount)))
+                old_order.save()
+            if updated_tr and updated_tr.type == "client_account_payment" and updated_tr.order:
+                updated_tr.order.paid_amount += abs(Decimal(str(updated_tr.amount)))
+                updated_tr.order.save()
+
+            if tr.type == "client_account_payment" and tr.client:
+                tr.client.balance += abs(Decimal(str(old_amount)))  
+                tr.client.save()
+            if updated_tr and updated_tr.type == "client_account_payment" and updated_tr.client:
+                updated_tr.client.balance -= abs(Decimal(str(updated_tr.amount))) 
+                updated_tr.client.save()
+
+            if tr.type == "client_account_deposit" and tr.client:
+                tr.client.balance -= abs(Decimal(str(old_amount)))
+                tr.client.save()
+            if updated_tr and updated_tr.type == "client_account_deposit" and updated_tr.client:
+                updated_tr.client.balance += abs(Decimal(str(updated_tr.amount)))
+                updated_tr.client.save()
+
+            if tr.type == "transfer":
+                if old_bank_account:
+                    old_bank_account.balance -= Decimal(str(old_amount))
+                    old_bank_account.save()
+                if old_related_bank_account:
+                    old_related_bank_account.balance -= Decimal(str(old_related_amount))
+                    old_related_bank_account.save()
+                if updated_tr and updated_tr.bank_account:
+                    updated_tr.bank_account.balance += Decimal(str(updated_tr.amount))
+                    updated_tr.bank_account.save()
+                if related_tr and related_tr.bank_account:
+                    related_tr.bank_account.balance += Decimal(str(related_tr.amount))
+                    related_tr.bank_account.save()
+
+            if tr.type == "transfer":
+                return JsonResponse(
+                    {
+                        "incoming_transaction": {
+                            "id": related_tr.id,
+                            "html": render_to_string(
+                                "components/table_row.html",
+                                {"item": related_tr, "fields": fields},
+                            ),
+                        },
+                        "outgoing_transaction": {
+                            "id": updated_tr.id,
+                            "html": render_to_string(
+                                "components/table_row.html",
+                                {"item": updated_tr, "fields": fields},
+                            ),
+                        },
+                    }
+                )
+            else:
+                return JsonResponse(
+                    {
+                        "id": updated_tr.id,
+                        "html": render_to_string(
+                            "components/table_row.html",
+                            {"item": updated_tr, "fields": fields},
+                        ),
+                    }
+                )
+    except Transaction.DoesNotExist:
+        return JsonResponse(
+            {"status": "error", "message": "Транзакция не найдена"}, status=404
+        )
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
 def transaction_delete(request, pk: int):
     try:
         with transaction.atomic():
@@ -787,7 +965,7 @@ def get_payment_fields():
         "completed_date",
         "product",
         "amount",
-        "orderId",
+        "order",
         "client",
         "legal_name",
         "comment",
@@ -809,7 +987,7 @@ def get_payment_fields():
     insertions = [
         (1, {"name": "manager", "verbose_name": "Менеджер", "is_relation": True}),
         (3, {"name": "product", "verbose_name": "Продукция", "is_relation": True}),
-        (5, {"name": "orderId", "verbose_name": "Заказ", "is_number": True}),
+        (5, {"name": "order", "verbose_name": "Заказ", "is_number": True}),
         (6, {"name": "client", "verbose_name": "Клиент", "is_relation": True}),
         (7, {"name": "legal_name", "verbose_name": "Фирма"}),
     ]
@@ -819,7 +997,6 @@ def get_payment_fields():
 
     return fields
 
-
 def prepare_payment_data(transactions):
     data = []
     for tr in transactions:
@@ -828,8 +1005,8 @@ def prepare_payment_data(transactions):
         tr.legal_name = (
             tr.order.client.legal_name if tr.order and tr.order.client else None
         )
-        tr.orderId = tr.order.id if tr.order else None
-        tr.manager = tr.order.manager.last_name if tr.order else None
+        # tr.order = tr.order.id if tr.order else None
+        tr.manager = tr.order.manager.last_name or tr.order.manager.username if tr.order and tr.order.manager else None
         data.append(tr)
     return data
 
@@ -848,7 +1025,7 @@ def current_shift(request):
         transactions = transactions.filter(created_by=user)
 
     accounts_data = prepare_accounts_data(accounts, transactions)
-    transactions_data = prepare_shift_transactions(transactions)
+    # transactions_data = prepare_shift_transactions(transactions)
 
     context = {
         "fields": {
@@ -860,8 +1037,8 @@ def current_shift(request):
             ],
             "transactions": get_transaction_fields(),
         },
-        "data": {"bank_accounts": accounts_data, "transactions": transactions_data},
-        "is_grouped": {"bank-accounts-table": True},
+        "data": {"bank_accounts": accounts_data, "transactions": transactions},
+        "is_grouped": {"transactions-bank-accounts-table": True},
         "transaction_ids": [tr.id for tr in transactions],
     }
     return render(request, "ledger/current_shift.html", context)
@@ -890,7 +1067,7 @@ def prepare_accounts_data(accounts, transactions):
 def prepare_shift_transactions(transactions):
     data = []
     for tr in transactions:
-        tr.orderId = tr.order.id if tr.order else None
+        # tr.order = tr.order.id if tr.order else None
         data.append(tr)
     return data
 
@@ -959,8 +1136,8 @@ def render_updated_accounts_table():
                 {"name": "total_amount", "verbose_name": "Сумма", "is_number": True},
             ],
             "data": data,
-            "id": "bank-accounts-table",
-            "is_grouped": {"bank-accounts-table": True},
+            "id": "transactions-bank-accounts-table",
+            "is_grouped": {"transactions-bank-accounts-table": True},
         },
     )
 
@@ -978,6 +1155,9 @@ def order_payment_create(request):
 
             if report_date_value and len(report_date_value) == 7:
                 report_date_value = f"{report_date_value}-01"
+            elif not report_date_value:
+                now = timezone.now()
+                report_date_value = now.strftime("%Y-%m-01")
 
             data = {
                 "order_id": request.POST.get("order"),
@@ -986,7 +1166,7 @@ def order_payment_create(request):
                 "comment": request.POST.get("comment", ""),
                 "type": "order_payment",
                 "created_by": request.user,
-                "report_date": report_date_value or None,
+                "report_date": report_date_value,
             }
 
             validate_payment_data(data)
@@ -1000,7 +1180,7 @@ def validate_payment_data(data):
     if not data["bank_account_id"]:
         raise ValidationError("Не указан счет")
     if data["amount"] <= 0:
-        raise ValidationError("Неверная сумма")
+        raise ValidationError("Сумма должна быть больше нуля")
     if not data["order_id"]:
         raise ValidationError("Не указан заказ")
 
@@ -1076,7 +1256,7 @@ def validate_client_payment(data):
     if not data["client_id"]:
         raise ValidationError("Не указан клиент")
     if data["amount"] <= 0:
-        raise ValidationError("Неверная сумма")
+        raise ValidationError("Сумма должна быть больше нуля")
     if not data["order_id"]:
         raise ValidationError("Не указан заказ")
 
@@ -1084,6 +1264,7 @@ def validate_client_payment(data):
     order = Order.objects.get(id=data["order_id"])
 
     balance = calculate_client_balance(client)
+    
     if data["amount"] > balance:
         raise ValidationError(f"Недостаточно средств: {format_currency(balance)} р.")
 
@@ -1095,14 +1276,13 @@ def validate_client_payment(data):
 def calculate_client_balance(client):
     deposits = (
         Transaction.objects.filter(
-            client=client, type="client_account_deposit"
+            client=client, type="client_account_deposit", completed_date__isnull=True
         ).aggregate(total=Sum("amount"))["total"]
         or 0
     )
-
     payments = (
         Transaction.objects.filter(
-            client=client, type="client_account_payment"
+            client=client, type="client_account_payment", completed_date__isnull=True
         ).aggregate(total=Sum("amount"))["total"]
         or 0
     )
@@ -1152,7 +1332,7 @@ def client_balance_deposit(request):
                 )
             if data["amount"] <= 0:
                 return JsonResponse(
-                    {"status": "error", "message": "Неверная сумма"}, status=400
+                    {"status": "error", "message": "Сумма должна быть больше нуля"}, status=400
                 )
 
             tr = Transaction.objects.create(**data)
@@ -1169,6 +1349,5 @@ def render_transaction_response(transaction):
             "id": transaction.id,
         }
     )
-
 
 # endregion

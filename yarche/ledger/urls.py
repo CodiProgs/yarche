@@ -4,8 +4,14 @@ from . import views
 app_name = "ledger"
 
 urlpatterns = [
+	path('current_shift/', views.current_shift, name='current_shift'),
+    path('transactions/', views.transactions, name='transactions'),
+    path('bank-accounts/', views.bank_accounts, name='bank-accounts'),
+    path('transaction-categories/', views.transaction_categories, name='transaction-categories'),
+    path('payments/', views.payments, name='payments'),
+    # 
     path("bank-accounts/types/", views.bank_account_types, name="bank_account_types"),
-    path("bank-accounts/", views.bank_account_list, name="bank_account_list"),
+    path("bank-accounts/list/", views.bank_account_list, name="bank_account_list"),
     path(
         "bank-accounts/<int:pk>/",
         views.bank_account_detail,
@@ -28,7 +34,7 @@ urlpatterns = [
         name="refresh_bank_accounts",
     ),
     path(
-        "transaction-categories/",
+        "transaction-categories/list/",
         views.transaction_category_list,
         name="transaction_category_list",
     ),
@@ -58,13 +64,18 @@ urlpatterns = [
         name="refresh_transaction_categories",
     ),
     path("transaction-types/", views.transaction_types, name="transaction_types"),
-    path("transactions/", views.transaction_list, name="transaction_list"),
+    path("transactions/list/", views.transaction_list, name="transaction_list"),
     path("transactions/add/", views.transaction_create, name="transaction_create"),
     path("transactions/<int:pk>/", views.transaction_detail, name="transaction_detail"),
     path(
         "transactions/edit/<int:pk>/",
         views.transaction_update,
         name="transaction_update",
+    ),
+	path(
+        "transactions/closed/edit/<int:pk>/",
+        views.closed_transaction_update,
+        name="closed_transaction_update",
     ),
     path(
         "transactions/delete/<int:pk>/",

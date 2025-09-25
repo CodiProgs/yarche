@@ -1,13 +1,9 @@
 from django.db import models
-from menu.models import MenuItem
 from .permission import Permission
 
 
 class UserType(models.Model):
     name = models.CharField(max_length=255, verbose_name="Группа пользователей")
-    menu_items = models.ManyToManyField(
-        MenuItem, through="users.UserTypeMenuItem", verbose_name="Пункты меню"
-    )
     permissions = models.ManyToManyField(
         Permission,
         blank=True,
