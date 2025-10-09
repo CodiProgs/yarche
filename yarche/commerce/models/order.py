@@ -75,6 +75,9 @@ class Order(models.Model):
         blank=True,
         null=True,
     )
+    archived_at = models.DateTimeField(
+        verbose_name="Отправлено в архив", null=True, blank=True
+    )
 
     def __str__(self):
         return f"{self.id}"

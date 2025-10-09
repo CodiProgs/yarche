@@ -91,6 +91,71 @@ class ColumnSizeCalculator {
 			this.handleSmallContainer(computedWidths, tableWidth, visibleHeaders)
 		}
 
+		const total = computedWidths.reduce((s, w) => s + (w || 0), 0)
+		if (total > tableWidth && total > 0) {
+			const ratio = tableWidth / total
+			computedWidths = computedWidths.map((w, idx) => {
+				const header = this.headerCells[idx]
+				if (!header || header.classList.contains('hidden')) return 0
+				let type = header.getAttribute('data-column-type') || 'default'
+				if (
+					type === 'select' &&
+					header.classList.contains('table__cell-header-sign')
+				) {
+					type = 'sign'
+				}
+				const { min, max } =
+					ColumnSizeCalculator.CONFIG[type] ||
+					ColumnSizeCalculator.CONFIG.default
+				let nw = Math.max(min, Math.floor((w || 0) * ratio))
+				nw = Math.min(nw, max)
+				return nw
+			})
+
+			let sumNow = computedWidths.reduce((s, w) => s + (w || 0), 0)
+			let diff = tableWidth - sumNow
+
+			while (diff > 0) {
+				let idx = computedWidths.findIndex((cw, i) => {
+					const header = this.headerCells[i]
+					if (!header || header.classList.contains('hidden')) return false
+					const type = header.getAttribute('data-column-type') || 'default'
+					const max = (
+						ColumnSizeCalculator.CONFIG[type] ||
+						ColumnSizeCalculator.CONFIG.default
+					).max
+					return cw < max
+				})
+				if (idx === -1) break
+				computedWidths[idx] = (computedWidths[idx] || 0) + 1
+				diff -= 1
+			}
+
+			while (diff < 0) {
+				let idx = computedWidths.findIndex((cw, i) => {
+					const header = this.headerCells[i]
+					if (!header || header.classList.contains('hidden')) return false
+					const type = header.getAttribute('data-column-type') || 'default'
+					const min = (
+						ColumnSizeCalculator.CONFIG[type] ||
+						ColumnSizeCalculator.CONFIG.default
+					).min
+					return cw > min
+				})
+				if (idx === -1) break
+				computedWidths[idx] = Math.max(
+					(
+						ColumnSizeCalculator.CONFIG[
+							this.headerCells[idx].getAttribute('data-column-type') ||
+								'default'
+						] || ColumnSizeCalculator.CONFIG.default
+					).min,
+					(computedWidths[idx] || 1) - 1
+				)
+				diff += 1
+			}
+		}
+
 		this.applyColumnWidths(computedWidths)
 		requestAnimationFrame(() => {
 			this.tableElement.style.visibility = 'visible'
@@ -140,13 +205,32 @@ class ColumnSizeCalculator {
 		})
 
 		const currentTotal = computedWidths.reduce((a, b) => a + b, 0)
-		const widthDiff = containerWidth - currentTotal
+		let widthDiff = containerWidth - currentTotal
 
 		if (widthDiff !== 0) {
-			const lastFlexIndex = this.headerCells.indexOf(
-				flexibleColumns[flexibleColumns.length - 1]
-			)
-			computedWidths[lastFlexIndex] += widthDiff
+			const flexIndexes = flexibleColumns.map(h => this.headerCells.indexOf(h))
+			let i = 0
+			while (widthDiff !== 0 && flexIndexes.length > 0) {
+				const idx = flexIndexes[i % flexIndexes.length]
+				const header = this.headerCells[idx]
+				const type = header.getAttribute('data-column-type') || 'default'
+				const cfg =
+					ColumnSizeCalculator.CONFIG[type] ||
+					ColumnSizeCalculator.CONFIG.default
+
+				if (widthDiff > 0 && computedWidths[idx] < cfg.max) {
+					computedWidths[idx] = computedWidths[idx] + 1
+					widthDiff -= 1
+				} else if (widthDiff < 0 && computedWidths[idx] > cfg.min) {
+					computedWidths[idx] = computedWidths[idx] - 1
+					widthDiff += 1
+				} else {
+					const pos = flexIndexes.indexOf(idx)
+					if (pos !== -1) flexIndexes.splice(pos, 1)
+				}
+				i += 1
+				if (i > 1000) break
+			}
 		}
 	}
 

@@ -62,10 +62,44 @@ const addMenuHandler = () => {
 	const settleDebtAllButton = document.getElementById('settle-debt-all-button')
 	const repaymentsEditButton = document.getElementById('repayment-edit-button')
 
-	function showMenu(x, y) {
+	function showMenu(pageX, pageY) {
 		menu.style.display = 'block'
-		menu.style.left = `${x + 10}px`
-		menu.style.top = `${y}px`
+
+		const clientX = pageX - window.scrollX
+		const clientY = pageY - window.scrollY
+
+		const viewportWidth =
+			window.innerWidth || document.documentElement.clientWidth
+		const viewportHeight =
+			window.innerHeight || document.documentElement.clientHeight
+
+		const rect = menu.getBoundingClientRect()
+		const menuWidth = rect.width || 200
+		const menuHeight = rect.height || 200
+
+		const margin = 8
+		const offset = 10
+
+		let leftClient = clientX + offset
+		if (leftClient + menuWidth > viewportWidth - margin) {
+			leftClient = Math.max(margin, viewportWidth - menuWidth - margin)
+		}
+		if (leftClient < margin) leftClient = margin
+
+		const bottomThreshold = viewportHeight * 0.75
+		let topClient
+		if (clientY > bottomThreshold) {
+			topClient = clientY - menuHeight - offset
+			if (topClient < margin) topClient = margin
+		} else {
+			topClient = clientY + offset
+			if (topClient + menuHeight > viewportHeight - margin) {
+				topClient = Math.max(margin, viewportHeight - menuHeight - margin)
+			}
+		}
+
+		menu.style.left = `${leftClient + window.scrollX}px`
+		menu.style.top = `${topClient + window.scrollY}px`
 	}
 
 	if (menu) {
@@ -221,6 +255,65 @@ const addMenuHandler = () => {
 				}
 			}
 		})
+
+		let touchTimer = null
+		let touchStartTarget = null
+		let touchStartX = 0
+		let touchStartY = 0
+		const LONG_PRESS_DELAY = 600
+
+		document.addEventListener(
+			'touchstart',
+			function (ev) {
+				if (ev.touches && ev.touches.length > 1) return
+				const t = ev.touches ? ev.touches[0] : null
+				if (!t) return
+				touchStartX = t.pageX
+				touchStartY = t.pageY
+				touchStartTarget = ev.target
+
+				touchTimer = setTimeout(() => {
+					const evt = new MouseEvent('contextmenu', {
+						bubbles: true,
+						cancelable: true,
+						view: window,
+						clientX: touchStartX,
+						clientY: touchStartY,
+						pageX: touchStartX,
+						pageY: touchStartY,
+					})
+					try {
+						touchStartTarget.dispatchEvent(evt)
+					} catch (e) {
+						document.dispatchEvent(evt)
+					}
+					touchTimer = null
+				}, LONG_PRESS_DELAY)
+			},
+			{ passive: true }
+		)
+
+		document.addEventListener(
+			'touchmove',
+			function () {
+				if (touchTimer) {
+					clearTimeout(touchTimer)
+					touchTimer = null
+				}
+			},
+			{ passive: true }
+		)
+
+		document.addEventListener(
+			'touchend',
+			function () {
+				if (touchTimer) {
+					clearTimeout(touchTimer)
+					touchTimer = null
+				}
+			},
+			{ passive: true }
+		)
 
 		document.addEventListener('click', () => {
 			menu.style.display = 'none'
@@ -1302,7 +1395,7 @@ const initTransactionsPage = () => {
 				})
 
 				if (data.message) {
-					console.log('Server message:', data.message)
+					console.warn('Server message:', data.message)
 				} else if (!response.ok) {
 					showError('Ошибка загрузки данных транзакций.')
 				}
@@ -1867,12 +1960,15 @@ document.addEventListener('DOMContentLoaded', () => {
 		} else if (urlName === 'current_shift') {
 			initCurrentShiftPage()
 		} else {
-			console.log(
+			console.error(
 				`No specific initialization logic defined for URL segment: ${urlName}`
 			)
 		}
 	} else {
-		console.log('Could not determine page context from URL pathname:', pathname)
+		console.error(
+			'Could not determine page context from URL pathname:',
+			pathname
+		)
 	}
 
 	const hideButton = document.getElementById('hide-button')

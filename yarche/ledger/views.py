@@ -28,7 +28,12 @@ def parse_amount(amount_str: str) -> float:
     if not amount_str:
         return 0.00
     clean_amount = amount_str.replace(CURRENCY_SUFFIX, "").replace(" ", "")
-    return round(float(clean_amount.replace(",", ".")), 2)
+    if clean_amount == "" or clean_amount == ",":
+        return 0.00
+    try:
+        return round(float(clean_amount.replace(",", ".")), 2)
+    except (ValueError, TypeError):
+        return 0.00
 
 
 def format_currency(amount: float) -> str:
@@ -60,6 +65,7 @@ def get_transaction_fields():
         "order",
         "related_transaction",
         "created_by",
+        "archived_at",
     ]
     field_order = [
         "category",
@@ -958,6 +964,7 @@ def get_payment_fields():
         "related_transaction",
         "created_by",
         "client",
+        "archived_at",
     ]
     field_order = [
         "id",
@@ -1351,3 +1358,4 @@ def render_transaction_response(transaction):
     )
 
 # endregion
+

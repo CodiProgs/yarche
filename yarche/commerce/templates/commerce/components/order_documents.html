@@ -1,0 +1,39 @@
+{% comment %} <div class="order-documents">
+	<form id="upload-form" method="post" enctype="multipart/form-data">
+		{% csrf_token %}
+		<div class="modal-form__group modal-form__group--horizontal">
+			{% include "components/select.html" with id="file_type" placeholder="Выберите тип файла" %}
+			<button id="upload-btn" class="button">Загрузить файл</button>
+		</div>
+		<div id="documents-container">
+		</div>
+		<h1>Загрузить документ</h1>
+		
+	</form>
+
+
+	<form method="post" enctype="multipart/form-data">
+			{% csrf_token %}
+			{{ form.as_p }}
+			<button type="submit">Загрузить</button>
+		</form>
+</div> {% endcomment %}
+
+
+<div class="order-documents">
+    <form id="upload-form" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-form__group modal-form__group--horizontal">
+            {% include "components/select.html" with id="file_type" placeholder="Выберите тип файла" %}
+            <button id="upload-btn" type="button" class="button">Выбрать файл</button>
+            <button id="upload-submit" type="submit" class="button" style="display:none">Загрузить</button>
+        </div>
+
+        <!-- скрытый input для выбора файла -->
+        <input type="file" id="upload-file-input" name="file" style="display:none" />
+
+        <div id="documents-container">
+            {{ docs_html|default:"" }}
+        </div>
+    </form>
+</div>

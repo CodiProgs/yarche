@@ -9,6 +9,9 @@
                id="type"
                name="type"
                value="{{ type }}"
+                       autocapitalize="off"
+                       autocorrect="off"
+                       autocomplete="off"
                hidden>
         <div class="modal-form__group">
             {% include "components/select.html" with id="bank_account" placeholder="Выберите счёт" %}
@@ -22,6 +25,9 @@
                    id="amount"
                    name="amount"
                    spellcheck="false"
+                       autocapitalize="off"
+                       autocorrect="off"
+                       autocomplete="off"
                    placeholder="Введите сумму">
         </div>
         <div class="modal-form__group">
@@ -30,6 +36,9 @@
                           type="text"
                           id="comment"
                           name="comment"
+                       autocapitalize="off"
+                       autocorrect="off"
+                       autocomplete="off"
                           placeholder="Комментарий"></textarea>
                 <img src="{% static 'images/close.svg' %}" alt="Clear" class="clear-button">
             </div>
@@ -41,6 +50,9 @@
                        type="month"
                        id="report_date"
                        name="report_date"
+                       autocapitalize="off"
+                       autocorrect="off"
+                       autocomplete="off"
                        placeholder="Месяц реализации">
             </div>
         {% endif %}

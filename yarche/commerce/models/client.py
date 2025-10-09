@@ -42,3 +42,32 @@ class ClientObject(models.Model):
     class Meta:
         verbose_name = "Объект клиента"
         verbose_name_plural = "Объекты клиентов"
+
+
+class Contact(models.Model):
+    client = models.ForeignKey(
+        Client, on_delete=models.CASCADE, related_name='contacts', verbose_name="Клиент"
+    )
+
+    last_name = models.CharField(max_length=150, verbose_name="Фамилия", blank=True, null=True)
+    first_name = models.CharField(max_length=150, verbose_name="Имя", blank=True, null=True)
+    patronymic = models.CharField(max_length=150, verbose_name="Отчество", blank=True, null=True)
+    position = models.CharField(max_length=255, verbose_name="Должность", blank=True, null=True)
+
+    phone1 = models.CharField(max_length=30, verbose_name="Телефон 1", blank=True, null=True)
+    phone2 = models.CharField(max_length=30, verbose_name="Телефон 2", blank=True, null=True)
+    phone3 = models.CharField(max_length=30, verbose_name="Телефон 3", blank=True, null=True)
+
+    email = models.EmailField(verbose_name="Почта", blank=True, null=True)
+    birthday = models.DateField(verbose_name="ДР", blank=True, null=True)
+
+    socials = models.TextField(verbose_name="Социалки", blank=True, null=True)
+
+    def __str__(self):
+        parts = [self.last_name, self.first_name]
+        name = " ".join([p for p in parts if p])
+        return f"{name} ({self.position})" if name else f"Контакт #{self.pk}"
+
+    class Meta:
+        verbose_name = "Контакт клиента"
+        verbose_name_plural = "Контакты клиентов"

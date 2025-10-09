@@ -1,1 +1,1 @@
-from models import Client, Document, FileType, Order, OrderStatus, Product, ClientObject
+from models import Client, Document, FileType, Order, OrderStatus, Product, ClientObject, Contact

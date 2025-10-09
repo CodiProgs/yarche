@@ -5,6 +5,7 @@ import { showError, showQuestion } from '/static/js/ui-utils.js'
 export function initTableHandlers(config) {
 	const container = document.getElementById(config.containerId)
 	if (!container) return
+
 	const table = document.getElementById(config.tableId)
 	if (!table) return
 
@@ -22,6 +23,19 @@ export function initTableHandlers(config) {
 	const editModalTitle = hasModalConfig
 		? config.modalConfig.editModalTitle
 		: 'Изменить запись'
+
+	const addBtnSelector = config.addButtonId
+		? `#${config.addButtonId}`
+		: '#add-button'
+	const editBtnSelector = config.editButtonId
+		? `#${config.editButtonId}`
+		: '#edit-button'
+	const deleteBtnSelector = config.deleteButtonId
+		? `#${config.deleteButtonId}`
+		: '#delete-button'
+	const refreshBtnSelector = config.refreshButtonId
+		? `#${config.refreshButtonId}`
+		: '#refresh-button'
 
 	const addFormHandler = new DynamicFormHandler({
 		dataUrls: config.dataUrls,
@@ -81,7 +95,7 @@ export function initTableHandlers(config) {
 	})
 
 	if (config.refreshUrl) {
-		const refreshButton = container.querySelector('#refresh-button')
+		const refreshButton = document.querySelector(refreshBtnSelector)
 		if (refreshButton) {
 			refreshButton.addEventListener('click', async () => {
 				await TableManager.hideForm(config.formId, config.tableId)
@@ -94,46 +108,42 @@ export function initTableHandlers(config) {
 		}
 	}
 
-	const addButton = container.querySelector('#add-button')
-	const editButton = container.querySelector('#edit-button')
-	const deleteButton = container.querySelector('#delete-button')
+	const addButton = document.querySelector(addBtnSelector)
+	const editButton = document.querySelector(editBtnSelector)
+	const deleteButton = document.querySelector(deleteBtnSelector)
 
 	if (addButton) {
-		container
-			.querySelector('#add-button')
-			.addEventListener('click', async () => {
-				await addFormHandler.init()
+		addButton.addEventListener('click', async () => {
+			await addFormHandler.init()
 
-				if (config.addFunc) {
-					config.addFunc()
-				}
-			})
+			if (config.addFunc) {
+				config.addFunc()
+			}
+		})
 	}
 
 	if (editButton) {
-		container
-			.querySelector('#edit-button')
-			.addEventListener('click', async () => {
-				const selectedRowId = TableManager.getSelectedRowId(config.tableId)
+		editButton.addEventListener('click', async () => {
+			const selectedRowId = TableManager.getSelectedRowId(config.tableId)
 
-				if (selectedRowId) {
-					if (!editModalUrl) {
-						editFormHandler.config.createFormFunction = formId =>
-							TableManager.createForm(formId, config.tableId, selectedRowId)
-					}
-					await editFormHandler.init(selectedRowId)
-
-					if (config.editFunc) {
-						config.editFunc()
-					}
-				} else {
-					showError('Выберите строку для редактирования!')
+			if (selectedRowId) {
+				if (!editModalUrl) {
+					editFormHandler.config.createFormFunction = formId =>
+						TableManager.createForm(formId, config.tableId, selectedRowId)
 				}
-			})
+				await editFormHandler.init(selectedRowId)
+
+				if (config.editFunc) {
+					config.editFunc()
+				}
+			} else {
+				showError('Выберите строку для редактирования!')
+			}
+		})
 	}
 
 	if (deleteButton) {
-		container.querySelector('#delete-button').addEventListener('click', () => {
+		deleteButton.addEventListener('click', async () => {
 			TableManager.hideForm(config.formId, config.tableId)
 			const selectedRowId = TableManager.getSelectedRowId(config.tableId)
 			if (selectedRowId) {

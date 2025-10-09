@@ -14,25 +14,18 @@ class FileType(models.Model):
 
 
 class Document(models.Model):
-    file_type = models.ForeignKey(
-        FileType,
-        on_delete=models.PROTECT,
-        verbose_name="Тип файла",
-        related_name="documents",
-    )
-    user = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        verbose_name="Пользователь",
-        related_name="documents",
-    )
-    file = models.FileField(upload_to="orders/", verbose_name="Файл")
-    uploaded_at = models.DateTimeField(auto_now_add=True, verbose_name="Загружен")
-    size = models.PositiveIntegerField(verbose_name="Размер")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Пользователь")
+    file_type = models.ForeignKey('FileType', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Тип файла")
+    name = models.CharField(max_length=255, verbose_name="Имя файла", default='', blank=True)
+    file = models.FileField(upload_to="uploads/", verbose_name="Файл", null=True, blank=True)
+    size = models.BigIntegerField(verbose_name="Размер файла (в байтах)", null=True, blank=True)
+    url = models.URLField(verbose_name="URL файла", blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата загрузки")
 
     def __str__(self):
-        return f"{self.file.name} ({self.file_type.name})"
+        return f"{self.name} ({self.user})"
 
     class Meta:
         verbose_name = "Документ"
         verbose_name_plural = "Документы"
+

@@ -1046,3 +1046,97 @@ textarea::placeholder {
 .refresh-money-logs-btn:hover {
 	background: #f0f0f0;
 }
+
+#clients-container {
+	display: flex;
+	flex-direction: row;
+}
+
+#clients-container .page-table-left {
+	width: 40%;
+	display: flex;
+	flex-direction: column;
+}
+
+#clients-container .page-form-right {
+	width: 60%;
+}
+
+#clients-container .page-form-right {
+	padding: 10px 20px;
+	border: 1px solid var(--color-border-window);
+	border-left: none;
+}
+
+.modal-form__section-title {
+	font-size: 14px;
+	font-weight: 600;
+	margin-bottom: 20px;
+	color: #2c3e50;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	padding-left: 2px;
+	border-bottom: 1px solid #e5e8ed;
+}
+
+.modal-form__group.modal-form__group--horizontal {
+	display: flex;
+	gap: 10px;
+	margin-bottom: 4px;
+}
+
+.modal-form__group--horizontal .modal-form__label {
+	min-width: 120px;
+	width: 120px;
+	padding-top: 5px;
+}
+
+#clients-container .modal-form__buttons {
+	position: relative;
+	margin-bottom: 20px;
+}
+
+#clients-container .modal-form__buttons::before {
+	content: '';
+	position: absolute;
+	height: 1px;
+	background-color: var(--color-border-window);
+	width: 100%;
+	left: 0;
+	top: 0;
+	transform: translateY(0px);
+	z-index: 1;
+	display: block;
+}
+
+#clients-container .modal-form__buttons::after {
+	transform: translateY(50px);
+}
+
+#contacts-container {
+	flex: 1 1 auto;
+	height: 100%;
+}
+
+#client-form {
+	height: 100%;
+}
+
+#client-form .modal-form__content {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+}
+
+.order-documents {
+	width: 50vw;
+	min-height: 50vh;
+}
+
+#upload-form {
+	padding: 20px;
+}
+
+#upload-btn {
+	width: 200px;
+}

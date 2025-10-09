@@ -1,5 +1,6 @@
 from django.db import models
 from django.http import JsonResponse
+from django.forms.models import model_to_dict
 from django.db.models import (
     F,
     Q,
@@ -10,13 +11,17 @@ from django.db.models import (
     Subquery,
     ExpressionWrapper,
 )
+from django.db import transaction
+from django.core.paginator import Paginator
 from django.db.models.functions import Coalesce
 from django.template.loader import render_to_string
 from yarche.utils import get_model_fields
 from django.contrib.auth.decorators import login_required
-from .models import Product, Client, Order, OrderStatus
+from .models import Product, Client, Order, OrderStatus, Contact, FileType
 from ledger.models import Transaction, BankAccount
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
+from django.views.decorators.http import require_http_methods
+import json
 
 
 # region Helpers
@@ -135,6 +140,9 @@ def entity_list(request, model_class):
 
 def product_list(request):
     return entity_list(request, Product)
+
+def document_types(request):
+    return entity_list(request, FileType)
 
 
 def client_list(request):
@@ -296,7 +304,6 @@ def orders(request):
     }
     return render(request, "commerce/orders.html", context)
 
-
 def get_order_fields():
     excluded = [
         "client_object",
@@ -362,3 +369,535 @@ def order_statuses(request):
         {"id": acc.id, "name": acc.name} for acc in OrderStatus.objects.all()
     ]
     return JsonResponse(statuses, safe=False)
+
+@login_required
+def clients_paginate(request):
+    clients_qs = Client.objects.all()
+
+    fields = [
+        {"name": "id", "verbose_name": "ID"},
+        {"name": "name", "verbose_name": "Клиент"},
+        {"name": "legal_name", "verbose_name": "Юр. название"},
+    ]
+
+    page_number = request.GET.get("page", 1)
+    paginator = Paginator(list(clients_qs), 25)
+    page_obj = paginator.get_page(page_number)
+
+    client_ids = [c.id for c in page_obj.object_list]
+
+    html = "".join(
+        render_to_string("components/table_row.html", {"item": client, "fields": fields})
+        for client in page_obj.object_list
+    )
+
+    return JsonResponse(
+        {
+            "html": html,
+            "context": {
+                "total_pages": paginator.num_pages,
+                "current_page": page_obj.number,
+                "client_ids": client_ids,
+            },
+        }
+    )
+
+@login_required
+def clients(request):
+    clients_qs = Client.objects.all().order_by("id")[:25]
+
+    fields = [
+        {"name": "id", "verbose_name": "ID"},
+        {"name": "name", "verbose_name": "Клиент"},
+        {"name": "legal_name", "verbose_name": "Юр. название"},
+    ]
+
+    context = {
+        "fields": fields,
+        "data": clients_qs,
+    }
+    return render(request, "commerce/clients.html", context)
+
+@login_required
+@require_http_methods(["POST"])
+def client_create(request):
+    try:
+        with transaction.atomic():
+            name = (request.POST.get("name") or "").strip()
+            legal_name = (request.POST.get("legal_name") or "").strip()
+
+            if not name and not legal_name:
+                return JsonResponse(
+                    {"status": "error", "message": "Требуется указать имя или юр. название"},
+                    status=400,
+                )
+
+            client = Client.objects.create(
+                name=name or None,
+                legal_name=legal_name or None,
+            )
+
+            fields = [
+                {"name": "id", "verbose_name": "ID"},
+                {"name": "name", "verbose_name": "Клиент"},
+                {"name": "legal_name", "verbose_name": "Юр. название"},
+            ]
+
+            context = {"item": client, "fields": fields}
+            return JsonResponse(
+                {
+                    "html": render_to_string("components/table_row.html", context),
+                    "id": client.id,
+                }
+            )
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["POST"])
+def client_delete(request, pk: int):
+    try:
+        with transaction.atomic():
+            client = get_object_or_404(Client, id=pk)
+
+            if Order.objects.filter(client=client).exists():
+                return JsonResponse(
+                    {"status": "error", "message": "Нельзя удалить клиента с привязанными заказами"},
+                    status=400,
+                )
+
+            if Transaction.objects.filter(client=client).exists():
+                return JsonResponse(
+                    {"status": "error", "message": "Нельзя удалить клиента с привязанными транзакциями"},
+                    status=400,
+                )
+
+            if hasattr(client, "client_objects") and client.client_objects.exists():
+                return JsonResponse(
+                    {"status": "error", "message": "Нельзя удалить клиента с привязанными объектами"},
+                    status=400,
+                )
+
+            client.delete()
+            return JsonResponse({"status": "success"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+def client_detail(request, pk: int):
+    client = get_object_or_404(Client, id=pk)
+    data = model_to_dict(client)
+
+    for field in (
+        "id",
+        "name",
+        "comment",
+        "inn",
+        "legal_name",
+        "director",
+        "ogrn",
+        "basis",
+        "legal_address",
+        "actual_address",
+    ):
+        if field not in data and hasattr(client, field):
+            data[field] = getattr(client, field)
+
+    contact_fields = [
+        {"name": "last_name", "verbose_name": "Фамилия"},
+        {"name": "first_name", "verbose_name": "Имя"},
+        {"name": "patronymic", "verbose_name": "Отчество"},
+        {"name": "position", "verbose_name": "Должность"},
+        {"name": "phone1", "verbose_name": "Телефон 1"},
+        {"name": "phone2", "verbose_name": "Телефон 2"},
+        {"name": "phone3", "verbose_name": "Телефон 3"},
+        {"name": "email", "verbose_name": "Почта"},
+        {"name": "birthday", "verbose_name": "ДР"},
+        {"name": "socials", "verbose_name": "Социалки"},
+    ]
+
+    contacts_qs = client.contacts.all()
+    contacts_html = render_to_string(
+        "components/table.html",
+        {
+            "fields": contact_fields,
+            "data": contacts_qs,
+            "id": "contacts-table",
+        },
+    )
+
+    return JsonResponse({"data": data, "contacts_html": contacts_html, "contacts_ids": list(contacts_qs.values_list("id", flat=True))})
+
+@login_required
+@require_http_methods(["PUT", "PATCH", "POST"])
+def client_update(request, pk: int):
+    try:
+        with transaction.atomic():
+            client = get_object_or_404(Client, id=pk)
+            data = (
+                json.loads(request.body) if request.method in ["PUT", "PATCH"] else request.POST.dict()
+            )
+
+            updatable = [
+                "name",
+                "comment",
+                "inn",
+                "legal_name",
+                "director",
+                "ogrn",
+                "basis",
+                "legal_address",
+                "actual_address",
+            ]
+
+            for field in updatable:
+                if field in data:
+                    val = data[field]
+                    if isinstance(val, str):
+                        val = val.strip()
+                        if val == "":
+                            val = None
+                    setattr(client, field, val)
+
+            name_val = client.name.strip() if client.name else ""
+            legal_val = client.legal_name.strip() if client.legal_name else ""
+            if not name_val and not legal_val:
+                return JsonResponse(
+                    {"status": "error", "message": "Требуется указать имя или юр. название"},
+                    status=400,
+                )
+
+            client.save()
+
+            fields = [
+                {"name": "id", "verbose_name": "ID"},
+                {"name": "name", "verbose_name": "Клиент"},
+                {"name": "legal_name", "verbose_name": "Юр. название"},
+            ]
+            context = {"item": client, "fields": fields}
+
+            return JsonResponse(
+                {
+                    "id": client.id,
+                    "html": render_to_string("components/table_row.html", context),
+                }
+            )
+    except json.JSONDecodeError:
+        return JsonResponse({"status": "error", "message": "Неверный формат JSON"}, status=400)
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["POST"])
+def contact_create(request):
+    try:
+        with transaction.atomic():
+            client_id = request.POST.get("client") or request.POST.get("client_id") or request.POST.get("client_form_id")
+            if not client_id:
+                return JsonResponse({"status": "error", "message": "Не указан клиент"}, status=400)
+
+            client = get_object_or_404(Client, id=client_id)
+
+            last_name = (request.POST.get("last_name") or "").strip() or None
+            first_name = (request.POST.get("first_name") or "").strip() or None
+            patronymic = (request.POST.get("patronymic") or "").strip() or None
+            position = (request.POST.get("position") or "").strip() or None
+            phone1 = (request.POST.get("phone1") or "").strip() or None
+            phone2 = (request.POST.get("phone2") or "").strip() or None
+            phone3 = (request.POST.get("phone3") or "").strip() or None
+            email = (request.POST.get("email") or "").strip() or None
+            birthday_str = (request.POST.get("birthday") or "").strip()
+            birthday = (request.POST.get("birthday") or "").strip() or None
+            socials = (request.POST.get("socials") or "").strip() or None
+
+            if not any([last_name, first_name, patronymic, position, phone1, phone2, phone3, email, birthday, socials]):
+                return JsonResponse(
+                    {"status": "error", "message": "Требуется указать хотя бы одно поле контакта"},
+                    status=400,
+                )
+
+            contact = Contact.objects.create(
+                client=client,
+                last_name=last_name,
+                first_name=first_name,
+                patronymic=patronymic,
+                position=position,
+                phone1=phone1,
+                phone2=phone2,
+                phone3=phone3,
+                email=email,
+                birthday=birthday,
+                socials=socials,
+            )
+
+            contact_fields = [
+                {"name": "last_name", "verbose_name": "Фамилия"},
+                {"name": "first_name", "verbose_name": "Имя"},
+                {"name": "patronymic", "verbose_name": "Отчество"},
+                {"name": "position", "verbose_name": "Должность"},
+                {"name": "phone1", "verbose_name": "Телефон 1"},
+                {"name": "phone2", "verbose_name": "Телефон 2"},
+                {"name": "phone3", "verbose_name": "Телефон 3"},
+                {"name": "email", "verbose_name": "Почта"},
+                {"name": "birthday", "verbose_name": "ДР"},
+                {"name": "socials", "verbose_name": "Социалки"},
+            ]
+
+            context = {"item": contact, "fields": contact_fields}
+            return JsonResponse(
+                {
+                    "html": render_to_string("components/table_row.html", context),
+                    "id": contact.id,
+                }
+            )
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["PUT", "PATCH", "POST"])
+def contact_update(request, pk: int):
+    try:
+        with transaction.atomic():
+            contact = get_object_or_404(Contact, id=pk)
+            data = (
+                json.loads(request.body) if request.method in ["PUT", "PATCH"] else request.POST.dict()
+            )
+
+            updatable = [
+                "last_name",
+                "first_name",
+                "patronymic",
+                "position",
+                "phone1",
+                "phone2",
+                "phone3",
+                "email",
+                "birthday",
+                "socials",
+            ]
+
+            for field in updatable:
+                if field in data:
+                    val = data[field]
+                    if isinstance(val, str):
+                        val = val.strip()
+                        if val == "":
+                            val = None
+                    setattr(contact, field, val)
+
+            contact.save()
+
+            contact_fields = [
+                {"name": "last_name", "verbose_name": "Фамилия"},
+                {"name": "first_name", "verbose_name": "Имя"},
+                {"name": "patronymic", "verbose_name": "Отчество"},
+                {"name": "position", "verbose_name": "Должность"},
+                {"name": "phone1", "verbose_name": "Телефон 1"},
+                {"name": "phone2", "verbose_name": "Телефон 2"},
+                {"name": "phone3", "verbose_name": "Телефон 3"},
+                {"name": "email", "verbose_name": "Почта"},
+                {"name": "birthday", "verbose_name": "ДР"},
+                {"name": "socials", "verbose_name": "Социалки"},
+            ]
+            context = {"item": contact, "fields": contact_fields}
+            return JsonResponse(
+                {
+                    "id": contact.id,
+                    "html": render_to_string("components/table_row.html", context),
+                }
+            )
+    except json.JSONDecodeError:
+        return JsonResponse({"status": "error", "message": "Неверный формат JSON"}, status=400)
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+    
+@login_required
+@require_http_methods(["POST"])
+def contact_delete(request, pk: int):
+    try:
+        with transaction.atomic():
+            contact = get_object_or_404(Contact, id=pk)
+            contact.delete()
+            return JsonResponse({"status": "success"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+    
+@login_required
+@require_http_methods(["GET"])
+def contact_detail(request, pk: int):
+    contact = get_object_or_404(Contact, id=pk)
+    data = model_to_dict(contact)
+
+    contact_fields = [
+        {"name": "last_name", "verbose_name": "Фамилия"},
+        {"name": "first_name", "verbose_name": "Имя"},
+        {"name": "patronymic", "verbose_name": "Отчество"},
+        {"name": "position", "verbose_name": "Должность"},
+        {"name": "phone1", "verbose_name": "Телефон 1"},
+        {"name": "phone2", "verbose_name": "Телефон 2"},
+        {"name": "phone3", "verbose_name": "Телефон 3"},
+        {"name": "email", "verbose_name": "Почта"},
+        {"name": "birthday", "verbose_name": "ДР"},
+        {"name": "socials", "verbose_name": "Социалки"},
+    ]
+
+    html = render_to_string("components/table_row.html", {"item": contact, "fields": contact_fields})
+    return JsonResponse({"data": data, "html": html})
+
+@login_required
+def products(request):
+    products_qs = Product.objects.all().order_by('id')
+
+    fields = [
+        {"name": "id", "verbose_name": "ID"},
+        {"name": "name", "verbose_name": "Название"},
+    ]
+
+    context = {
+        "fields": fields,
+        "data": products_qs,
+    }
+    return render(request, "commerce/products.html", context)
+
+@login_required
+@require_http_methods(["GET"])
+def product_detail(request, pk: int):
+    product = get_object_or_404(Product, id=pk)
+    data = model_to_dict(product)
+
+    fields = [
+        {"name": "id", "verbose_name": "ID"},
+        {"name": "name", "verbose_name": "Название"},
+    ]
+
+    html = render_to_string("components/table_row.html", {"item": product, "fields": fields})
+    return JsonResponse({"data": data, "html": html})
+
+@login_required
+@require_http_methods(["POST"])
+def product_create(request):
+    try:
+        with transaction.atomic():
+            name = (request.POST.get("name") or "").strip()
+            if not name:
+                return JsonResponse(
+                    {"status": "error", "message": "Требуется указать название продукта"},
+                    status=400,
+                )
+
+            product = Product.objects.create(name=name)
+
+            fields = [
+                {"name": "id", "verbose_name": "ID"},
+                {"name": "name", "verbose_name": "Название"},
+            ]
+            context = {"item": product, "fields": fields}
+
+            return JsonResponse(
+                {
+                    "html": render_to_string("components/table_row.html", context),
+                    "id": product.id,
+                }
+            )
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+
+@require_http_methods(["PUT", "PATCH", "POST"])
+def product_update(request, pk: int):
+    try:
+        with transaction.atomic():
+            product = get_object_or_404(Product, id=pk)
+            data = json.loads(request.body) if request.method in ["PUT", "PATCH"] else request.POST.dict()
+
+            if "name" in data:
+                name = data["name"]
+                if isinstance(name, str):
+                    name = name.strip()
+                else:
+                    name = str(name).strip()
+
+                if not name:
+                    return JsonResponse(
+                        {"status": "error", "message": "Требуется указать название продукта"},
+                        status=400,
+                    )
+
+                product.name = name
+
+            if not product.name or (isinstance(product.name, str) and not product.name.strip()):
+                return JsonResponse(
+                    {"status": "error", "message": "Требуется указать название продукта"},
+                    status=400,
+                )
+
+            product.save()
+
+            fields = [
+                {"name": "id", "verbose_name": "ID"},
+                {"name": "name", "verbose_name": "Название"},
+            ]
+            context = {"item": product, "fields": fields}
+
+            return JsonResponse(
+                {
+                    "id": product.id,
+                    "html": render_to_string("components/table_row.html", context),
+                }
+            )
+    except json.JSONDecodeError:
+        return JsonResponse({"status": "error", "message": "Неверный формат JSON"}, status=400)
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["POST"])
+def product_delete(request, pk: int):
+    try:
+        with transaction.atomic():
+            product = get_object_or_404(Product, id=pk)
+            if Order.objects.filter(product=product).exists():
+                return JsonResponse(
+                    {"status": "error", "message": "Нельзя удалить продукт с привязанными заказами"},
+                    status=400,
+                )
+            product.delete()
+            return JsonResponse({"status": "success"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+def orders_archive(request):
+    orders_qs = Order.objects.filter(archived_at__isnull=False).order_by("-archived_at")
+
+    page_number = request.GET.get("page", 1)
+    paginator = Paginator(list(orders_qs), 25)
+    page_obj = paginator.get_page(page_number)
+
+    data = []
+    for o in page_obj.object_list:
+        o.legal_name = o.client.legal_name if o.client else None
+        data.append(o)
+
+    fields = [
+        {"name": "id", "verbose_name": "Заказ"},
+        {"name": "archived_at", "verbose_name": "Архив", "is_date": True},
+        {"name": "manager", "verbose_name": "Менеджер", "is_relation": True},
+        {"name": "client", "verbose_name": "Клиент", "is_relation": True},
+        {"name": "legal_name", "verbose_name": "Фирма"},
+        {"name": "product", "verbose_name": "Продукция", "is_relation": True},
+        {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+        {"name": "created", "verbose_name": "Создан", "is_date": True},
+        {"name": "additional_info", "verbose_name": "Доп. инф-я"},
+    ]
+
+    context = {
+        "fields": fields,
+        "data": data,
+        "pagination": {
+            "total_pages": paginator.num_pages,
+            "current_page": page_obj.number,
+        },
+    }
+    return render(request, "commerce/orders_archive.html", context)
+

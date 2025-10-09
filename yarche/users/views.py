@@ -17,13 +17,18 @@ def manager_list(request):
             if view_all_payments_permission in current_user.user_type.permissions.all():
                 has_view_all_payments_perm = True
 
-    managers = User.objects.filter(user_type__name="Менеджер по работе с клиентами")
+    managers_qs = User.objects.filter(user_type__name="Менеджер по работе с клиентами")
 
-    if not has_view_all_payments_perm:
-        managers = managers.filter(id=current_user.id)
+    if has_view_all_payments_perm:
+        managers = list(managers_qs)
+    else:
+        managers = list(managers_qs.filter(id=current_user.id))
+
+    if not any(u.id == current_user.id for u in managers):
+        managers.append(current_user)
 
     types = [
-        {"id": t.id, "name": t.last_name if t.last_name else t.login} for t in managers
+        {"id": t.id, "name": t.last_name if t.last_name else t.username} for t in managers
     ]
 
     return JsonResponse(types, safe=False)

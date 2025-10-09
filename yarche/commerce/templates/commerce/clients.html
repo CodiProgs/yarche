@@ -1,0 +1,206 @@
+{% extends "layout.html" %}
+{% load static %}
+{% load components %}
+{% add_style 'css/modal-form.css' %}
+{% block content %}
+    <div class="page-table-container page-two-column" id="clients-container">
+        <div class="page-table-left">
+            {% include "components/table.html" with id="clients-table" fields=fields data=data %}
+            <div class="pagination-controls">
+            <button class="pagination-button"
+                    id="first-page"
+                    title="Первая страница"
+                    disabled>
+                <img src="{% static 'images/angle-double-left.svg' %}" alt="First" class="icon">
+            </button>
+            <button class="pagination-button"
+                    id="prev-page"
+                    title="Предыдущая страница"
+                    disabled>
+                <img src="{% static 'images/angle-left.svg' %}" alt="Previous" class="icon">
+            </button>
+            <div class="pagination-line"></div>
+            <div class="pagination-input-container">
+                <span>Страница</span>
+                <input type="text"
+                       id="current-page"
+                       class="pagination-input"
+                       value="0"
+                       disabled>
+                <span>из</span>
+                <span id="total-pages">0</span>
+            </div>
+            <div class="pagination-line"></div>
+            <button class="pagination-button"
+                    id="next-page"
+                    title="Следующая страница"
+                    disabled>
+                <img src="{% static 'images/angle-right.svg' %}" alt="Next" class="icon">
+            </button>
+            <button class="pagination-button"
+                    id="last-page"
+                    title="Последняя страница"
+                    disabled>
+                <img src="{% static 'images/angle-double-right.svg' %}" alt="Last" class="icon">
+            </button>
+            <div class="pagination-line"></div>
+            <button class="pagination-button" id="refresh" title="Обновить">
+                <img src="{% static 'images/arrows-rotate.svg' %}" alt="Refresh" class="icon">
+            </button>
+        </div>
+        </div>
+
+        <aside class="page-form-right">
+            <form id="client-form" method="post">
+                <div class="modal-form__content">
+                    {% csrf_token %}
+                    <input type="hidden" id="client_id" name="client_id" value="">
+
+                    <h3 class="modal-form__section-title">Клиентская информация</h3>
+
+                    <div class="modal-form__group modal-form__group--horizontal">
+                        <label class="modal-form__label" for="name">Клиент:</label>
+                        <input class="modal-form__input"
+                               type="text"
+                               id="name"
+                               name="name"
+                               spellcheck="false"
+                               autocapitalize="off"
+                               autocorrect="off"
+                               autocomplete="off">
+                    </div>
+
+                    <div class="modal-form__group modal-form__group--horizontal">
+                        <label class="modal-form__label" for="comment">Комментарий:</label>
+                        <div class="input-container" style="flex:1">
+                            <textarea class="modal-form__textarea"
+                                      id="comment"
+                                      name="comment"
+                                      autocapitalize="off"
+                                      autocorrect="off"
+                                      autocomplete="off"
+                                      ></textarea>
+                            <img src="{% static 'images/close.svg' %}" alt="Clear" class="clear-button">
+                        </div>
+                    </div>
+
+                    <h3 class="modal-form__section-title">Юридическая информация</h3>
+
+                    <div class="modal-form__group modal-form__group--horizontal">
+                        <label class="modal-form__label" for="inn">ИНН:</label>
+                        <div style="width:100%; position:relative" class="input-container">
+                            <input class="modal-form__input"
+                               type="text"
+                               id="inn"
+                               name="inn"
+                               spellcheck="false"
+                               autocapitalize="off"
+                               autocorrect="off"
+                               autocomplete="off">
+                        </div>
+                    </div>
+
+                    <div class="modal-form__group modal-form__group--horizontal">
+                        <label class="modal-form__label" for="legal_name">Юр. название:</label>
+                        <input class="modal-form__input"
+                               type="text"
+                               id="legal_name"
+                               name="legal_name"
+                               spellcheck="false"
+                               autocapitalize="off"
+                               autocorrect="off"
+                               autocomplete="off">
+                    </div>
+
+                    <div class="modal-form__group modal-form__group--horizontal">
+                        <label class="modal-form__label" for="director">Директор:</label>
+                        <input class="modal-form__input"
+                               type="text"
+                               id="director"
+                               name="director"
+                               spellcheck="false"
+                               autocapitalize="off"
+                               autocorrect="off"
+                               autocomplete="off">
+                    </div>
+
+                    <div class="modal-form__group modal-form__group--horizontal">
+                        <label class="modal-form__label" for="ogrn">ОГРН:</label>
+                        <input class="modal-form__input"
+                               type="text"
+                               id="ogrn"
+                               name="ogrn"
+                               spellcheck="false"
+                               autocapitalize="off"
+                               autocorrect="off"
+                               autocomplete="off">
+                    </div>
+
+                    <div class="modal-form__group modal-form__group--horizontal">
+                        <label class="modal-form__label" for="basis">Основание:</label>
+                        <input class="modal-form__input"
+                               type="text"
+                               id="basis"
+                               name="basis"
+                               spellcheck="false"
+                               autocapitalize="off"
+                               autocorrect="off"
+                               autocomplete="off">
+                    </div>
+
+                    <div class="modal-form__group modal-form__group--horizontal">
+                        <label class="modal-form__label" for="legal_address">Адрес юридический:</label>
+                        <input class="modal-form__input"
+                               type="text"
+                               id="legal_address"
+                               name="legal_address"
+                               spellcheck="false"
+                               autocapitalize="off"
+                               autocorrect="off"
+                               autocomplete="off">
+                    </div>
+
+                    <div class="modal-form__group modal-form__group--horizontal">
+                        <label class="modal-form__label" for="actual_address">Адрес фактический:</label>
+                        <input class="modal-form__input"
+                               type="text"
+                               id="actual_address"
+                               name="actual_address"
+                               spellcheck="false"
+                               autocapitalize="off"
+                               autocorrect="off"
+                               autocomplete="off">
+                    </div>
+
+                    <div class="modal-form__buttons modal-form__buttons--without-bg">
+                        <button class="button modal-form__button" type="submit" id="save-button">Сохранить</button>
+                        <button class="button modal-form__button button--cancel" type="button" id="cancel-button">Отмена</button>
+                    </div>
+
+                    <h3 class="modal-form__section-title">Контакты</h3>
+
+                    <div id="contacts-container">
+                    </div>
+                </div>
+            </form>
+        </aside>
+
+        <div id="context-menu"
+             class="dropdown-menu"
+             data-is-admin="{% if request.user.user_type and request.user.user_type.name == 'Администратор' %}true{% else %}false{% endif %}">
+            <a class="dropdown-item context-action" id="add-button" data-action="add">Добавить</a>
+            <a class="dropdown-item context-action" id="delete-button" data-action="delete">Удалить</a>
+            <a class="dropdown-item context-action" id="add-contact-button" data-action="add-contact">Добавить контакт</a>
+            <a class="dropdown-item context-action" id="edit-contact-button" data-action="edit-contact">Редактировать контакт</a>
+            <a class="dropdown-item context-action" id="delete-contact-button" data-action="delete-contact">Удалить контакт</a>
+            <div class="dropdown-divider"></div>
+            <a class="dropdown-item context-action" id="hide-button" data-action="hide">Скрыть</a>
+            <a class="dropdown-item context-action" id="show-all-button" data-action="show-all">Показать все</a>
+        </div>
+    </div>
+{% endblock content %}
+
+{% block extra_scripts %}
+    {{ block.super }}
+    <script src="{% static 'commerce/js/commerce.js' %}" type="module"></script>
+{% endblock extra_scripts %}
