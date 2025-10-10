@@ -30,4 +30,6 @@ urlpatterns = [
 	path("products/delete/<int:pk>/", views.product_delete, name="product_delete"),
 	path("orders/archive/", views.orders_archive, name="orders_archive"),
 	path("documents/types/", views.document_types, name="document_types"),
+	path("documents/table/<int:pk>/", views.order_documents_table, name="order_documents_table"),
+	path("documents/upload/", views.document_upload, name="document_upload"),
 ]

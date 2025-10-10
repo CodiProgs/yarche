@@ -55,14 +55,6 @@ class Order(models.Model):
     )
     created = models.DateTimeField(auto_now_add=True, verbose_name="Создан")
     deadline = models.DateTimeField(verbose_name="Срок сдачи", blank=True, null=True)
-    documents = models.ForeignKey(
-        Document,
-        on_delete=models.PROTECT,
-        verbose_name="Док-ты",
-        related_name="orders",
-        blank=True,
-        null=True,
-    )
     comment = models.TextField(verbose_name="Комментарий", blank=True, null=True)
     additional_info = models.TextField(
         verbose_name="Дополнительная информация", blank=True, null=True

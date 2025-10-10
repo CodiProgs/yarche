@@ -2,32 +2,8 @@ from django.contrib import admin
 from django.urls import path, re_path, include
 from . import views
 from django.contrib.auth.views import LogoutView
-from django.http import HttpResponseForbidden, Http404
-from django.core.exceptions import PermissionDenied
-
-
-# def dynamic_view(request, category, url_name):
-#     user = request.user
-#     user_type = user.user_type
-
-#     menu_item = user_type.menu_items.filter(url_name=url_name).first()
-#     if not menu_item:
-#         raise PermissionDenied
-
-#     access_codename = f"access_{url_name}"
-#     menu_item_permission = menu_item.permissions.filter(
-#         codename=access_codename
-#     ).first()
-
-#     if menu_item_permission:
-#         if not user_type.permissions.filter(codename=access_codename).exists():
-#             raise PermissionDenied
-
-#     view_function = views.get_view_function(url_name)
-#     if view_function:
-#         return view_function(request, **request.GET.dict())
-#     else:
-#         raise Http404("Страница не найдена")
+from django.conf import settings
+from django.conf.urls.static import static
 
 
 handler404 = "yarche.views.error_404_view"
@@ -55,9 +31,8 @@ urlpatterns = [
         views.ComponentView.as_view(),
         name="app_component_view",
     ),
-    # re_path(
-    #     r"^(?P<category>[\w-]+)/(?P<url_name>[\w-]+)/$",
-    #     dynamic_view,
-    #     name="dynamic_view",
-    # ),
+    
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -17,11 +17,14 @@ from django.db.models.functions import Coalesce
 from django.template.loader import render_to_string
 from yarche.utils import get_model_fields
 from django.contrib.auth.decorators import login_required
-from .models import Product, Client, Order, OrderStatus, Contact, FileType
+from .models import Product, Client, Order, OrderStatus, Contact, FileType, Document
 from ledger.models import Transaction, BankAccount
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.http import require_http_methods
 import json
+from urllib.parse import urlparse, unquote
+import os
+from django.utils.timezone import localtime
 
 
 # region Helpers
@@ -901,3 +904,170 @@ def orders_archive(request):
     }
     return render(request, "commerce/orders_archive.html", context)
 
+@login_required
+@require_http_methods(["GET"])
+def order_documents_table(request, pk: int):
+    order = get_object_or_404(Order, id=pk)
+
+    docs_qs = Document.objects.filter(order=order)
+
+    docs = list(docs_qs.order_by("uploaded_at"))
+
+    def human_size(n):
+        if not n:
+            return ""
+        n = float(n)
+        for unit in ["Б", "КБ", "МБ", "ГБ", "ТБ"]:
+            if n < 1024:
+                if unit == "Б":
+                    return f"{int(n)} {unit}"
+                return f"{n:.2f} {unit}"
+            n /= 1024.0
+        return f"{n:.2f} ТБ"
+
+    for d in docs:
+        d.file_type_name = d.file_type.name if d.file_type else ""
+        try:
+            d.user_name = d.user.last_name if d.user.last_name else d.user.username
+        except Exception:
+            d.user_name = str(d.user) if d.user else ""
+
+        d.file_display = d.name
+
+        try:
+            d.uploaded = (
+                localtime(d.uploaded_at).strftime("%d.%m.%Y %H:%M")
+                if getattr(d, "uploaded_at", None)
+                else ""
+            )
+        except Exception:
+            d.uploaded = str(d.uploaded_at) if getattr(d, "uploaded_at", None) else ""
+
+        d.size_display = human_size(d.size)
+
+    fields = [
+        {"name": "file_type_name", "verbose_name": "Тип файла"},
+        {"name": "user_name", "verbose_name": "Пользователь"},
+        {"name": "file_display", "verbose_name": "Файл"},
+        {"name": "uploaded", "verbose_name": "Загружен", "is_date": True},
+        {"name": "size_display", "verbose_name": "Размер"},
+    ]
+
+    html = render_to_string(
+        "components/table.html",
+        {"fields": fields, "data": docs, "id": f"order-documents-{order.id}"},
+    )
+
+    urls = []
+    for d in docs:
+        try:
+            file_url = getattr(d, "url", None) or getattr(getattr(d, "file", None), "url", None)
+            if file_url:
+                try:
+                    file_url = request.build_absolute_uri(file_url)
+                except Exception:
+                    pass
+            else:
+                file_url = ""
+        except Exception:
+            file_url = ""
+        urls.append(file_url)
+    return JsonResponse({"html": html, "urls": urls})
+
+@login_required
+@require_http_methods(["POST"])
+def document_upload(request):
+    try:
+        with transaction.atomic():
+            uploaded_file = request.FILES.get("file")
+            order_id = request.POST.get("order") or request.POST.get("order_id")
+            file_type_id = request.POST.get("file_type")
+
+            if not uploaded_file:
+                return JsonResponse({"status": "error", "message": "Файл не передан"}, status=400)
+
+            if not order_id:
+                return JsonResponse({"status": "error", "message": "Не указан order"}, status=400)
+
+            if not file_type_id:
+                return JsonResponse({"status": "error", "message": "Не указан file_type"}, status=400)
+
+            try:
+                order = get_object_or_404(Order, id=int(order_id))
+            except (ValueError, TypeError):
+                return JsonResponse({"status": "error", "message": "Неверный id заказа"}, status=400)
+
+            try:
+                file_type = get_object_or_404(FileType, id=int(file_type_id))
+            except (ValueError, TypeError):
+                return JsonResponse({"status": "error", "message": "Неверный id типа файла"}, status=400)
+
+            doc = Document(user=request.user, order=order, file_type=file_type)
+
+            if hasattr(doc, "store_file") and callable(getattr(doc, "store_file")):
+                doc = doc.store_file(uploaded_file, replace_existing=True)
+            else:
+                doc.file.save(uploaded_file.name, uploaded_file, save=False)
+                doc.name = os.path.basename(doc.file.name) or uploaded_file.name
+                try:
+                    doc.size = getattr(uploaded_file, "size", None) or getattr(doc.file, "size", None)
+                except Exception:
+                    doc.size = None
+                doc.save()
+
+                try:
+                    file_url = getattr(doc.file, "url", None)
+                    if file_url and (not doc.url or doc.url != file_url):
+                        doc.url = file_url
+                        doc.save(update_fields=["url"])
+                except Exception:
+                    pass
+
+            def human_size(n):
+                if not n:
+                    return ""
+                n = float(n)
+                for unit in ["Б", "КБ", "МБ", "ГБ", "ТБ"]:
+                    if n < 1024:
+                        if unit == "Б":
+                            return f"{int(n)} {unit}"
+                        return f"{n:.2f} {unit}"
+                    n /= 1024.0
+                return f"{n:.2f} ТБ"
+
+            doc.file_type_name = doc.file_type.name if doc.file_type else ""
+            try:
+                doc.user_name = doc.user.last_name if doc.user and getattr(doc.user, "last_name", "") else doc.user.username
+            except Exception:
+                doc.user_name = str(doc.user) if doc.user else ""
+            doc.file_display = doc.name or ""
+            try:
+                doc.uploaded = (
+                    localtime(doc.uploaded_at).strftime("%d.%m.%Y %H:%M")
+                    if getattr(doc, "uploaded_at", None)
+                    else ""
+                )
+            except Exception:
+                doc.uploaded = str(doc.uploaded_at) if getattr(doc, "uploaded_at", None) else ""
+            doc.size_display = human_size(doc.size)
+
+            fields = [
+                {"name": "file_type_name", "verbose_name": "Тип файла"},
+                {"name": "user_name", "verbose_name": "Пользователь"},
+                {"name": "file_display", "verbose_name": "Файл"},
+                {"name": "uploaded", "verbose_name": "Загружен", "is_date": True},
+                {"name": "size_display", "verbose_name": "Размер"},
+            ]
+
+            html = render_to_string("components/table_row.html", {"item": doc, "fields": fields})
+
+            return JsonResponse(
+                {
+                    "status": "success",
+                    "id": doc.id,
+                    "html": html,
+                    "url": getattr(doc, "url", None) or getattr(getattr(doc, "file", None), "url", None) or "",
+                }
+            )
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)

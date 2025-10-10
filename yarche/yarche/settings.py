@@ -14,11 +14,11 @@ SECRET_KEY = "django-insecure-!-6%7^-jv5o212#!^n)e9p8n$p*(htyxt^+u^l=5l0()=*kvq&
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-# ALLOWED_HOSTS = [
-#     "CodiProgs.mysql.pythonanywhere-services.com",
-#     "CodiProgs.pythonanywhere.com",
-# ]
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = [
+    "CodiProgs.mysql.pythonanywhere-services.com",
+    "CodiProgs.pythonanywhere.com",
+]
+# ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
@@ -72,34 +72,34 @@ WSGI_APPLICATION = "yarche.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": "yarche2",
-        "USER": "root",
-        "PASSWORD": "root",
-        "HOST": "localhost",
-        "PORT": "3306",
-        "OPTIONS": {
-            "charset": "utf8mb4",
-            "init_command": "SET foreign_key_checks = 0;",
-        },
-    }
-}
 # DATABASES = {
 #     "default": {
 #         "ENGINE": "django.db.backends.mysql",
-#         "NAME": "CodiProgs$TestDb2",
-#         "USER": "CodiProgs",
-#         "PASSWORD": "PFMPDifo",
-#         "HOST": "CodiProgs.mysql.pythonanywhere-services.com",
+#         "NAME": "yarche2",
+#         "USER": "root",
+#         "PASSWORD": "root",
+#         "HOST": "localhost",
 #         "PORT": "3306",
 #         "OPTIONS": {
-#             "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
 #             "charset": "utf8mb4",
+#             "init_command": "SET foreign_key_checks = 0;",
 #         },
 #     }
 # }
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": "CodiProgs$TestDb2",
+        "USER": "CodiProgs",
+        "PASSWORD": "PFMPDifo",
+        "HOST": "CodiProgs.mysql.pythonanywhere-services.com",
+        "PORT": "3306",
+        "OPTIONS": {
+            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+            "charset": "utf8mb4",
+        },
+    }
+}
 
 
 # Password validation
@@ -129,7 +129,7 @@ AUTHENTICATION_BACKENDS = [
 
 LANGUAGE_CODE = "ru"
 
-TIME_ZONE = "UTC"
+TIME_ZONE = "Europe/Moscow"
 
 USE_I18N = True
 
@@ -157,3 +157,6 @@ LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "index"
 
 LOGOUT_REDIRECT_URL = "login"
+
+MEDIA_URL = "/uploads/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "uploads")

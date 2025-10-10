@@ -1,0 +1,253 @@
+.menu-container {
+	height: 100%;
+}
+
+.menu {
+	width: 280px;
+	background-color: var(--color-background-window);
+	height: 100%;
+	box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px 0px;
+	overflow: hidden;
+}
+
+.burger-menu {
+	z-index: 1000;
+	position: absolute;
+
+	width: 40px;
+	height: 40px;
+	display: none;
+	cursor: pointer;
+	right: 0;
+	top: 0;
+
+	border-bottom-left-radius: 0.25rem;
+	border: 1px solid var(--color-button-primary-border-hover);
+	background-color: var(--color-button-tertiary-background);
+}
+
+.burger-menu__line,
+.burger-menu::before,
+.burger-menu::after {
+	left: 8px;
+	position: absolute;
+	height: 2px;
+	width: 24px;
+	transition: all 0.3s ease 0s;
+	background-color: var(--color-icon);
+}
+
+.burger-menu::before,
+.burger-menu::after {
+	content: '';
+}
+
+.burger-menu::before {
+	top: 12px;
+}
+
+.burger-menu::after {
+	bottom: 12px;
+}
+
+.burger-menu__line {
+	top: 50%;
+	transform: translateY(-50%);
+}
+
+.menu__title {
+	height: 28px;
+	background-color: var(--color-primary);
+	color: white;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.menu__section {
+	line-height: 24px;
+	color: var(--text-color);
+}
+
+.menu__category {
+	cursor: pointer;
+	position: relative;
+}
+
+.menu__category--active .menu__arrow {
+	transform: rotate(0deg);
+}
+
+.menu__header {
+	display: flex;
+	align-items: center;
+	padding: 0 10px;
+}
+
+.menu__icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 16px;
+	width: 18px;
+	height: 18px;
+	margin-right: 10px;
+	color: var(--color-icon);
+}
+
+.menu__arrow {
+	display: inline-block;
+	margin-left: auto;
+	width: 0;
+	height: 0;
+	border-left: 5px solid transparent;
+	border-right: 5px solid transparent;
+	border-top: 5px solid var(--color-text-secondary);
+	transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+	transform: rotate(-90deg);
+}
+
+.menu__content {
+	overflow: hidden;
+	position: relative;
+	max-height: 0;
+	clip-path: inset(0 0 100% 0);
+	transition: clip-path 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+		max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s linear;
+}
+
+.menu__content::after {
+	content: '';
+	display: block;
+	height: 0;
+	overflow: hidden;
+}
+
+.menu__category--active .menu__content {
+	clip-path: inset(0 0 0 0);
+	max-height: none;
+}
+
+.menu__list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.menu__header,
+.menu__subitem {
+	transition: background 0.3s;
+	height: 24px;
+}
+
+.menu__header:focus-visible,
+.menu__subitem:focus-visible {
+	outline: none;
+	border: 1px solid var(--color-primary);
+}
+
+.menu__header:hover,
+.menu__subitem:hover {
+	background-color: var(--color-button-primary-hover);
+}
+
+.menu__subitem--active {
+	background-color: var(--color-button-primary-border);
+}
+
+.menu__subitem--active:hover {
+	background-color: var(--color-button-primary-border);
+}
+
+.menu__link {
+	display: inline-flex;
+	align-items: center;
+	width: 100%;
+	height: 100%;
+	padding-left: 26px;
+}
+
+.overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background: rgba(0, 0, 0, 0.5);
+	z-index: 998;
+	display: none;
+	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (max-width: 768px) {
+	.burger-menu {
+		display: block;
+	}
+
+	.menu--active + .burger-menu {
+		background-color: transparent;
+		border-color: transparent;
+
+		.burger-menu__line,
+		&::before,
+		&::after {
+			background-color: white;
+		}
+	}
+
+	.menu__title {
+		position: sticky;
+		width: 100%;
+		top: 0;
+		left: 0;
+		z-index: 999;
+	}
+
+	.menu--active + .burger-menu .burger-menu__line {
+		display: none;
+	}
+
+	.menu--active + .burger-menu::before {
+		top: 50%;
+		transform: translateY(-50%) rotate(45deg);
+	}
+
+	.menu--active + .burger-menu::after {
+		top: 50%;
+		transform: translateY(-50%) rotate(-45deg);
+	}
+
+	.menu {
+		width: 300px !important;
+		position: fixed !important;
+		z-index: 999;
+		top: 0;
+		left: 0;
+		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+		overflow-y: auto;
+		transform: translate(-100%);
+	}
+
+	.menu--active {
+		transform: translate(0);
+	}
+
+	.menu--active ~ .overlay {
+		display: block;
+	}
+}
+
+@media (max-width: 425px) {
+	.menu {
+		width: 100% !important;
+	}
+
+	.menu__header,
+	.menu__subitem {
+		height: 32px;
+	}
+
+	.menu__title {
+		height: 40px;
+	}
+}
