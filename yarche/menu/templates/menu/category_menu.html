@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+{% load static %}
+
+{% block title %}{{ category.display_name }} - Ярче{% endblock %}
+
+{% block content %}
+<div class="category-menu">
+    <h1 class="category-menu__title">{{ category.display_name }}</h1>
+    
+    <div class="category-menu__grid">
+        {% for item in menu_items %}
+        <a href="{{ item.full_url }}" class="category-menu__card">
+            <h3 class="category-menu__card-title">{{ item.title }}</h3>
+        </a>
+        {% empty %}
+        <p class="category-menu__empty">Нет доступных пунктов меню</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

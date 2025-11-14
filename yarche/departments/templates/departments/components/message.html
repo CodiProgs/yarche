@@ -1,0 +1,30 @@
+{% load static %}
+{% load components %}
+{% add_style 'css/modal-form.css' %}
+<form class="modal-form" id="message-form" method="post">
+    <div class="modal-form__content">
+        {% csrf_token %}
+        <div class="modal-form__group">
+			<label class="modal-form__label" for="recipient">Кому</label>
+            {% include "components/select.html" with id="recipient" placeholder="Выберите получателя" %}
+        </div>
+		<div class="modal-form__group">
+            <div class="input-container">
+                <textarea class="modal-form__textarea"
+                          type="text"
+                          id="message"
+                          name="message"
+                       autocapitalize="off"
+                       autocorrect="off"
+                       autocomplete="off"
+                          placeholder=""></textarea>
+                <img src="{% static 'images/close.svg' %}" alt="Clear" class="clear-button">
+            </div>
+        </div>
+        
+        <div class="modal-form__buttons">
+            <button class="button modal-form__button" type="submit">Сохранить</button>
+            <button class="button modal-form__button button--cancel" type="button">Отменить</button>
+        </div>
+    </div>
+</form>

@@ -15,6 +15,8 @@ urlpatterns = [
     path("ledger/", include("ledger.urls")),
     path("commerce/", include("commerce.urls")),
     path("users/", include("users.urls")),
+    path("departments/", include("departments.urls")),
+    path("menu/", include("menu.urls")),
     path(
         "login/",
         views.CustomLoginView.as_view(),
@@ -31,7 +33,6 @@ urlpatterns = [
         views.ComponentView.as_view(),
         name="app_component_view",
     ),
-    
 ]
 
 if settings.DEBUG:

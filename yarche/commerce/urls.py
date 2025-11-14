@@ -9,6 +9,7 @@ urlpatterns = [
     path("orders/<int:pk>/debt/", views.order_debt, name="order_debt"),
     path("orders/ids/", views.order_ids, name="order_ids"),
 	path("orders/statuses/", views.order_statuses, name="order_statuses"),
+	path("orders/add/", views.order_create, name="order_add"),
 	path("works/", views.works, name="works"),
 	path("product_orders/", views.product_orders, name="product_orders"),
     path("clients/", views.clients, name="clients"),
@@ -32,4 +33,8 @@ urlpatterns = [
 	path("documents/types/", views.document_types, name="document_types"),
 	path("documents/table/<int:pk>/", views.order_documents_table, name="order_documents_table"),
 	path("documents/upload/", views.document_upload, name="document_upload"),
+	path("clients/objects/<int:pk>/", views.client_object_detail, name="client_object_detail"),
+	path("clients/objects/add/", views.client_object_create, name="client_object_add"),
+	path("clients/objects/edit/<int:pk>/", views.client_object_update, name="client_object_edit"),
+	path("clients/objects/delete/<int:pk>/", views.client_object_delete, name="client_object_delete"),
 ]

@@ -12,7 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-!-6%7^-jv5o212#!^n)e9p8n$p*(htyxt^+u^l=5l0()=*kvq&"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = [
     "CodiProgs.mysql.pythonanywhere-services.com",
@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "users",
     "commerce",
     "ledger",
+    "departments",
 ]
 
 MIDDLEWARE = [

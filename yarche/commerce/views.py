@@ -17,7 +17,7 @@ from django.db.models.functions import Coalesce
 from django.template.loader import render_to_string
 from yarche.utils import get_model_fields
 from django.contrib.auth.decorators import login_required
-from .models import Product, Client, Order, OrderStatus, Contact, FileType, Document
+from .models import Product, Client, Order, OrderStatus, Contact, FileType, Document, ClientObject
 from ledger.models import Transaction, BankAccount
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.http import require_http_methods
@@ -281,17 +281,50 @@ def product_orders(request):
     product_id = request.GET.get("product_id")
     client_id = request.GET.get("client_id")
     object_id = request.GET.get("object_id")
+    
     orders = Order.objects.filter(
         product_id=product_id,
         client_id=client_id,
         client_object_id=object_id,
-    )
-    html = ""
+    ).order_by("-created")
+    
+    data = []
     for order in orders:
-        html += f'<li class="debtors-office-list__item"><div class="debtors-office-list__row" style="border-left-width: 52px;">Заказ №{order.id} — {order.amount} р.</div></li>'
-    if not html:
-        html = "<li class='debtors-office-list__item'><div class='debtors-office-list__row' style='border-left-width: 52px;'>Нет заказов</div></li>"
-    return JsonResponse({"html": html})
+        order.legal_name = order.client.legal_name if order.client else None
+        order.paid_percent = int(order.paid_amount / order.amount * 100) if order.amount else 0
+        data.append(order)
+    
+    fields = [
+        {"name": "id", "verbose_name": "Заказ"},
+        {"name": "status", "verbose_name": "Статус", "is_relation": True},
+        {"name": "client", "verbose_name": "Клиент", "is_relation": True},
+        {"name": "legal_name", "verbose_name": "Полное юринфо"},
+        {"name": "product", "verbose_name": "Продукт", "is_relation": True},
+        {"name": "created", "verbose_name": "Создан", "is_date": True},
+        {"name": "deadline", "verbose_name": "Срок сдачи", "is_date": True},
+        {"name": "required_documents", "verbose_name": "Док-ты", "is_boolean": True},
+        {"name": "unit_price", "verbose_name": "Стоимость", "is_amount": True},
+        {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+        {"name": "paid_amount", "verbose_name": "Погашено", "is_amount": True},
+        {"name": "comment", "verbose_name": "Комментарий"},
+        {"name": "additional_info", "verbose_name": "Доп. инф-я"},
+    ]
+    
+    table_id = f"product-orders-{product_id}-{client_id}-{object_id}"
+    
+    html = render_to_string(
+        "components/table.html",
+        {
+            "fields": fields,
+            "data": data,
+            "id": table_id,
+        },
+    )
+    
+    if not data:
+        html = '<div class="info debtors-office-list__row" border-left-width: 16px;>Нет заказов</div>'
+    
+    return JsonResponse({"html": html, "order_ids": [o.id for o in orders], "table_id": table_id})
 
 @login_required
 def orders(request):
@@ -316,6 +349,7 @@ def get_order_fields():
         "documents",
         "paid_amount",
         "comment",
+        "archived_at"
     ]
     field_order = [
         "id",
@@ -1071,3 +1105,348 @@ def document_upload(request):
             )
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@login_required
+@require_http_methods(["POST"])
+def client_object_create(request):
+    try:
+        with transaction.atomic():
+            client_id = request.POST.get("client") or request.POST.get("client_id") or request.POST.get("client_form_id")
+            name = (request.POST.get("name") or "").strip()
+
+            if not client_id:
+                return JsonResponse({"status": "error", "message": "Не указан клиент"}, status=400)
+
+            if not name:
+                return JsonResponse({"status": "error", "message": "Требуется указать название объекта"}, status=400)
+
+            client = get_object_or_404(Client, id=client_id)
+
+            obj = ClientObject.objects.create(client=client, name=name)
+
+            products = Product.objects.all()
+            
+            products_html = ""
+            for product in products:
+                products_html += f'''
+                    <li class="debtors-office-list__item">
+                        <div class="debtors-office-list__row" data-target="product-{client_id}-{obj.id}-{product.id}" data-product-id="{product.id}" data-client-id="{client_id}" data-object-id="{obj.id}" style="border-left-width: 24px;">
+                            <button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
+                            <span class="debtors-office-list__title">{product.name}</span>
+                        </div>
+                        <div class="debtors-office-list__details" id="product-{client_id}-{obj.id}-{product.id}">
+                        </div>
+                    </li>
+                '''
+            
+            object_html = f'''
+                <li class="debtors-office-list__item">
+                    <div class="debtors-office-list__row" data-target="object-{client_id}-{obj.id}" style="border-left-width: 16px;">
+                        <button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
+                        <h4>{obj.name}</h4>
+                    </div>
+                    <div class="debtors-office-list__details" id="object-{client_id}-{obj.id}">
+                        <ul>
+                            {products_html}
+                        </ul>
+                    </div>
+                </li>
+            '''
+
+            return JsonResponse(
+                {
+                    "status": "success",
+                    "id": obj.id,
+                    "html": object_html,
+                    "client_id": client_id,
+                    "object": {
+                        "id": obj.id,
+                        "name": obj.name,
+                    }
+                }
+            )
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["POST"])
+def client_object_delete(request, pk: int):
+    try:
+        with transaction.atomic():
+            client_object = get_object_or_404(ClientObject, id=pk)
+            
+            if Order.objects.filter(client_object=client_object).exists():
+                return JsonResponse(
+                    {"status": "error", "message": "Нельзя удалить объект с привязанными заказами"},
+                    status=400,
+                )
+            
+            client_object.delete()
+            return JsonResponse({"status": "success"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["PUT", "PATCH", "POST"])
+def client_object_update(request, pk: int):
+    try:
+        with transaction.atomic():
+            client_object = get_object_or_404(ClientObject, id=pk)
+            data = (
+                json.loads(request.body) if request.method in ["PUT", "PATCH"] else request.POST.dict()
+            )
+
+            if "name" in data:
+                name = data["name"]
+                if isinstance(name, str):
+                    name = name.strip()
+                else:
+                    name = str(name).strip()
+
+                if not name:
+                    return JsonResponse(
+                        {"status": "error", "message": "Требуется указать название объекта"},
+                        status=400,
+                    )
+
+                client_object.name = name
+
+            if not client_object.name or (isinstance(client_object.name, str) and not client_object.name.strip()):
+                return JsonResponse(
+                    {"status": "error", "message": "Требуется указать название объекта"},
+                    status=400,
+                )
+
+            client_object.save()
+
+            products = Product.objects.all()
+            client_id = client_object.client.id
+            
+            products_html = ""
+            for product in products:
+                products_html += f'''
+                    <li class="debtors-office-list__item">
+                        <div class="debtors-office-list__row" data-target="product-{client_id}-{client_object.id}-{product.id}" data-product-id="{product.id}" data-client-id="{client_id}" data-object-id="{client_object.id}" style="border-left-width: 24px;">
+                            <button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
+                            <span class="debtors-office-list__title">{product.name}</span>
+                        </div>
+                        <div class="debtors-office-list__details" id="product-{client_id}-{client_object.id}-{product.id}">
+                        </div>
+                    </li>
+                '''
+            
+            object_html = f'''
+                <li class="debtors-office-list__item">
+                    <div class="debtors-office-list__row" data-target="object-{client_id}-{client_object.id}" style="border-left-width: 16px;">
+                        <button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
+                        <h4>{client_object.name}</h4>
+                    </div>
+                    <div class="debtors-office-list__details" id="object-{client_id}-{client_object.id}">
+                        <ul>
+                            {products_html}
+                        </ul>
+                    </div>
+                </li>
+            '''
+
+            return JsonResponse(
+                {
+                    "status": "success",
+                    "id": client_object.id,
+                    "html": object_html,
+                    "client_id": client_id,
+                    "object": {
+                        "id": client_object.id,
+                        "name": client_object.name,
+                    }
+                }
+            )
+    except json.JSONDecodeError:
+        return JsonResponse({"status": "error", "message": "Неверный формат JSON"}, status=400)
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["GET"])
+def client_object_detail(request, pk: int):
+    client_object = get_object_or_404(ClientObject, id=pk)
+    data = model_to_dict(client_object)
+
+    fields = [
+        {"name": "id", "verbose_name": "ID"},
+        {"name": "name", "verbose_name": "Название объекта"},
+    ]
+
+    html = render_to_string("components/table_row.html", {"item": client_object, "fields": fields})
+    return JsonResponse({"data": data, "html": html})
+
+@login_required
+@require_http_methods(["POST"])
+def order_create(request):
+    try:
+        with transaction.atomic():
+            client_id = request.POST.get("client") or request.POST.get("client_id")
+            product_id = request.POST.get("product") or request.POST.get("product_id")
+            
+            if not client_id:
+                return JsonResponse(
+                    {"status": "error", "message": "Не указан клиент"},
+                    status=400,
+                )
+            
+            if not product_id:
+                return JsonResponse(
+                    {"status": "error", "message": "Не указана продукция"},
+                    status=400,
+                )
+            
+            try:
+                client = get_object_or_404(Client, id=int(client_id))
+            except (ValueError, TypeError):
+                return JsonResponse(
+                    {"status": "error", "message": "Неверный ID клиента"},
+                    status=400,
+                )
+            
+            try:
+                product = get_object_or_404(Product, id=int(product_id))
+            except (ValueError, TypeError):
+                return JsonResponse(
+                    {"status": "error", "message": "Неверный ID продукции"},
+                    status=400,
+                )
+            
+            deadline_str = (request.POST.get("deadline") or "").strip()
+            deadline = None
+            if deadline_str:
+                from django.utils.dateparse import parse_datetime
+                from django.utils import timezone
+                
+                deadline = parse_datetime(deadline_str)
+                if deadline and timezone.is_naive(deadline):
+                    deadline = timezone.make_aware(deadline)
+            
+            required_documents = request.POST.get("required_documents") == "on" or request.POST.get("required_documents") == "true"
+            
+            unit_price_str = (request.POST.get("unit_price") or "").strip()
+            unit_price = None
+            if unit_price_str:
+                try:
+                    cleaned_price = unit_price_str.replace(" р.", "").replace("р.", "").replace(" ", "").replace(",", ".")
+                    unit_price = float(cleaned_price)
+                except (ValueError, TypeError):
+                    return JsonResponse(
+                        {"status": "error", "message": "Неверный формат цены за единицу"},
+                        status=400,
+                    )
+            
+            quantity_str = (request.POST.get("quantity") or "").strip()
+            quantity = None
+            if quantity_str:
+                try:
+                    quantity = float(quantity_str.replace(" ", "").replace(",", "."))
+                except (ValueError, TypeError):
+                    return JsonResponse(
+                        {"status": "error", "message": "Неверный формат количества"},
+                        status=400,
+                    )
+            
+            amount_str = (request.POST.get("amount") or "").strip()
+            if not amount_str:
+                if unit_price is not None and quantity is not None:
+                    amount = unit_price * quantity
+                else:
+                    return JsonResponse(
+                        {"status": "error", "message": "Требуется указать цену и количество"},
+                        status=400,
+                    )
+            else:
+                try:
+                    cleaned_amount = amount_str.replace(" р.", "").replace("р.", "").replace(" ", "").replace(",", ".")
+                    amount = float(cleaned_amount)
+                except (ValueError, TypeError):
+                    return JsonResponse(
+                        {"status": "error", "message": "Неверный формат суммы"},
+                        status=400,
+                    )
+            
+            comment = (request.POST.get("comment") or "").strip() or None
+            additional_info = (request.POST.get("additional_info") or "").strip() or None
+            
+            client_object_id = request.POST.get("client_object") or request.POST.get("client_object_id")
+            client_object = None
+            if client_object_id:
+                try:
+                    client_object = get_object_or_404(ClientObject, id=int(client_object_id))
+                except (ValueError, TypeError):
+                    return JsonResponse(
+                        {"status": "error", "message": "Неверный ID объекта клиента"},
+                        status=400,
+                    )
+            
+            default_status = OrderStatus.objects.first()
+            if not default_status:
+                return JsonResponse(
+                    {"status": "error", "message": "В системе не настроены статусы заказов"},
+                    status=400,
+                )
+            
+            order = Order.objects.create(
+                status=default_status,
+                manager=request.user,
+                client=client,
+                product=product,
+                unit_price=unit_price,
+                quantity=quantity,
+                amount=amount,
+                deadline=deadline,
+                comment=comment,
+                additional_info=additional_info,
+                client_object=client_object,
+                required_documents=required_documents,
+            )
+            
+            order.legal_name = order.client.legal_name if order.client else None
+            order.paid_percent = int(order.paid_amount / order.amount * 100) if order.amount else 0
+            
+            fields = [
+                {"name": "id", "verbose_name": "Заказ"},
+                {"name": "status", "verbose_name": "Статус", "is_relation": True},
+                {"name": "client", "verbose_name": "Клиент", "is_relation": True},
+                {"name": "legal_name", "verbose_name": "Полное юринфо"},
+                {"name": "product", "verbose_name": "Продукт", "is_relation": True},
+                {"name": "created", "verbose_name": "Создан", "is_date": True},
+                {"name": "deadline", "verbose_name": "Срок сдачи", "is_date": True},
+                {"name": "required_documents", "verbose_name": "Док-ты", "is_boolean": True},
+                {"name": "unit_price", "verbose_name": "Стоимость", "is_amount": True},
+                {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+                {"name": "paid_amount", "verbose_name": "Погашено", "is_amount": True},
+                {"name": "comment", "verbose_name": "Комментарий"},
+                {"name": "additional_info", "verbose_name": "Доп. инф-я"},
+            ]
+            
+            object_id = client_object.id if client_object else "noobject"
+            table_id = f"product-orders-{product_id}-{client_id}-{object_id}"
+            
+            html = render_to_string(
+                "components/table_row.html",
+                {
+                    "item": order,
+                    "fields": fields,
+                },
+            )
+            
+            return JsonResponse(
+                {
+                    "status": "success",
+                    "id": order.id,
+                    "html": html,
+                    "table_id": table_id,
+                }
+            )
+            
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+

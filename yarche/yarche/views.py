@@ -75,3 +75,4 @@ class ComponentView(TemplateView):
 
         context = request.GET.dict()
         return super().render_to_response(context=context)
+

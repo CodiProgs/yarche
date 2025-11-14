@@ -1034,6 +1034,10 @@ export const TableManager = {
 			if (tableEl.id) {
 				this.tables.set(tableEl.id, new ResizableTable(tableEl))
 				this.formatCurrencyValues(tableEl.id)
+
+				tableEl.querySelectorAll('tbody .table__row').forEach(row => {
+					this.attachRowCellHandlers(row)
+				})
 			}
 		})
 		this.setInitialCellSelection()
@@ -1392,6 +1396,10 @@ export const TableManager = {
 		const newTable = new ResizableTable(table, columnWidths)
 		this.tables.set(tableId, newTable)
 		this.formatCurrencyValues(tableId)
+
+		table.querySelectorAll('tbody .table__row').forEach(row => {
+			this.attachRowCellHandlers(row)
+		})
 	},
 
 	updateTable(htmlContent, tableId) {
@@ -1580,6 +1588,53 @@ export const TableManager = {
 	attachRowCellHandlers(row) {
 		row.querySelectorAll('.table__cell').forEach(cell => {
 			cell.addEventListener('click', this.onTableCellClick.bind(this))
+
+			const isTruncated = el => {
+				if (!el) return false
+				return el.scrollWidth > el.clientWidth + 1
+			}
+
+			const updateTitle = () => {
+				try {
+					const text = (cell.innerText || cell.textContent || '').trim()
+					const target = cell.firstElementChild || cell
+
+					if (text && isTruncated(target)) {
+						if (cell.getAttribute('title') !== text) {
+							cell.setAttribute('title', text)
+						}
+						if (cell.firstElementChild) {
+							cell.firstElementChild.setAttribute('title', text)
+						}
+					} else {
+						cell.removeAttribute('title')
+						if (cell.firstElementChild) {
+							cell.firstElementChild.removeAttribute('title')
+						}
+					}
+				} catch (e) {}
+			}
+
+			const mouseEnterHandler = () => updateTitle()
+			cell.addEventListener('mouseenter', mouseEnterHandler)
+
+			if (window.MutationObserver) {
+				const mo = new MutationObserver(updateTitle)
+				mo.observe(cell, {
+					childList: true,
+					subtree: true,
+					characterData: true,
+				})
+				cell._table_mutation_observer = mo
+			}
+			if (window.ResizeObserver) {
+				const ro = new ResizeObserver(updateTitle)
+				ro.observe(cell)
+				if (cell.firstElementChild) ro.observe(cell.firstElementChild)
+				cell._table_resize_observer = ro
+			}
+
+			requestAnimationFrame(updateTitle)
 		})
 	},
 
@@ -2318,4 +2373,50 @@ document.addEventListener('DOMContentLoaded', function () {
 	// }
 	// window.addEventListener('resize', resizeCharts)
 	// resizeCharts()
+
+	;(function () {
+		const sidebar = document.querySelector('.sidebar-nav')
+		if (!sidebar) return
+
+		let btn = sidebar.querySelector('.burger-button')
+		if (!btn) {
+			btn = document.createElement('button')
+			btn.className = 'burger-button'
+			btn.setAttribute('aria-label', 'Открыть меню')
+			btn.setAttribute('aria-expanded', 'false')
+			btn.innerHTML = '<span class="bar"></span>'
+			document.body.appendChild(btn)
+		}
+
+		const toggle = () => {
+			const opened = sidebar.classList.toggle('nav-open')
+			btn.setAttribute('aria-expanded', opened ? 'true' : 'false')
+			document.body.classList.toggle('nav-menu-open', opened)
+		}
+
+		btn.addEventListener('click', e => {
+			e.stopPropagation()
+			toggle()
+		})
+
+		document.addEventListener('click', e => {
+			if (!sidebar.contains(e.target) && !btn.contains(e.target)) {
+				sidebar.classList.remove('nav-open')
+				btn.setAttribute('aria-expanded', 'false')
+				document.body.classList.remove('nav-menu-open')
+			}
+		})
+
+		if (window.innerWidth <= 680) {
+			sidebar.classList.remove('nav-open')
+			document.body.classList.remove('nav-menu-open')
+		}
+		window.addEventListener('resize', () => {
+			if (window.innerWidth > 680) {
+				sidebar.classList.remove('nav-open')
+				btn.setAttribute('aria-expanded', 'false')
+				document.body.classList.remove('nav-menu-open')
+			}
+		})
+	})()
 })

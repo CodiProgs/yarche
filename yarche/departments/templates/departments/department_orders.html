@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+{% load static %}
+{% block content %}
+    <div class="page-table-container" id="department_orders-container">
+        {% include "components/table.html" with id="department_orders-table" fields=fields data=data %}
+        <div id="context-menu"
+            class="dropdown-menu"
+            data-is-admin="{% if request.user.user_type and request.user.user_type.name == 'Администратор' %}true{% else %}false{% endif %}">
+            <a class="dropdown-item context-action"
+               id="assign_executor-button"
+               data-action="assign_executor">Назначить исполнителя</a>
+			<a class="dropdown-item context-action"
+			   id="update_status-button"
+			   data-action="update_status">Сменить статус</a>
+			<a class="dropdown-item context-action"
+			   id="view_correspondence-button"
+			   data-action="view_correspondence">Переписка по заказу</a>
+			<a class="dropdown-item context-action"
+			   id="view_order_files-button"
+			   data-action="view_order_files">Файлы заказа</a>
+            <a class="dropdown-item context-action"
+               id="new_message-button"
+               data-action="new_message">Новое сообщение</a>
+            <a class="dropdown-item context-action"
+               id="edit_message-button"
+               data-action="edit_message">Отредактировать сообщение</a>
+            <a class="dropdown-item context-action"
+               id="delete_message-button"
+               data-action="delete_message">Удалить сообщение</a>
+            <a class="dropdown-item context-action"
+               id="refresh_messages-button"
+               data-action="refresh_messages">Обновить</a>
+        </div>
+    </div>
+{% endblock content %}
+{% block extra_scripts %}
+    {{ block.super }}
+    <script src="{% static 'commerce/js/commerce.js' %}" type="module"></script>
+{% endblock extra_scripts %}

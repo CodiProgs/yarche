@@ -1,0 +1,111 @@
+{% load static %}
+{% load components %}
+{% add_style 'css/modal-form.css' %}
+<form class="modal-form" id="orders-form" method="post">
+    <div class="modal-form__content">
+        {% csrf_token %}
+        <input class="modal-form__input"
+            type="text"
+            id="client_object"
+            spellcheck="false"
+            autocapitalize="off"
+            autocorrect="off"
+            autocomplete="off"
+            hidden
+            name="client_object">
+        <div class="modal-form__group">
+			<label class="modal-form__label" for="client">Клиент</label>
+            {% include "components/select.html" with id="client" placeholder="Выберите клиента" %}
+        </div>
+        <div class="modal-form__group">
+			<label class="modal-form__label" for="product">Продукция</label>
+            {% include "components/select.html" with id="product" placeholder="Выберите продукцию" %}
+        </div>
+        <div class="modal-form__row" style="align-items: flex-end;">
+            <div class="modal-form__group modal-form__group--width-40">
+				<label class="modal-form__label" for="report_date">Дата завершения</label>
+				<input class="modal-form__input"
+					type="date"
+					id="deadline"
+					name="deadline"
+					autocapitalize="off"
+					autocorrect="off"
+					autocomplete="off"
+					placeholder="Выберите дату">
+			</div>
+            <div class="modal-form__group modal-form__group--width-40" style="padding-bottom: 5px;">
+                {% include "components/checkbox.html" with value="false" id="required_documents" label="Документы" %}
+            </div>
+        </div>
+		<div class="modal-form__row" >
+            <div class="modal-form__group modal-form__group--width-30">
+				<label class="modal-form__label" for="unit_price">Цена за единицу</label>
+				 <input class="modal-form__input"
+                   type="text"
+                   id="unit_price"
+                   name="unit_price"
+                   spellcheck="false"
+                       autocapitalize="off"
+                       autocorrect="off"
+                       autocomplete="off"
+                   placeholder="0">
+			</div>
+            <div class="modal-form__group modal-form__group--width-30">
+				<label class="modal-form__label" for="quantity">Количество</label>
+				 <input class="modal-form__input"
+                   type="number"
+                   id="quantity"
+                   name="quantity"
+                   spellcheck="false"
+                       autocapitalize="off"
+                       autocorrect="off"
+                       autocomplete="off"
+                   placeholder="0">
+			</div>
+			<div class="modal-form__group modal-form__group--width-30">
+				<label class="modal-form__label" for="amount">Сумма</label>
+				 <input class="modal-form__input"
+                   type="text"
+                   id="amount"
+                   readonly
+                   name="amount"
+                   spellcheck="false"
+                       autocapitalize="off"
+                       autocorrect="off"
+                       autocomplete="off"
+                   placeholder="0">
+			</div>
+        </div>
+        <div class="modal-form__group">
+            <div class="input-container">
+                <textarea class="modal-form__textarea"
+                          type="text"
+                          id="comment"
+                          name="comment"
+                       autocapitalize="off"
+                       autocorrect="off"
+                       autocomplete="off"
+                          placeholder="Комментарий к заказу"></textarea>
+                <img src="{% static 'images/close.svg' %}" alt="Clear" class="clear-button">
+            </div>
+        </div>
+		<div class="modal-form__group">
+            <div class="input-container">
+                <textarea class="modal-form__textarea"
+                          type="text"
+                          id="additional_info"
+                          name="additional_info"
+                       autocapitalize="off"
+                       autocorrect="off"
+                       autocomplete="off"
+                          placeholder="Дополнительная информация"></textarea>
+                <img src="{% static 'images/close.svg' %}" alt="Clear" class="clear-button">
+            </div>
+        </div>
+        
+        <div class="modal-form__buttons">
+            <button class="button modal-form__button" type="submit">Сохранить</button>
+            <button class="button modal-form__button button--cancel" type="button">Отменить</button>
+        </div>
+    </div>
+</form>
