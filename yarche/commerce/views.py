@@ -17,14 +17,15 @@ from django.db.models.functions import Coalesce
 from django.template.loader import render_to_string
 from yarche.utils import get_model_fields
 from django.contrib.auth.decorators import login_required
-from .models import Product, Client, Order, OrderStatus, Contact, FileType, Document, ClientObject
+from .models import Product, Client, Order, OrderStatus, Contact, FileType, Document, ClientObject, OrderDepartmentWork, KanbanClientPlacement, KanbanColumn
 from ledger.models import Transaction, BankAccount
 from django.shortcuts import render, get_object_or_404
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 import json
-from urllib.parse import urlparse, unquote
+from users.models import User
 import os
 from django.utils.timezone import localtime
+from django.utils.text import get_valid_filename
 
 
 # region Helpers
@@ -276,6 +277,8 @@ def works(request):
 
     return render(request, "commerce/works.html", context)
 
+from django.db.models import Q
+
 @login_required
 def product_orders(request):
     product_id = request.GET.get("product_id")
@@ -286,24 +289,18 @@ def product_orders(request):
         product_id=product_id,
         client_id=client_id,
         client_object_id=object_id,
+    ).filter(
+        Q(manager=request.user) | Q(viewers=request.user)
     ).order_by("-created")
-    
-    data = []
-    for order in orders:
-        order.legal_name = order.client.legal_name if order.client else None
-        order.paid_percent = int(order.paid_amount / order.amount * 100) if order.amount else 0
-        data.append(order)
     
     fields = [
         {"name": "id", "verbose_name": "Заказ"},
         {"name": "status", "verbose_name": "Статус", "is_relation": True},
-        {"name": "client", "verbose_name": "Клиент", "is_relation": True},
-        {"name": "legal_name", "verbose_name": "Полное юринфо"},
-        {"name": "product", "verbose_name": "Продукт", "is_relation": True},
         {"name": "created", "verbose_name": "Создан", "is_date": True},
         {"name": "deadline", "verbose_name": "Срок сдачи", "is_date": True},
         {"name": "required_documents", "verbose_name": "Док-ты", "is_boolean": True},
         {"name": "unit_price", "verbose_name": "Стоимость", "is_amount": True},
+        {"name": "quantity", "verbose_name": "Количество"},
         {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
         {"name": "paid_amount", "verbose_name": "Погашено", "is_amount": True},
         {"name": "comment", "verbose_name": "Комментарий"},
@@ -316,15 +313,15 @@ def product_orders(request):
         "components/table.html",
         {
             "fields": fields,
-            "data": data,
+            "data": orders,
             "id": table_id,
         },
     )
     
-    if not data:
+    if not orders:
         html = '<div class="info debtors-office-list__row" border-left-width: 16px;>Нет заказов</div>'
-    
-    return JsonResponse({"html": html, "order_ids": [o.id for o in orders], "table_id": table_id})
+
+    return JsonResponse({"html": html, "order_ids": [o.id for o in orders], "table_id": table_id })
 
 @login_required
 def orders(request):
@@ -1008,6 +1005,7 @@ def order_documents_table(request, pk: int):
         urls.append(file_url)
     return JsonResponse({"html": html, "urls": urls})
 
+
 @login_required
 @require_http_methods(["POST"])
 def document_upload(request):
@@ -1016,6 +1014,8 @@ def document_upload(request):
             uploaded_file = request.FILES.get("file")
             order_id = request.POST.get("order") or request.POST.get("order_id")
             file_type_id = request.POST.get("file_type")
+
+            desired_name = (request.POST.get("filename") or request.POST.get("name") or "").strip()
 
             if not uploaded_file:
                 return JsonResponse({"status": "error", "message": "Файл не передан"}, status=400)
@@ -1035,6 +1035,14 @@ def document_upload(request):
                 file_type = get_object_or_404(FileType, id=int(file_type_id))
             except (ValueError, TypeError):
                 return JsonResponse({"status": "error", "message": "Неверный id типа файла"}, status=400)
+
+            if desired_name:
+                desired_name = get_valid_filename(desired_name)
+                orig_ext = os.path.splitext(uploaded_file.name)[1]
+                if orig_ext and not os.path.splitext(desired_name)[1]:
+                    desired_name = desired_name + orig_ext
+                if desired_name:
+                    uploaded_file.name = desired_name
 
             doc = Document(user=request.user, order=order, file_type=file_type)
 
@@ -1268,18 +1276,9 @@ def client_object_update(request, pk: int):
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 @login_required
-@require_http_methods(["GET"])
 def client_object_detail(request, pk: int):
     client_object = get_object_or_404(ClientObject, id=pk)
-    data = model_to_dict(client_object)
-
-    fields = [
-        {"name": "id", "verbose_name": "ID"},
-        {"name": "name", "verbose_name": "Название объекта"},
-    ]
-
-    html = render_to_string("components/table_row.html", {"item": client_object, "fields": fields})
-    return JsonResponse({"data": data, "html": html})
+    return JsonResponse({"data": model_to_dict(client_object)})
 
 @login_required
 @require_http_methods(["POST"])
@@ -1346,6 +1345,8 @@ def order_create(request):
             if quantity_str:
                 try:
                     quantity = float(quantity_str.replace(" ", "").replace(",", "."))
+                    if quantity.is_integer():
+                        quantity = int(quantity)
                 except (ValueError, TypeError):
                     return JsonResponse(
                         {"status": "error", "message": "Неверный формат количества"},
@@ -1413,13 +1414,11 @@ def order_create(request):
             fields = [
                 {"name": "id", "verbose_name": "Заказ"},
                 {"name": "status", "verbose_name": "Статус", "is_relation": True},
-                {"name": "client", "verbose_name": "Клиент", "is_relation": True},
-                {"name": "legal_name", "verbose_name": "Полное юринфо"},
-                {"name": "product", "verbose_name": "Продукт", "is_relation": True},
                 {"name": "created", "verbose_name": "Создан", "is_date": True},
                 {"name": "deadline", "verbose_name": "Срок сдачи", "is_date": True},
                 {"name": "required_documents", "verbose_name": "Док-ты", "is_boolean": True},
                 {"name": "unit_price", "verbose_name": "Стоимость", "is_amount": True},
+                {"name": "quantity", "verbose_name": "Количество"},
                 {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
                 {"name": "paid_amount", "verbose_name": "Погашено", "is_amount": True},
                 {"name": "comment", "verbose_name": "Комментарий"},
@@ -1449,4 +1448,349 @@ def order_create(request):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
+@login_required
+@require_http_methods(["PUT", "PATCH", "POST"])
+def order_update(request, pk: int):
+    try:
+        with transaction.atomic():
+            order = get_object_or_404(Order, id=pk)
+            data = (
+                json.loads(request.body)
+                if request.method in ["PUT", "PATCH"]
+                else request.POST.dict()
+            )
 
+            updatable = [
+                "unit_price",
+                "quantity",
+                "amount",
+                "deadline",
+                "comment",
+                "additional_info",
+                "required_documents",
+            ]
+
+            for field in updatable:
+                if field in data:
+                    val = data[field]
+                    if field in ["unit_price", "quantity", "amount"]:
+                        try:
+                            val = float(str(val).replace(" ", "").replace(",", ".").replace(" р.", "").replace("р.", ""))
+                            if field == "quantity" and val.is_integer():
+                                val = int(val)
+                        except Exception:
+                            val = None
+                    elif field == "deadline":
+                        from django.utils.dateparse import parse_datetime
+                        from django.utils import timezone
+                        val = parse_datetime(str(val).strip())
+                        if val and timezone.is_naive(val):
+                            val = timezone.make_aware(val)
+                    elif field == "required_documents":
+                        val = str(val).lower() in ["on", "true", "1"]
+                    elif isinstance(val, str):
+                        val = val.strip()
+                        if val == "":
+                            val = None
+                    setattr(order, field, val)
+
+            order.save()
+
+            fields = [
+                {"name": "id", "verbose_name": "Заказ"},
+                {"name": "status", "verbose_name": "Статус", "is_relation": True},
+                {"name": "created", "verbose_name": "Создан", "is_date": True},
+                {"name": "deadline", "verbose_name": "Срок сдачи", "is_date": True},
+                {"name": "required_documents", "verbose_name": "Док-ты", "is_boolean": True},
+                {"name": "unit_price", "verbose_name": "Стоимость", "is_amount": True},
+                {"name": "quantity", "verbose_name": "Количество"},
+                {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+                {"name": "paid_amount", "verbose_name": "Погашено", "is_amount": True},
+                {"name": "comment", "verbose_name": "Комментарий"},
+                {"name": "additional_info", "verbose_name": "Доп. инф-я"},
+            ]
+
+            html = render_to_string(
+                "components/table_row.html",
+                {
+                    "item": order,
+                    "fields": fields,
+                },
+            )
+
+            return JsonResponse(
+                {
+                    "status": "success",
+                    "id": order.id,
+                    "html": html,
+                }
+            )
+    except json.JSONDecodeError:
+        return JsonResponse({"status": "error", "message": "Неверный формат JSON"}, status=400)
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+def order_detail(request, pk: int):
+    order = get_object_or_404(Order, id=pk)
+    department_works = []
+    for dw in OrderDepartmentWork.objects.filter(order=order).select_related('department', 'status').order_by('id'):
+        item = model_to_dict(dw)
+        item['department_name'] = dw.department.name if dw.department else ''
+        item['status_name'] = dw.status.name if dw.status else ''
+        department_works.append(item)
+    data = model_to_dict(order)
+    if "viewers" in data:
+        data["viewers"] = list(order.viewers.values_list("id", flat=True))
+    if "created" in data and data["created"]:
+        data["created"] = localtime(data["created"]).strftime("%Y-%m-%d")
+    if "deadline" in data and data["deadline"]:
+        data["deadline"] = localtime(data["deadline"]).strftime("%Y-%m-%d")
+    return JsonResponse({
+        "data": data,
+        "department_works": department_works
+    })
+
+
+@login_required
+@require_http_methods(["POST"])
+def order_delete(request, pk: int):
+    try:
+        with transaction.atomic():
+            order = get_object_or_404(Order, id=pk)
+            order.delete()
+            return JsonResponse({"status": "success"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["GET"])
+def order_viewers(request, pk: int):
+    order = get_object_or_404(Order, id=pk)
+    viewers = order.viewers.all()
+
+    fields = [
+        {"name": "id", "verbose_name": "ID"},
+        {"name": "username", "verbose_name": "Логин"},
+        {"name": "first_name", "verbose_name": "Имя"},
+        {"name": "last_name", "verbose_name": "Фамилия"},
+    ]
+
+    html = render_to_string(
+        "components/table.html",
+        {
+            "fields": fields,
+            "data": viewers,
+            "id": f"order-viewers-{order.id}",
+        },
+    )
+    return JsonResponse({"html": html, "ids": [u.id for u in viewers], "table_id": f"order-viewers-{order.id}"})
+
+@login_required
+@require_http_methods(["POST"])
+def order_remove_viewer(request, pk: int):
+    try:
+        order = get_object_or_404(Order, id=pk)
+        user_id = request.POST.get("user_id")
+        if not user_id:
+            return JsonResponse({"status": "error", "message": "Не передан user_id"}, status=400)
+        try:
+            user = User.objects.get(id=int(user_id))
+        except (User.DoesNotExist, ValueError, TypeError):
+            return JsonResponse({"status": "error", "message": "Пользователь не найден"}, status=404)
+        order.viewers.remove(user)
+        return JsonResponse({"status": "success"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+    
+@login_required
+@require_POST
+def order_add_viewers(request, pk: int):
+    try:
+        order = get_object_or_404(Order, id=pk)
+        viewers_ids = request.POST.getlist("viewers[]") or request.POST.getlist("viewers")
+        if not viewers_ids:
+            try:
+                data = json.loads(request.body)
+                viewers_ids = data.get("viewers", [])
+            except Exception:
+                viewers_ids = []
+        if not isinstance(viewers_ids, list):
+            viewers_ids = [viewers_ids]
+        viewers_ids = [int(uid) for uid in viewers_ids if str(uid).isdigit()]
+        users = User.objects.filter(id__in=viewers_ids)
+        order.viewers.set(users)
+
+        fields = [
+            {"name": "id", "verbose_name": "ID"},
+            {"name": "username", "verbose_name": "Логин"},
+            {"name": "first_name", "verbose_name": "Имя"},
+            {"name": "last_name", "verbose_name": "Фамилия"},
+        ]
+        html_rows = [
+            render_to_string("components/table_row.html", {"item": user, "fields": fields})
+            for user in users
+        ]
+
+        return JsonResponse({
+            "status": "success",
+            "added_ids": viewers_ids,
+            "html": html_rows,
+        })
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+    
+
+@login_required
+def kanban_board(request):
+    columns = KanbanColumn.objects.all().order_by('order')
+    columns_data = []
+    for col in columns:
+        placements = KanbanClientPlacement.objects.filter(column=col).select_related('client').order_by('order')
+        columns_data.append({
+            'id': col.id,
+            'name': col.name,
+            'clients': placements,
+        })
+    return render(request, "commerce/kanban.html", {"columns": columns_data})
+
+@require_POST
+@login_required
+def kanban_move_client(request):
+    client_id = request.POST.get("client_id")
+    column_id = request.POST.get("column_id")
+    order_list = request.POST.getlist("order[]") 
+
+    try:
+        placement = KanbanClientPlacement.objects.get(client_id=client_id)
+        placement.column_id = column_id
+        placement.save()
+
+        for idx, cid in enumerate(order_list):
+            KanbanClientPlacement.objects.filter(client_id=cid, column_id=column_id).update(order=idx)
+        return JsonResponse({"status": "success"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+    
+@login_required
+@require_POST
+def kanban_update_columns(request):
+    import json
+    try:
+        columns = json.loads(request.POST.get("columns", "[]"))
+        for col in columns:
+            KanbanColumn.objects.filter(id=col["id"]).update(
+                name=col["name"], order=col["order"]
+            )
+        return JsonResponse({"status": "success"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_POST
+def kanban_quick_add_client(request):
+    try:
+        with transaction.atomic():
+            name = (request.POST.get("q_name") or "").strip()
+            phone = (request.POST.get("q_phone") or "").strip()
+            email = (request.POST.get("q_email") or "").strip()
+            company = (request.POST.get("q_company") or "").strip()
+            address = (request.POST.get("q_address") or "").strip()
+            column_id = request.POST.get("column_id")
+
+            if not name:
+                return JsonResponse({"status": "error", "message": "Укажите имя"}, status=400)
+
+            client = Client.objects.create(
+                name=name,
+                legal_name=company or None,
+                actual_address=address or None,
+            )
+
+            if phone or email:
+                Contact.objects.create(
+                    client=client,
+                    first_name=name,
+                    phone1=phone or None,
+                    email=email or None,
+                )
+
+            if column_id:
+                from .models import KanbanClientPlacement
+                max_order = KanbanClientPlacement.objects.filter(column_id=column_id).aggregate(max_order=models.Max('order'))['max_order'] or 0
+                KanbanClientPlacement.objects.create(
+                    client=client,
+                    column_id=column_id,
+                    order=max_order + 1
+                )
+
+            return JsonResponse({
+                "status": "success",
+                "client_id": client.id,
+                "client_name": client.name,
+            })
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_POST
+def kanban_delete_column(request, pk: int):
+    try:
+        with transaction.atomic():
+            from .models import KanbanColumn, KanbanClientPlacement
+
+            column = get_object_or_404(KanbanColumn, id=pk)
+
+            first_column = KanbanColumn.objects.exclude(id=column.id).order_by('order').first()
+            if not first_column:
+                return JsonResponse({"status": "error", "message": "Нет другого столбца для переноса клиентов"}, status=400)
+
+            placements = KanbanClientPlacement.objects.filter(column=column).order_by('order')
+
+            max_order = KanbanClientPlacement.objects.filter(column=first_column).aggregate(
+                max_order=models.Max('order')
+            )['max_order'] or 0
+
+            for idx, placement in enumerate(placements, start=1):
+                placement.column = first_column
+                placement.order = max_order + idx
+                placement.save()
+
+            column.delete()
+
+            return JsonResponse({"status": "success"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_POST
+def kanban_create_column(request):
+    try:
+        name = (request.POST.get("name") or "").strip()
+        order_val = request.POST.get("order")
+        if not name:
+            return JsonResponse({"status": "error", "message": "Укажите название столбца"}, status=400)
+
+        max_order = KanbanColumn.objects.aggregate(max_order=models.Max('order'))['max_order'] or 0
+
+        try:
+            order_val = int(order_val)
+            if order_val < 0:
+                order_val = 0
+            elif order_val > max_order + 1:
+                order_val = max_order + 1
+        except (TypeError, ValueError):
+            order_val = max_order + 1
+
+        KanbanColumn.objects.filter(order__gte=order_val).update(order=models.F('order') + 1)
+
+        column = KanbanColumn.objects.create(name=name, order=order_val)
+
+        return JsonResponse({
+            "status": "success",
+            "id": column.id,
+            "name": column.name,
+            "order": column.order,
+        })
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)

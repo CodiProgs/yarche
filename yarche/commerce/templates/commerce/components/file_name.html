@@ -1,0 +1,23 @@
+{% load static %}
+{% load components %}
+{% add_style 'css/modal-form.css' %}
+<form class="modal-form" id="file_name-form" method="post">
+    <div class="modal-form__content">
+        {% csrf_token %}
+        <div class="modal-form__group">
+                <label class="modal-form__label" for="name">Название файла</label>
+                <input class="modal-form__input"
+                       type="text"
+                       id="name"
+                       spellcheck="false"
+                       autocapitalize="off"
+                       autocorrect="off"
+                       autocomplete="off"
+                       name="name">
+            </div>
+        <div class="modal-form__buttons">
+            <button class="button modal-form__button" type="submit">Сохранить</button>
+            <button class="button modal-form__button button--cancel" type="button">Отменить</button>
+        </div>
+    </div>
+</form>

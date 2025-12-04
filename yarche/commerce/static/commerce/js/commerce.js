@@ -253,6 +253,14 @@ const addMenuHandler = () => {
 				e.preventDefault()
 
 				if (addButton) {
+					if (urlName === 'clients' && table.id === 'contacts-table') {
+						if (addButton) addButton.style.display = 'none'
+						if (deleteButton) deleteButton.style.display = 'none'
+					} else {
+						if (addButton) addButton.style.display = 'block'
+						if (deleteButton) deleteButton.style.display = 'block'
+					}
+
 					if (table.id === 'transactions-bank-accounts-table') {
 						addButton.style.display = 'none'
 					} else {
@@ -262,12 +270,20 @@ const addMenuHandler = () => {
 					if (urlName === 'works') {
 						addButton.textContent = 'Новый расчет'
 					}
+
+					if (table.id && table.id.startsWith('order-viewers-')) {
+						addButton.style.display = 'none'
+					}
 				}
 				if (editButton) {
 					if (table.id === 'transactions-bank-accounts-table') {
 						editButton.style.display = 'none'
 					} else {
 						editButton.style.display = 'block'
+					}
+
+					if (table.id.startsWith('order-viewers-')) {
+						editButton.style.display = 'none'
 					}
 				}
 				if (deleteButton) {
@@ -276,7 +292,12 @@ const addMenuHandler = () => {
 					} else {
 						deleteButton.style.display = 'block'
 					}
+
+					if (table.id.startsWith('order-viewers-')) {
+						deleteButton.textContent = 'Убрать из списка'
+					}
 				}
+
 				if (paymentButton) paymentButton.style.display = 'block'
 				if (hideButton) {
 					if (table.id === 'transactions-bank-accounts-table') {
@@ -393,14 +414,6 @@ const addMenuHandler = () => {
 					}
 				}
 
-				if (urlName === 'clients' && table.id === 'contacts-table') {
-					if (addButton) addButton.style.display = 'none'
-					if (deleteButton) deleteButton.style.display = 'none'
-				} else {
-					if (addButton) addButton.style.display = 'block'
-					if (deleteButton) deleteButton.style.display = 'block'
-				}
-
 				const viewOrderFilesBtn = document.getElementById(
 					'view_order_files-button'
 				)
@@ -438,15 +451,43 @@ const addMenuHandler = () => {
 				}
 
 				if (table.id.startsWith('order-work-messages-')) {
-					newMessageBtn.style.display = 'block'
-					editMessageBtn.style.display = 'block'
-					deleteMessageBtn.style.display = 'block'
-					refreshMessagesBtn.style.display = 'block'
+					if (newMessageBtn) newMessageBtn.style.display = 'block'
+					if (editMessageBtn) editMessageBtn.style.display = 'block'
+					if (deleteMessageBtn) deleteMessageBtn.style.display = 'block'
+					if (refreshMessagesBtn) refreshMessagesBtn.style.display = 'block'
 				} else {
-					newMessageBtn.style.display = 'none'
-					editMessageBtn.style.display = 'none'
-					deleteMessageBtn.style.display = 'none'
-					refreshMessagesBtn.style.display = 'none'
+					if (newMessageBtn) newMessageBtn.style.display = 'none'
+					if (editMessageBtn) editMessageBtn.style.display = 'none'
+					if (deleteMessageBtn) deleteMessageBtn.style.display = 'none'
+					if (refreshMessagesBtn) refreshMessagesBtn.style.display = 'none'
+				}
+
+				if (table.id.startsWith('product-orders-')) {
+					if (addButton) {
+						addButton.style.display = 'block'
+						addButton.textContent = 'Новый расчет'
+					}
+
+					if (editButton) {
+						editButton.style.display = 'block'
+						editButton.textContent = 'Редактировать расчет'
+					}
+
+					if (deleteButton) {
+						deleteButton.style.display = 'block'
+						deleteButton.textContent = 'Удалить расчет'
+					}
+				}
+
+				const addViewerButton = document.getElementById('add-viewer-button')
+				if (addViewerButton && urlName === 'works') {
+					addViewerButton.style.display = 'block'
+
+					if (table.id && table.id.startsWith('order-viewers-')) {
+						addViewerButton.style.display = 'none'
+					}
+				} else if (addViewerButton) {
+					addViewerButton.style.display = 'none'
 				}
 
 				showMenu(e.pageX, e.pageY)
@@ -539,6 +580,9 @@ const addMenuHandler = () => {
 				if (deleteMessageBtn) deleteMessageBtn.style.display = 'none'
 				if (refreshMessagesBtn) refreshMessagesBtn.style.display = 'none'
 
+				const addViewerButton = document.getElementById('add-viewer-button')
+				if (addViewerButton) addViewerButton.style.display = 'none'
+
 				showMenu(e.pageX, e.pageY)
 			}
 
@@ -558,6 +602,56 @@ const addMenuHandler = () => {
 						settleDebtButton.dataset.type = h4.textContent.trim()
 					}
 				}
+			}
+
+			if (e.target.closest('.correspondence-container')) {
+				e.preventDefault()
+
+				const newMessageBtn = document.getElementById('new_message-button')
+				const editMessageBtn = document.getElementById('edit_message-button')
+				const deleteMessageBtn = document.getElementById(
+					'delete_message-button'
+				)
+				const refreshMessagesBtn = document.getElementById(
+					'refresh_messages-button'
+				)
+				if (newMessageBtn) newMessageBtn.style.display = 'block'
+				if (editMessageBtn) editMessageBtn.style.display = 'block'
+				if (deleteMessageBtn) deleteMessageBtn.style.display = 'block'
+				if (refreshMessagesBtn) refreshMessagesBtn.style.display = 'block'
+
+				if (addButton) addButton.style.display = 'block'
+				if (editButton) editButton.style.display = 'none'
+				if (deleteButton) deleteButton.style.display = 'none'
+				if (paymentButton) paymentButton.style.display = 'none'
+				if (hideButton) hideButton.style.display = 'none'
+				if (settleDebtButton) settleDebtButton.style.display = 'none'
+				if (settleDebtAllButton) settleDebtAllButton.style.display = 'none'
+				if (repaymentsEditButton) repaymentsEditButton.style.display = 'none'
+				if (viewButton) viewButton.style.display = 'none'
+
+				if (editContactButton) editContactButton.style.display = 'none'
+				if (deleteContactButton) deleteContactButton.style.display = 'none'
+
+				if (refreshButton) refreshButton.style.display = 'none'
+
+				const viewOrderFilesBtn = document.getElementById(
+					'view_order_files-button'
+				)
+				const updateStatusBtn = document.getElementById('update_status-button')
+				const assignExecutorBtn = document.getElementById(
+					'assign_executor-button'
+				)
+				const viewCorrespondenceBtn = document.getElementById(
+					'view_correspondence-button'
+				)
+
+				if (viewOrderFilesBtn) viewOrderFilesBtn.style.display = 'none'
+				if (updateStatusBtn) updateStatusBtn.style.display = 'none'
+				if (assignExecutorBtn) assignExecutorBtn.style.display = 'none'
+				if (viewCorrespondenceBtn) viewCorrespondenceBtn.style.display = 'none'
+
+				showMenu(e.pageX, e.pageY)
 			}
 		})
 
@@ -626,7 +720,122 @@ const addMenuHandler = () => {
 	}
 }
 
+function filterList(listEl, query, selector) {
+	if (!listEl) return
+	const items = listEl.querySelectorAll(':scope > li')
+	const q = query.trim().toLowerCase()
+	items.forEach(li => {
+		const target = li.querySelector(selector)
+		const text = target ? target.textContent.trim().toLowerCase() : ''
+		li.style.display = !q || text.includes(q) ? '' : 'none'
+	})
+}
+
+function addSearchInput(
+	listEl,
+	placeholder,
+	selector,
+	marginLeft = '0px',
+	type = 'clients'
+) {
+	if (!listEl) return
+	const wrapper = document.createElement('div')
+	wrapper.classList.add('debtors-search-input-wrapper', type)
+	const input = document.createElement('input')
+	input.type = 'text'
+	input.className = 'debtors-search-input'
+	input.placeholder = placeholder
+	wrapper.appendChild(input)
+	listEl.parentNode.insertBefore(wrapper, listEl)
+
+	input.addEventListener('input', () => {
+		filterList(listEl, input.value, selector)
+	})
+}
+
+async function deleteDepartmentWork(workId, card) {
+	showQuestion(
+		'Вы действительно хотите удалить работу отдела?',
+		'Удаление работы отдела',
+		async () => {
+			const loader = createLoader()
+			document.body.appendChild(loader)
+			try {
+				const resp = await fetch(`/departments/work/delete/${workId}/`, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'X-CSRFToken': getCSRFToken(),
+					},
+					credentials: 'same-origin',
+				})
+				const data = await resp.json()
+				loader.remove()
+				if (!resp.ok || data.status !== 'success') {
+					showError(
+						data.message || data.error || 'Ошибка при удалении работы отдела'
+					)
+					return
+				}
+				if (card && card.parentNode) card.remove()
+				showSuccess('Работа отдела успешно удалена')
+			} catch (err) {
+				loader.remove()
+				showError(err.message || 'Ошибка при удалении работы отдела')
+			}
+		}
+	)
+}
+
 const initWorksPage = () => {
+	let clientId = null
+	let objectId = null
+	let productId = null
+
+	const clientsList = document.querySelector('.debtors-office-list')
+	addSearchInput(clientsList, 'Поиск клиента...', '.debtors-office-list__title')
+
+	clientsList.addEventListener('click', function (e) {
+		const clientRow = e.target.closest(
+			'.debtors-office-list__row[data-target^="branch-"]'
+		)
+		if (clientRow) {
+			const branchId = clientRow.getAttribute('data-target')
+			const details = document.getElementById(branchId)
+			if (details && !details.querySelector('.debtors-search-input')) {
+				const objectsList = details.querySelector('ul')
+				if (objectsList) {
+					addSearchInput(
+						objectsList,
+						'Поиск объекта...',
+						'h4',
+						'16px',
+						'objects'
+					)
+				}
+			}
+		}
+		const objectRow = e.target.closest(
+			'.debtors-office-list__row[data-target^="object-"]'
+		)
+		if (objectRow) {
+			const objectIdAttr = objectRow.getAttribute('data-target')
+			const details = document.getElementById(objectIdAttr)
+			if (details && !details.querySelector('.debtors-search-input')) {
+				const productsList = details.querySelector('ul')
+				if (productsList) {
+					addSearchInput(
+						productsList,
+						'Поиск продукции...',
+						'.debtors-office-list__title',
+						'32px',
+						'products'
+					)
+				}
+			}
+		}
+	})
+
 	document.querySelectorAll('.debtors-office-list__row').forEach(row => {
 		row.addEventListener('click', async function (e) {
 			const targetId = row.getAttribute('data-target')
@@ -645,9 +854,9 @@ const initWorksPage = () => {
 				const loader = createLoader()
 				document.body.appendChild(loader)
 
-				const productId = row.dataset.productId
-				const clientId = row.dataset.clientId
-				const objectId = row.dataset.objectId
+				productId = row.dataset.productId
+				clientId = row.dataset.clientId
+				objectId = row.dataset.objectId
 				if (!productId || !clientId || !objectId) return
 
 				const resp = await fetch(
@@ -664,16 +873,18 @@ const initWorksPage = () => {
 				details.innerHTML = `<div>${data.html}</div>`
 				details.dataset.loaded = '1'
 
+				const table = details.querySelector('table')
+				if (!table) return
+
 				TableManager.initTable(data.table_id)
 				TableManager.createColumnsForTable(data.table_id, [
 					{ name: 'id' },
 					{ name: 'status', url: '/commerce/orders/statuses/' },
-					{ name: 'client', url: '/commerce/clients/list/' },
-					{ name: 'legal_name' },
-					{ name: 'product', url: '/commerce/products/list/' },
 					{ name: 'created' },
 					{ name: 'deadline' },
+					{ name: 'required_documents' },
 					{ name: 'unit_price' },
+					{ name: 'quantity' },
 					{ name: 'amount' },
 					{ name: 'paid_amount' },
 					{ name: 'comment' },
@@ -683,14 +894,10 @@ const initWorksPage = () => {
 		})
 	})
 
-	let clientId = null
-	let objectId = null
-
 	document.addEventListener('contextmenu', e => {
 		const row = e.target.closest('.debtors-office-list__row')
 		if (row) {
 			const dataTarget = row.getAttribute('data-target')
-
 			if (dataTarget && dataTarget.startsWith('branch-')) {
 				const id = dataTarget.replace('branch-', '')
 				clientId = id
@@ -701,9 +908,17 @@ const initWorksPage = () => {
 					clientId = parts[0]
 					objectId = parts[1]
 				}
+			} else if (dataTarget && dataTarget.startsWith('product-')) {
+				const parts = dataTarget.replace('product-', '').split('-')
+				if (parts.length >= 3) {
+					clientId = parts[0]
+					objectId = parts[1]
+					productId = parts[2]
+				}
 			} else {
 				clientId = null
 				objectId = null
+				productId = null
 			}
 		}
 	})
@@ -884,11 +1099,7 @@ const initWorksPage = () => {
 					return
 				}
 
-				const productId = row.dataset.productId
-				const currentClientId = row.dataset.clientId
-				const currentObjectId = row.dataset.objectId
-
-				if (!productId || !currentClientId || !currentObjectId) {
+				if (!productId || !clientId || !objectId) {
 					showError('Не удалось определить параметры для создания расчета.')
 					return
 				}
@@ -912,61 +1123,23 @@ const initWorksPage = () => {
 					],
 					onSuccess: async result => {
 						if (result.status === 'success' && result.id) {
+							const debtorsOfficeDetails = document.getElementById(
+								`product-${clientId}-${objectId}-${productId}`
+							)
+							if (!debtorsOfficeDetails) return
+
+							const isOpen = debtorsOfficeDetails.classList.contains('open')
+
 							const tableId = result.table_id
 
 							let table = document.getElementById(tableId)
 
-							if (!table) {
-								const productId = row.dataset.productId
-								const currentClientId = row.dataset.clientId
-								const currentObjectId = row.dataset.objectId
-
-								const productDetails = document.getElementById(
-									`product-${currentClientId}-${currentObjectId}-${productId}`
-								)
-
-								if (productDetails) {
-									const fields = [
-										{ name: 'id', verbose_name: 'Заказ' },
-										{ name: 'status', verbose_name: 'Статус' },
-										{ name: 'client', verbose_name: 'Клиент' },
-										{ name: 'legal_name', verbose_name: 'Полное юринфо' },
-										{ name: 'product', verbose_name: 'Продукт' },
-										{ name: 'created', verbose_name: 'Создан' },
-										{ name: 'deadline', verbose_name: 'Срок сдачи' },
-										{ name: 'required_documents', verbose_name: 'Док-ты' },
-										{ name: 'unit_price', verbose_name: 'Стоимость' },
-										{ name: 'amount', verbose_name: 'Сумма' },
-										{ name: 'paid_amount', verbose_name: 'Погашено' },
-										{ name: 'comment', verbose_name: 'Комментарий' },
-										{ name: 'additional_info', verbose_name: 'Доп. инф-я' },
-									]
-
-									const tableHTML = `
-											<div>
-												<table id="${tableId}" class="table">
-													<thead>
-														<tr>
-															${fields.map(f => `<th data-name="${f.name}">${f.verbose_name}</th>`).join('')}
-														</tr>
-													</thead>
-													<tbody>
-													</tbody>
-												</table>
-											</div>
-										`
-
-									productDetails.innerHTML = tableHTML
-									productDetails.dataset.loaded = '1'
-
-									table = document.getElementById(tableId)
-
-									TableManager.initTable(tableId)
-								}
-							}
-
 							if (table) {
-								const newRow = await TableManager.addTableRow(result, tableId)
+								const newRow = await TableManager.addTableRow(
+									result,
+									tableId,
+									true
+								)
 
 								if (newRow) {
 									TableManager.attachRowCellHandlers(newRow)
@@ -975,8 +1148,69 @@ const initWorksPage = () => {
 
 									showSuccess('Расчет успешно создан')
 								}
-							} else {
-								showError('Не удалось добавить заказ в таблицу')
+							} else if (isOpen) {
+								const tableHtml = `
+        <table class="table" id="${tableId}" style="visibility: visible; width: 1034px;">
+            <colgroup>
+                <col id="col-0" style="width: 50px; min-width: 50px; max-width: 50px;">
+                <col id="col-1" style="width: 150px; min-width: 150px; max-width: 150px;">
+                <col id="col-2" style="width: 80px; min-width: 80px; max-width: 80px;">
+                <col id="col-3" style="width: 80px; min-width: 80px; max-width: 80px;">
+                <col id="col-4" style="width: 78px; min-width: 78px; max-width: 78px;">
+                <col id="col-5" style="width: 71px; min-width: 71px; max-width: 71px;">
+                <col id="col-6" style="width: 124px; min-width: 124px; max-width: 124px;">
+                <col id="col-7" style="width: 71px; min-width: 71px; max-width: 71px;">
+                <col id="col-8" style="width: 71px; min-width: 71px; max-width: 71px;">
+                <col id="col-9" style="width: 143px; min-width: 143px; max-width: 143px;">
+                <col id="col-10" style="width: 116px; min-width: 116px; max-width: 116px;">
+            </colgroup>
+            <thead class="table__header">
+                <tr>
+                    <th class="table__cell-header" data-column="0" data-column-type="text" data-name="id" style="max-width: 50px;">Заказ<div class="table__resize-handle"></div><div class="table__column-toggle"></div></th>
+                    <th class="table__cell-header" data-column="1" data-column-type="select" data-name="status" style="max-width: 150px;">Статус<div class="table__resize-handle"></div><div class="table__column-toggle"></div></th>
+                    <th class="table__cell-header" data-column="2" data-column-type="date" data-name="created" style="max-width: 80px;">Создан<div class="table__resize-handle"></div><div class="table__column-toggle"></div></th>
+                    <th class="table__cell-header" data-column="3" data-column-type="date" data-name="deadline" style="max-width: 80px;">Срок сдачи<div class="table__resize-handle"></div><div class="table__column-toggle"></div></th>
+                    <th class="table__cell-header" data-column="4" data-column-type="checkbox" data-name="required_documents" style="max-width: 78px;">Док-ты<div class="table__resize-handle"></div><div class="table__column-toggle"></div></th>
+                    <th class="table__cell-header" data-column="5" data-column-type="amount" data-name="unit_price" style="max-width: 71px;">Стоимость<div class="table__resize-handle"></div><div class="table__column-toggle"></div></th>
+                    <th class="table__cell-header" data-column="6" data-column-type="text" data-name="quantity" style="max-width: 124px;">Количество<div class="table__resize-handle"></div><div class="table__column-toggle"></div></th>
+                    <th class="table__cell-header" data-column="7" data-column-type="amount" data-name="amount" style="max-width: 71px;">Сумма<div class="table__resize-handle"></div><div class="table__column-toggle"></div></th>
+                    <th class="table__cell-header" data-column="8" data-column-type="amount" data-name="paid_amount" style="max-width: 71px;">Погашено<div class="table__resize-handle"></div><div class="table__column-toggle"></div></th>
+                    <th class="table__cell-header" data-column="9" data-column-type="text" data-name="comment" style="max-width: 143px;">Комментарий<div class="table__resize-handle"></div><div class="table__column-toggle"></div></th>
+                    <th class="table__cell-header table__cell-last" data-column="10" data-column-type="text" data-name="additional_info" style="max-width: 116px;">Доп. инф-я<div class="table__resize-handle"></div><div class="table__column-toggle"></div></th>
+                </tr>
+                <tr>
+                    <td class="table__cell-header table__filter-cell" style="max-width: 50px;"><div class="input-container"><input type="text" class="create-form__input" name="id"><img src="/static/images/close.svg" alt="Close" class="clear-button"></div></td>
+                    <td class="table__cell-header table__filter-cell" style="max-width: 150px;"><div class="select" data-multiple="false"><input type="text" hidden="" class="select__input" id="id_status" name="status" placeholder=""><div class="select__control" tabindex="0"><span class="select__text"></span><img src="/static/images/chevron-down.svg" alt="Close" class="select__arrow" height="28" width="28"><img src="/static/images/close.svg" alt="Close" class="select__clear" height="28" width="28"></div><div class="select__dropdown"></div></div></td>
+                    <td class="table__cell-header table__filter-cell" style="max-width: 80px;"><div class="input-container"><input type="text" class="create-form__input" name="created"><img src="/static/images/close.svg" alt="Close" class="clear-button"></div></td>
+                    <td class="table__cell-header table__filter-cell" style="max-width: 80px;"><div class="input-container"><input type="text" class="create-form__input" name="deadline"><img src="/static/images/close.svg" alt="Close" class="clear-button"></div></td>
+                    <td class="table__cell-header table__filter-cell" style="max-width: 78px;"></td>
+                    <td class="table__cell-header table__filter-cell" style="max-width: 71px;"><div class="input-container"><input type="text" class="create-form__input" name="unit_price"><img src="/static/images/close.svg" alt="Close" class="clear-button"></div></td>
+                    <td class="table__cell-header table__filter-cell" style="max-width: 124px;"></td>
+                    <td class="table__cell-header table__filter-cell" style="max-width: 71px;"><div class="input-container"><input type="text" class="create-form__input" name="amount"><img src="/static/images/close.svg" alt="Close" class="clear-button"></div></td>
+                    <td class="table__cell-header table__filter-cell" style="max-width: 71px;"><div class="input-container"><input type="text" class="create-form__input" name="paid_amount"><img src="/static/images/close.svg" alt="Close" class="clear-button"></div></td>
+                    <td class="table__cell-header table__filter-cell" style="max-width: 143px;"><div class="input-container"><input type="text" class="create-form__input" name="comment"><img src="/static/images/close.svg" alt="Close" class="clear-button"></div></td>
+                    <td class="table__cell-header table__filter-cell" style="max-width: 116px;"><div class="input-container"><input type="text" class="create-form__input" name="additional_info"><img src="/static/images/close.svg" alt="Close" class="clear-button"></div></td>
+                </tr>
+            </thead>
+            <tbody class="table__body"></tbody>
+        </table>
+    `
+
+								debtorsOfficeDetails.innerHTML = tableHtml
+								const table = document.getElementById(tableId)
+								if (table && result.html) {
+									table
+										.querySelector('tbody')
+										.insertAdjacentHTML('beforeend', result.html)
+									TableManager.initTable(tableId)
+									const newRow = table.querySelector('tbody tr:last-child')
+									if (newRow) {
+										TableManager.attachRowCellHandlers(newRow)
+										TableManager.formatCurrencyValuesForRow(tableId, newRow)
+										TableManager.applyColumnWidthsForRow(tableId, newRow)
+									}
+									showSuccess('Расчет успешно создан')
+								}
 							}
 						}
 					},
@@ -987,7 +1221,7 @@ const initWorksPage = () => {
 
 				const clientInput = document.getElementById('client')
 				if (clientInput) {
-					clientInput.value = currentClientId
+					clientInput.value = clientId
 					const selectWrapper = clientInput.closest('.select')
 					if (selectWrapper) {
 						const displaySpan = selectWrapper.querySelector(
@@ -995,11 +1229,11 @@ const initWorksPage = () => {
 						)
 						if (displaySpan) {
 							const clientRow = document.querySelector(
-								`[data-target="branch-${currentClientId}"]`
+								`[data-target="branch-${clientId}"]`
 							)
 							if (clientRow) {
 								displaySpan.textContent =
-									clientRow.querySelector('h3')?.textContent || currentClientId
+									clientRow.querySelector('h3')?.textContent || clientId
 							}
 						}
 					}
@@ -1023,7 +1257,7 @@ const initWorksPage = () => {
 
 				const clientObjectInput = document.getElementById('client_object')
 				if (clientObjectInput) {
-					clientObjectInput.value = currentObjectId
+					clientObjectInput.value = objectId
 					const selectWrapper = clientObjectInput.closest('.select')
 					if (selectWrapper) {
 						const displaySpan = selectWrapper.querySelector(
@@ -1031,11 +1265,11 @@ const initWorksPage = () => {
 						)
 						if (displaySpan) {
 							const objectRow = document.querySelector(
-								`[data-target="object-${currentClientId}-${currentObjectId}"]`
+								`[data-target="object-${clientId}-${objectId}"]`
 							)
 							if (objectRow) {
 								displaySpan.textContent =
-									objectRow.querySelector('h4')?.textContent || currentObjectId
+									objectRow.querySelector('h4')?.textContent || objectId
 							}
 						}
 					}
@@ -1082,223 +1316,668 @@ const initWorksPage = () => {
 					unit_priceInput.addEventListener('change', calculateAmount)
 					quantityInput.addEventListener('change', calculateAmount)
 				}
+
+				const modalBody = document.querySelector('.modal__body')
+				if (modalBody) {
+					let carousel = modalBody.querySelector('.departments-carousel')
+					if (!carousel) {
+						carousel = document.createElement('div')
+						carousel.className = 'departments-carousel'
+						const form = modalBody.querySelector('form.modal-form')
+						if (form) {
+							form.insertAdjacentElement('afterend', carousel)
+						} else {
+							modalBody.appendChild(carousel)
+						}
+					} else {
+						carousel.innerHTML = ''
+					}
+					let addCard = carousel.querySelector('.department-card--add')
+					if (!addCard) {
+						addCard = document.createElement('div')
+						addCard.className = 'department-card department-card--add'
+						addCard.innerHTML = `<button class="department-card__add" title="Добавить отдел">+</button>`
+						carousel.appendChild(addCard)
+					}
+					const addBtn = carousel.querySelector('.department-card__add')
+					if (addBtn) {
+						addBtn.onclick = async () => {
+							showError('Сначала создайте расчет, затем добавьте отделы')
+						}
+					}
+				}
 			}
 		})
 	}
 
 	if (editButton) {
 		editButton.addEventListener('click', async () => {
-			if (!clientId || !objectId) {
-				showError('Не выбран объект для редактирования.') // TODO:
-				return
-			}
+			if (editButton.textContent.trim() === 'Редактировать объект') {
+				if (!clientId || !objectId) {
+					showError('Не выбран объект для редактирования.')
+					return
+				}
 
-			const editConfig = {
-				submitUrl: `/commerce/clients/objects/edit/${objectId}/`,
-				getUrl: `/commerce/clients/objects/${objectId}/`,
-				tableId: `${CLIENTS_OBJECTS}-table`,
-				formId: `${CLIENTS_OBJECTS}-form`,
-				modalConfig: {
-					url: `/components/commerce/add_client-object`,
-					title: 'Редактировать объект',
-				},
+				const editConfig = {
+					submitUrl: `/commerce/clients/objects/edit/${objectId}/`,
+					getUrl: `/commerce/clients/objects/${objectId}/`,
+					tableId: `${CLIENTS_OBJECTS}-table`,
+					formId: `${CLIENTS_OBJECTS}-form`,
+					modalConfig: {
+						url: `/components/commerce/add_client-object`,
+						title: 'Редактировать объект',
+					},
 
-				onSuccess: async result => {
-					if (
-						result.status === 'success' &&
-						result.html &&
-						result.client_id &&
-						result.id
-					) {
-						const existingObjectItem = document
-							.querySelector(
-								`[data-target="object-${result.client_id}-${result.id}"]`
-							)
-							?.closest('li')
-
-						if (existingObjectItem) {
-							existingObjectItem.outerHTML = result.html
-
-							const newItem = document
+					onSuccess: async result => {
+						if (
+							result.status === 'success' &&
+							result.html &&
+							result.client_id &&
+							result.id
+						) {
+							const existingObjectItem = document
 								.querySelector(
 									`[data-target="object-${result.client_id}-${result.id}"]`
 								)
 								?.closest('li')
 
-							if (newItem) {
-								const newRow = newItem.querySelector(
-									'.debtors-office-list__row'
-								)
-								if (newRow) {
-									newRow.addEventListener('click', async function (e) {
-										const targetId = newRow.getAttribute('data-target')
-										if (!targetId) return
-										const details = document.getElementById(targetId)
-										if (!details) return
+							if (existingObjectItem) {
+								existingObjectItem.outerHTML = result.html
 
-										const btn = newRow.querySelector(
-											'.debtors-office-list__toggle'
-										)
-										if (btn) btn.classList.toggle('open')
-										details.classList.toggle('open')
+								const newItem = document
+									.querySelector(
+										`[data-target="object-${result.client_id}-${result.id}"]`
+									)
+									?.closest('li')
+
+								if (newItem) {
+									const newRow = newItem.querySelector(
+										'.debtors-office-list__row'
+									)
+									if (newRow) {
+										newRow.addEventListener('click', async function (e) {
+											const targetId = newRow.getAttribute('data-target')
+											if (!targetId) return
+											const details = document.getElementById(targetId)
+											if (!details) return
+
+											const btn = newRow.querySelector(
+												'.debtors-office-list__toggle'
+											)
+											if (btn) btn.classList.toggle('open')
+											details.classList.toggle('open')
+										})
+									}
+
+									const productRows = newItem.querySelectorAll(
+										'.debtors-office-list__row[data-target^="product-"]'
+									)
+									productRows.forEach(row => {
+										row.addEventListener('click', async function (e) {
+											const targetId = row.getAttribute('data-target')
+											if (!targetId) return
+											const details = document.getElementById(targetId)
+											if (!details) return
+
+											const btn = row.querySelector(
+												'.debtors-office-list__toggle'
+											)
+											if (btn) btn.classList.toggle('open')
+											details.classList.toggle('open')
+
+											if (
+												row.dataset.target.startsWith('product-') &&
+												!details.dataset.loaded
+											) {
+												const loader = createLoader()
+												document.body.appendChild(loader)
+
+												const productId = row.dataset.productId
+												const clientId = row.dataset.clientId
+												const objectId = row.dataset.objectId
+
+												if (productId && clientId && objectId) {
+													try {
+														const resp = await fetch(
+															`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`
+														)
+														const data = await resp.json()
+														loader.remove()
+
+														if (resp.ok) {
+															details.innerHTML = `<ul>${data.html}</ul>`
+															details.dataset.loaded = '1'
+														} else {
+															showError(data.error || 'Ошибка загрузки данных')
+														}
+													} catch (err) {
+														loader.remove()
+														showError(err.message || 'Ошибка загрузки данных')
+													}
+												}
+											}
+										})
 									})
 								}
 
-								const productRows = newItem.querySelectorAll(
-									'.debtors-office-list__row[data-target^="product-"]'
-								)
-								productRows.forEach(row => {
-									row.addEventListener('click', async function (e) {
-										const targetId = row.getAttribute('data-target')
-										if (!targetId) return
-										const details = document.getElementById(targetId)
-										if (!details) return
-
-										const btn = row.querySelector(
-											'.debtors-office-list__toggle'
-										)
-										if (btn) btn.classList.toggle('open')
-										details.classList.toggle('open')
-
-										if (
-											row.dataset.target.startsWith('product-') &&
-											!details.dataset.loaded
-										) {
-											const loader = createLoader()
-											document.body.appendChild(loader)
-
-											const productId = row.dataset.productId
-											const clientId = row.dataset.clientId
-											const objectId = row.dataset.objectId
-
-											if (productId && clientId && objectId) {
-												try {
-													const resp = await fetch(
-														`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`
-													)
-													const data = await resp.json()
-													loader.remove()
-
-													if (resp.ok) {
-														details.innerHTML = `<ul>${data.html}</ul>`
-														details.dataset.loaded = '1'
-													} else {
-														showError(data.error || 'Ошибка загрузки данных')
-													}
-												} catch (err) {
-													loader.remove()
-													showError(err.message || 'Ошибка загрузки данных')
-												}
-											}
-										}
-									})
-								})
+								showSuccess('Объект успешно обновлен')
 							}
+						}
+					},
+				}
 
-							showSuccess('Объект успешно обновлен')
+				const formHandler = new DynamicFormHandler(editConfig)
+				await formHandler.init()
+
+				try {
+					const resp = await fetch(`/commerce/clients/objects/${objectId}/`)
+					const data = await resp.json()
+
+					if (resp.ok && data.data) {
+						const nameInput = document.getElementById('name')
+						if (nameInput && data.data.name) {
+							nameInput.value = data.data.name
+						}
+
+						const clientIdInput = document.getElementById('client_id')
+						if (clientIdInput) {
+							clientIdInput.value = clientId
 						}
 					}
-				},
-			}
+				} catch (err) {
+					showError(err.message || 'Ошибка загрузки данных объекта')
+				}
+			} else if (editButton.textContent.trim() === 'Редактировать расчет') {
+				const selectedRow = document.querySelector('.table__row--selected')
+				const table = selectedRow?.closest('table')
+				const orderId = TableManager.getSelectedRowId(table?.id)
 
-			const formHandler = new DynamicFormHandler(editConfig)
-			await formHandler.init()
+				if (!orderId) {
+					showError('Не выбран расчет для редактирования.')
+					return
+				}
 
-			try {
-				const resp = await fetch(`/commerce/clients/objects/${objectId}/`)
-				const data = await resp.json()
+				const editConfig = {
+					submitUrl: `/commerce/orders/edit/`,
+					getUrl: `/commerce/orders/`,
+					tableId: `product-orders-${productId}-${clientId}-${objectId}`,
+					formId: `orders-form`,
+					modalConfig: {
+						url: `/components/commerce/add_order`,
+						title: 'Редактировать расчет',
+						context: {},
+					},
+					dataUrls: [
+						{ id: 'client', url: `/commerce/clients/list/` },
+						{ id: 'product', url: `/commerce/products/list/` },
+					],
+					onSuccess: async result => {
+						if (result.status === 'success' && result.html && result.id) {
+							TableManager.updateTableRow(result, editConfig.tableId)
+							showSuccess('Расчет успешно обновлен')
+						}
+					},
+				}
+				const formHandler = new DynamicFormHandler(editConfig)
+				await formHandler.init(orderId)
 
-				if (resp.ok && data.data) {
-					const nameInput = document.getElementById('name')
-					if (nameInput && data.data.name) {
-						nameInput.value = data.data.name
+				const departmentWorks = formHandler.departmentWorks
+
+				function renderDepartmentsCarousel(departmentWorks) {
+					const modalBody = document.querySelector('.modal__body')
+					if (!modalBody) return
+
+					const form = modalBody.querySelector('form.modal-form')
+					if (!form) return
+
+					let carousel = modalBody.querySelector('.departments-carousel')
+					if (!carousel) {
+						carousel = document.createElement('div')
+						carousel.className = 'departments-carousel'
+						form.insertAdjacentElement('afterend', carousel)
+					} else {
+						carousel
+							.querySelectorAll('.department-card:not(.department-card--add)')
+							.forEach(card => card.remove())
 					}
 
-					const clientIdInput = document.getElementById('client_id')
-					if (clientIdInput) {
-						clientIdInput.value = clientId
+					const departments = [
+						{ name: 'Дизайн', img: 'dizayn.png' },
+						{ name: 'Монтаж', img: 'montazh.png' },
+						{ name: 'Накатка', img: 'nakatka.png' },
+						{ name: 'Печать ИФП', img: 'pechat.png' },
+						{ name: 'Раскрой', img: 'raskroy.png' },
+						{ name: 'Сборка', img: 'sborka.png' },
+						{ name: 'Сварка', img: 'svarka.png' },
+					]
+
+					let addCard = carousel.querySelector('.department-card--add')
+					if (!addCard) {
+						addCard = document.createElement('div')
+						addCard.className = 'department-card department-card--add'
+						addCard.innerHTML = `<button class="department-card__add" title="Добавить отдел">+</button>`
+						carousel.appendChild(addCard)
+					}
+
+					departmentWorks.forEach(dw => {
+						const dep = departments.find(d => d.name === dw.department_name)
+						if (!dep) return
+						const card = document.createElement('div')
+						card.className = 'department-card'
+						card.dataset.id = dw.id
+						card.innerHTML = `
+            <button class="department-card__delete" title="Удалить отдел">&times;</button>
+            <img src="/static/images/departments/${dep.img}" alt="${dep.name}" class="department-card__img">
+            <div class="department-card__title">${dep.name}</div>
+			<p class="department-card__work-status">${dw.status_name}</p>
+        `
+						card.querySelector('.department-card__delete').onclick = () => {
+							deleteDepartmentWork(dw.id, card)
+						}
+
+						carousel.insertBefore(card, addCard)
+					})
+
+					const addBtn = carousel.querySelector('.department-card__add')
+					if (addBtn) {
+						addBtn.onclick = async () => {
+							if (!orderId) {
+								showError(
+									'Не удалось определить заказ для добавления работы отделу'
+								)
+								return
+							}
+
+							const config = {
+								submitUrl: '/departments/work/create/',
+								formId: 'add-work-form',
+								modalConfig: {
+									url: '/components/departments/add_work',
+									title: 'Добавить работу отделу',
+								},
+								dataUrls: [
+									{
+										id: 'department',
+										url: '/departments/list/',
+									},
+								],
+								beforeSubmit: formData => {
+									formData.append('order', orderId)
+									return formData
+								},
+								onSuccess: async result => {
+									if (result.status === 'success') {
+										showSuccess('Работа отдела успешно добавлена')
+
+										const dep = departments.find(
+											d => d.name === result.department_name
+										)
+										if (!dep) return
+
+										const card = document.createElement('div')
+										card.className = 'department-card'
+										card.dataset.id = result.id
+										card.innerHTML = `
+                    <button class="department-card__delete" title="Удалить отдел">&times;</button>
+                    <img src="/static/images/departments/${dep.img}" alt="${dep.name}" class="department-card__img">
+                    <div class="department-card__title">${dep.name}</div>
+                    <p class="department-card__work-status">${result.status_name}</p>
+                `
+										card.querySelector('.department-card__delete').onclick =
+											() => {
+												deleteDepartmentWork(result.id, card)
+											}
+
+										const addCard = carousel.querySelector(
+											'.department-card--add'
+										)
+										carousel.insertBefore(card, addCard)
+									} else {
+										showError(
+											result.message || 'Ошибка при добавлении работы отделу'
+										)
+									}
+								},
+							}
+
+							const formHandler = new DynamicFormHandler(config)
+							await formHandler.init()
+							const orderField = document.getElementById('order')
+							if (orderField) orderField.value = orderId
+						}
 					}
 				}
-			} catch (err) {
-				showError(err.message || 'Ошибка загрузки данных объекта')
+
+				renderDepartmentsCarousel(departmentWorks)
+
+				const unit_priceInput = document.getElementById('unit_price')
+				const quantityInput = document.getElementById('quantity')
+				const amountInput = document.getElementById('amount')
+
+				if (unit_priceInput && quantityInput && amountInput) {
+					const unitPriceAN = setupCurrencyInput('unit_price', 0)
+					const amountAN = setupCurrencyInput('amount', 0)
+
+					const calculateAmount = () => {
+						const unitPrice = unitPriceAN
+							? unitPriceAN.getNumber()
+							: parseFloat(
+									unit_priceInput.value.replace(/\s/g, '').replace(',', '.')
+							  ) || 0
+						const quantity =
+							parseFloat(
+								quantityInput.value.replace(/\s/g, '').replace(',', '.')
+							) || 0
+
+						if (unitPrice > 0 && quantity > 0) {
+							const amount = Math.round(unitPrice * quantity)
+							if (amountAN) {
+								amountAN.set(amount)
+							} else {
+								amountInput.value = amount
+							}
+						} else if (unitPrice === 0 || quantity === 0) {
+							if (amountAN) {
+								amountAN.set(0)
+							} else {
+								amountInput.value = ''
+							}
+						}
+					}
+
+					unit_priceInput.addEventListener('input', calculateAmount)
+					quantityInput.addEventListener('input', calculateAmount)
+
+					unit_priceInput.addEventListener('change', calculateAmount)
+					quantityInput.addEventListener('change', calculateAmount)
+				}
 			}
 		})
 	}
 
 	if (deleteButton) {
 		deleteButton.addEventListener('click', async () => {
-			if (!clientId || !objectId) {
-				showError('Не выбран объект для удаления.')
-				return
-			}
+			if (deleteButton.textContent.trim() === 'Удалить объект') {
+				if (!clientId || !objectId) {
+					showError('Не выбран объект для удаления.')
+					return
+				}
 
-			showQuestion(
-				'Вы действительно хотите удалить запись?',
-				'Удаление',
-				async () => {
-					const loader = createLoader()
-					document.body.appendChild(loader)
+				showQuestion(
+					'Вы действительно хотите удалить запись?',
+					'Удаление',
+					async () => {
+						const loader = createLoader()
+						document.body.appendChild(loader)
 
-					try {
-						const resp = await fetch(
-							`/commerce/clients/objects/delete/${objectId}/`,
-							{
+						try {
+							const resp = await fetch(
+								`/commerce/clients/objects/delete/${objectId}/`,
+								{
+									method: 'POST',
+									headers: {
+										'Content-Type': 'application/json',
+										'X-CSRFToken': getCSRFToken(),
+									},
+									credentials: 'same-origin',
+								}
+							)
+
+							const data = await resp.json()
+							loader.remove()
+
+							if (!resp.ok || data.status !== 'success') {
+								showError(
+									data.message || data.error || 'Ошибка при удалении объекта'
+								)
+								return
+							}
+
+							const objectItem = document
+								.querySelector(`[data-target="object-${clientId}-${objectId}"]`)
+								?.closest('li')
+
+							if (objectItem) {
+								objectItem.remove()
+
+								const branchDetails = document.getElementById(
+									`branch-${clientId}`
+								)
+								if (branchDetails) {
+									const ul = branchDetails.querySelector('ul')
+									const remainingObjects = ul?.querySelectorAll(
+										'li.debtors-office-list__item'
+									)
+
+									if (!remainingObjects || remainingObjects.length === 0) {
+										if (!ul) {
+											const newUl = document.createElement('ul')
+											branchDetails.appendChild(newUl)
+											newUl.innerHTML = '<li>Нет объектов</li>'
+										} else {
+											ul.innerHTML = '<li>Нет объектов</li>'
+										}
+									}
+								}
+
+								showSuccess('Объект успешно удален')
+
+								objectId = null
+							}
+						} catch (err) {
+							loader.remove()
+							showError(err.message || 'Ошибка при удалении объекта')
+						}
+					}
+				)
+			} else if (deleteButton.textContent.trim() === 'Удалить расчет') {
+				const selectedRow = document.querySelector('.table__row--selected')
+				const table = selectedRow?.closest('table')
+				const orderId = TableManager.getSelectedRowId(table?.id)
+
+				if (!orderId) {
+					showError('Не выбран расчет для удаления.')
+					return
+				}
+
+				showQuestion(
+					'Вы действительно хотите удалить расчет?',
+					'Удаление расчета',
+					async () => {
+						const loader = createLoader()
+						document.body.appendChild(loader)
+						try {
+							const resp = await fetch(`/commerce/orders/delete/${orderId}/`, {
 								method: 'POST',
 								headers: {
 									'Content-Type': 'application/json',
 									'X-CSRFToken': getCSRFToken(),
 								},
 								credentials: 'same-origin',
+							})
+							const data = await resp.json()
+							loader.remove()
+
+							if (!resp.ok || data.status !== 'success') {
+								showError(
+									data.message || data.error || 'Ошибка при удалении расчета'
+								)
+								return
+							}
+
+							selectedRow.remove()
+							showSuccess('Расчет успешно удален')
+						} catch (err) {
+							loader.remove()
+							showError(err.message || 'Ошибка при удалении расчета')
+						}
+					}
+				)
+			} else if (deleteButton.textContent.trim() === 'Убрать из списка') {
+				const selectedRow = document.querySelector('.table__row--selected')
+				const table = selectedRow?.closest('table')
+				const tableId = table?.id || ''
+				if (!selectedRow || !tableId.startsWith('order-viewers-')) {
+					showError(
+						'Выберите пользователя для удаления из списка наблюдателей.'
+					)
+					return
+				}
+				const userId = TableManager.getSelectedRowId(tableId)
+				const orderIdMatch = tableId.match(/^order-viewers-(\d+)/)
+
+				const orderId = orderIdMatch ? orderIdMatch[1] : null
+				if (!userId || !orderId) {
+					showError('Не удалось определить пользователя или заказ.')
+					return
+				}
+				showQuestion(
+					'Вы действительно хотите закрыть доступ этому пользователю к заказу?',
+					'Удаление наблюдателя',
+					async () => {
+						const loader = createLoader()
+						document.body.appendChild(loader)
+						try {
+							const resp = await fetch(
+								`/commerce/orders/${orderId}/remove_viewer/`,
+								{
+									method: 'POST',
+									headers: {
+										'Content-Type': 'application/x-www-form-urlencoded',
+										'X-CSRFToken': getCSRFToken(),
+									},
+									body: `user_id=${encodeURIComponent(userId)}`,
+									credentials: 'same-origin',
+								}
+							)
+							const data = await resp.json()
+							loader.remove()
+							if (!resp.ok || data.status !== 'success') {
+								showError(
+									data.message ||
+										data.error ||
+										'Ошибка при удалении пользователя из списка'
+								)
+								return
+							}
+							selectedRow.remove()
+							showSuccess('Пользователь успешно удалён из списка наблюдателей')
+						} catch (err) {
+							loader.remove()
+							showError(
+								err.message || 'Ошибка при удалении пользователя из списка'
+							)
+						}
+					}
+				)
+			}
+		})
+	}
+
+	const addViewerButton = document.getElementById('add-viewer-button')
+	if (addViewerButton) {
+		addViewerButton.addEventListener('click', async () => {
+			const selectedRow = document.querySelector('.table__row--selected')
+			let orderId = null
+			if (selectedRow) {
+				const firstCell = selectedRow.querySelector('td')
+				if (firstCell) {
+					orderId = firstCell.textContent.trim()
+				}
+			}
+			if (!orderId) {
+				showError('Сначала выберите заказ в таблице.')
+				return
+			}
+
+			const modal = new Modal()
+			const resp = await fetch(`/components/commerce/order-viewers`, {
+				headers: { 'X-Requested-With': 'XMLHttpRequest' },
+			})
+			const html = await resp.text()
+			await modal.open(html, 'Открыть доступ к заказу')
+
+			const viewersSelectInput = document.getElementById('viewers')
+			const viewersSelect =
+				viewersSelectInput && viewersSelectInput.closest('.select')
+			if (viewersSelect) {
+				viewersSelect.setAttribute('data-multiple', 'true')
+				SelectHandler.setupSelects({
+					select: viewersSelect,
+					url: '/users/managers/?role=viewer',
+				})
+			}
+
+			const container = document.getElementById('order-viewers-container')
+			if (container) {
+				const viewersResp = await fetch(
+					`/commerce/orders/${orderId}/viewers/`,
+					{
+						headers: { 'X-Requested-With': 'XMLHttpRequest' },
+					}
+				)
+				const viewersData = await viewersResp.json()
+				container.innerHTML = viewersData.html || '<div>Нет наблюдателей</div>'
+
+				TableManager.initTable(viewersData.table_id)
+			}
+
+			const orderViewerBtn = document.getElementById('order-viewers-btn')
+			if (orderViewerBtn) {
+				orderViewerBtn.addEventListener('click', async () => {
+					const viewersSelectInput = document.getElementById('viewers')
+					let viewers = []
+					if (viewersSelectInput) {
+						if (viewersSelectInput.multiple) {
+							viewers = Array.from(viewersSelectInput.selectedOptions).map(
+								opt => opt.value
+							)
+						} else {
+							if (viewersSelectInput.value) viewers = [viewersSelectInput.value]
+						}
+					}
+					if (!viewers.length) {
+						showError('Выберите хотя бы одного пользователя для добавления.')
+						return
+					}
+
+					const loader = createLoader()
+					document.body.appendChild(loader)
+					try {
+						const resp = await fetch(
+							`/commerce/orders/${orderId}/add_viewers/`,
+							{
+								method: 'POST',
+								headers: {
+									'Content-Type': 'application/x-www-form-urlencoded',
+									'X-CSRFToken': getCSRFToken(),
+								},
+								body: viewers
+									.map(id => `viewers[]=${encodeURIComponent(id)}`)
+									.join('&'),
+								credentials: 'same-origin',
 							}
 						)
-
 						const data = await resp.json()
 						loader.remove()
-
 						if (!resp.ok || data.status !== 'success') {
 							showError(
-								data.message || data.error || 'Ошибка при удалении объекта'
+								data.message || data.error || 'Ошибка добавления наблюдателей'
 							)
 							return
 						}
-
-						const objectItem = document
-							.querySelector(`[data-target="object-${clientId}-${objectId}"]`)
-							?.closest('li')
-
-						if (objectItem) {
-							objectItem.remove()
-
-							const branchDetails = document.getElementById(
-								`branch-${clientId}`
-							)
-							if (branchDetails) {
-								const ul = branchDetails.querySelector('ul')
-								const remainingObjects = ul?.querySelectorAll(
-									'li.debtors-office-list__item'
-								)
-
-								if (!remainingObjects || remainingObjects.length === 0) {
-									if (!ul) {
-										const newUl = document.createElement('ul')
-										branchDetails.appendChild(newUl)
-										newUl.innerHTML = '<li>Нет объектов</li>'
-									} else {
-										ul.innerHTML = '<li>Нет объектов</li>'
-									}
-								}
-							}
-
-							showSuccess('Объект успешно удален')
-
-							objectId = null
+						if (container && Array.isArray(data.html)) {
+							container.innerHTML = data.html.join('')
+							showSuccess('Пользователи успешно добавлены в наблюдатели')
+							TableManager.initTable(`order-viewers-${orderId}`)
 						}
+						modal.close()
 					} catch (err) {
 						loader.remove()
-						showError(err.message || 'Ошибка при удалении объекта')
+						showError(err.message || 'Ошибка добавления наблюдателей')
 					}
-				}
-			)
+				})
+			}
 		})
 	}
 }
@@ -2120,100 +2799,120 @@ function initArchivePage() {
 							return
 						}
 
-						const l = createLoader()
-						document.body.appendChild(l)
-						uploadBtn.disabled = true
+						const modal = new Modal()
+						const resp = await fetch('/components/commerce/file_name', {
+							headers: { 'X-Requested-With': 'XMLHttpRequest' },
+						})
+						const html = await resp.text()
+						await modal.open(html, 'Введите название файла')
 
-						try {
-							const fd = new FormData()
-							fd.append('file', f)
-							fd.append('order', orderId)
-							fd.append('file_type', fileTypeVal)
+						const form = document.getElementById('file_name-form')
+						const nameInput = form.querySelector('#name')
+						nameInput.value = f.name.replace(/\.[^/.]+$/, '')
+						nameInput.focus()
 
-							const uploadResp = await fetch(`${BASE_URL}documents/upload/`, {
-								method: 'POST',
-								headers: {
-									'X-CSRFToken': getCSRFToken(),
-									'X-Requested-With': 'XMLHttpRequest',
-								},
-								credentials: 'same-origin',
-								body: fd,
-							})
+						return new Promise(resolve => {
+							form.onsubmit = async e => {
+								e.preventDefault()
+								let newName = nameInput.value.trim()
+								if (!newName) {
+									showError('Имя файла не может быть пустым')
+									return
+								}
+								const ext = f.name.substring(f.name.lastIndexOf('.'))
+								const finalName = newName + ext
 
-							const payload = await uploadResp.json()
-
-							if (!uploadResp.ok || payload.status !== 'success') {
-								showError(
-									payload.message || payload.error || 'Ошибка загрузки файла'
-								)
-							} else {
-								const tableId = `order-documents-${orderId}`
-								const newRow = await TableManager.addTableRow(payload, tableId)
+								const l = createLoader()
+								document.body.appendChild(l)
+								uploadBtn.disabled = true
 
 								try {
-									if (payload.url) {
-										const table = document.getElementById(tableId)
-										if (table) {
-											const ths = Array.from(table.querySelectorAll('thead th'))
-											const fileColIndex = ths.findIndex(
-												th =>
-													th && th.dataset && th.dataset.name === 'file_display'
-											)
-											if (fileColIndex !== -1) {
-												let row = null
-												if (newRow instanceof HTMLElement) {
-													row = newRow
-												} else {
-													const nameToMatch = (payload.name || '').trim()
-													const rows = Array.from(
-														table.querySelectorAll(
-															'tbody tr:not(.table__row--summary):not(.table__row--empty)'
-														)
-													)
-													row =
-														rows.find(r => {
-															const c = r.children[fileColIndex]
-															return c && c.textContent.trim() === nameToMatch
-														}) || null
-												}
+									const fd = new FormData()
+									const fileWithNewName = new File([f], finalName, {
+										type: f.type,
+									})
+									fd.append('file', fileWithNewName)
+									fd.append('order', orderId)
+									fd.append('file_type', fileTypeVal)
+									fd.append('filename', finalName)
 
-												if (row) {
-													const cell = row.children[fileColIndex]
-													if (cell) {
-														const text =
-															cell.textContent.trim() || payload.name || ''
-														cell.innerHTML = ''
-														const a = document.createElement('a')
-														a.href = payload.url
-														a.target = '_blank'
-														a.rel = 'noopener noreferrer'
-														a.textContent = text
-														cell.appendChild(a)
+									const uploadResp = await fetch(
+										`${BASE_URL}documents/upload/`,
+										{
+											method: 'POST',
+											headers: {
+												'X-CSRFToken': getCSRFToken(),
+												'X-Requested-With': 'XMLHttpRequest',
+											},
+											credentials: 'same-origin',
+											body: fd,
+										}
+									)
+
+									const payload = await uploadResp.json()
+
+									if (!uploadResp.ok || payload.status !== 'success') {
+										showError(
+											payload.message ||
+												payload.error ||
+												'Ошибка загрузки файла'
+										)
+									} else {
+										const tableId = `order-documents-${orderId}`
+										const newRow = await TableManager.addTableRow(
+											payload,
+											tableId
+										)
+										showSuccess('Файл успешно загружен')
+
+										try {
+											const table = document.getElementById(tableId)
+											if (table && payload.url) {
+												const ths = Array.from(
+													table.querySelectorAll('thead th')
+												)
+												const fileColIndex = ths.findIndex(
+													th =>
+														th &&
+														th.dataset &&
+														th.dataset.name === 'file_display'
+												)
+												if (fileColIndex !== -1) {
+													const row = table.querySelector('tbody tr:last-child')
+													if (row) {
+														const cell = row.children[fileColIndex]
+														if (cell) {
+															const text = cell.textContent.trim()
+															if (payload.url && text) {
+																cell.innerHTML = `<a href="${payload.url}" target="_blank" rel="noopener noreferrer">${text}</a>`
+															}
+														}
 													}
 												}
 											}
+										} catch (e) {
+											console.warn(
+												'Не удалось применить ссылку к новой строке:',
+												e
+											)
 										}
 									}
-								} catch (e) {
-									console.warn(
-										'Не удалось сделать ссылку из названия файла:',
-										e
-									)
+									modal.close()
+								} catch (err) {
+									showError(err.message || 'Ошибка загрузки файла')
+								} finally {
+									l.remove()
+									uploadBtn.disabled = false
+									try {
+										fileInput.value = ''
+									} catch (e) {}
 								}
-
-								TableManager.initTable(tableId)
-
-								showSuccess('Файл успешно загружен')
 							}
-						} catch (err) {
-							showError(err.message || 'Ошибка загрузки файла')
-						} finally {
-							l.remove()
-							uploadBtn.disabled = false
-							try {
+							form.querySelector('.button--cancel').onclick = () => {
+								modal.close()
 								fileInput.value = ''
-							} catch (e) {}
-						}
+							}
+						})
 					})
 				}
 			} catch (e) {
@@ -2637,100 +3336,120 @@ const initDepartmentPage = departmentSlug => {
 							return
 						}
 
-						const l = createLoader()
-						document.body.appendChild(l)
-						uploadBtn.disabled = true
+						const modal = new Modal()
+						const resp = await fetch('/components/commerce/file_name', {
+							headers: { 'X-Requested-With': 'XMLHttpRequest' },
+						})
+						const html = await resp.text()
+						await modal.open(html, 'Введите название файла')
 
-						try {
-							const fd = new FormData()
-							fd.append('file', f)
-							fd.append('order', orderId)
-							fd.append('file_type', fileTypeVal)
+						const form = document.getElementById('file_name-form')
+						const nameInput = form.querySelector('#name')
+						nameInput.value = f.name.replace(/\.[^/.]+$/, '')
+						nameInput.focus()
 
-							const uploadResp = await fetch(`${BASE_URL}documents/upload/`, {
-								method: 'POST',
-								headers: {
-									'X-CSRFToken': getCSRFToken(),
-									'X-Requested-With': 'XMLHttpRequest',
-								},
-								credentials: 'same-origin',
-								body: fd,
-							})
+						return new Promise(resolve => {
+							form.onsubmit = async e => {
+								e.preventDefault()
+								let newName = nameInput.value.trim()
+								if (!newName) {
+									showError('Имя файла не может быть пустым')
+									return
+								}
+								const ext = f.name.substring(f.name.lastIndexOf('.'))
+								const finalName = newName + ext
 
-							const payload = await uploadResp.json()
-
-							if (!uploadResp.ok || payload.status !== 'success') {
-								showError(
-									payload.message || payload.error || 'Ошибка загрузки файла'
-								)
-							} else {
-								const tableId = `order-documents-${orderId}`
-								const newRow = await TableManager.addTableRow(payload, tableId)
+								const l = createLoader()
+								document.body.appendChild(l)
+								uploadBtn.disabled = true
 
 								try {
-									if (payload.url) {
-										const table = document.getElementById(tableId)
-										if (table) {
-											const ths = Array.from(table.querySelectorAll('thead th'))
-											const fileColIndex = ths.findIndex(
-												th =>
-													th && th.dataset && th.dataset.name === 'file_display'
-											)
-											if (fileColIndex !== -1) {
-												let row = null
-												if (newRow instanceof HTMLElement) {
-													row = newRow
-												} else {
-													const nameToMatch = (payload.name || '').trim()
-													const rows = Array.from(
-														table.querySelectorAll(
-															'tbody tr:not(.table__row--summary):not(.table__row--empty)'
-														)
-													)
-													row =
-														rows.find(r => {
-															const c = r.children[fileColIndex]
-															return c && c.textContent.trim() === nameToMatch
-														}) || null
-												}
+									const fd = new FormData()
+									const fileWithNewName = new File([f], finalName, {
+										type: f.type,
+									})
+									fd.append('file', fileWithNewName)
+									fd.append('order', orderId)
+									fd.append('file_type', fileTypeVal)
+									fd.append('filename', finalName)
 
-												if (row) {
-													const cell = row.children[fileColIndex]
-													if (cell) {
-														const text =
-															cell.textContent.trim() || payload.name || ''
-														cell.innerHTML = ''
-														const a = document.createElement('a')
-														a.href = payload.url
-														a.target = '_blank'
-														a.rel = 'noopener noreferrer'
-														a.textContent = text
-														cell.appendChild(a)
+									const uploadResp = await fetch(
+										`${BASE_URL}documents/upload/`,
+										{
+											method: 'POST',
+											headers: {
+												'X-CSRFToken': getCSRFToken(),
+												'X-Requested-With': 'XMLHttpRequest',
+											},
+											credentials: 'same-origin',
+											body: fd,
+										}
+									)
+
+									const payload = await uploadResp.json()
+
+									if (!uploadResp.ok || payload.status !== 'success') {
+										showError(
+											payload.message ||
+												payload.error ||
+												'Ошибка загрузки файла'
+										)
+									} else {
+										const tableId = `order-documents-${orderId}`
+										const newRow = await TableManager.addTableRow(
+											payload,
+											tableId
+										)
+										showSuccess('Файл успешно загружен')
+
+										try {
+											const table = document.getElementById(tableId)
+											if (table && payload.url) {
+												const ths = Array.from(
+													table.querySelectorAll('thead th')
+												)
+												const fileColIndex = ths.findIndex(
+													th =>
+														th &&
+														th.dataset &&
+														th.dataset.name === 'file_display'
+												)
+												if (fileColIndex !== -1) {
+													const row = table.querySelector('tbody tr:last-child')
+													if (row) {
+														const cell = row.children[fileColIndex]
+														if (cell) {
+															const text = cell.textContent.trim()
+															if (payload.url && text) {
+																cell.innerHTML = `<a href="${payload.url}" target="_blank" rel="noopener noreferrer">${text}</a>`
+															}
+														}
 													}
 												}
 											}
+										} catch (e) {
+											console.warn(
+												'Не удалось применить ссылку к новой строке:',
+												e
+											)
 										}
 									}
-								} catch (e) {
-									console.warn(
-										'Не удалось сделать ссылку из названия файла:',
-										e
-									)
+									modal.close()
+								} catch (err) {
+									showError(err.message || 'Ошибка загрузки файла')
+								} finally {
+									l.remove()
+									uploadBtn.disabled = false
+									try {
+										fileInput.value = ''
+									} catch (e) {}
 								}
-
-								TableManager.initTable(tableId)
-
-								showSuccess('Файл успешно загружен')
 							}
-						} catch (err) {
-							showError(err.message || 'Ошибка загрузки файла')
-						} finally {
-							l.remove()
-							uploadBtn.disabled = false
-							try {
+							form.querySelector('.button--cancel').onclick = () => {
+								modal.close()
 								fileInput.value = ''
-							} catch (e) {}
-						}
+							}
+						})
 					})
 				}
 			} catch (e) {
@@ -3622,3 +4341,72 @@ document.addEventListener('DOMContentLoaded', () => {
 		})
 	}
 })
+
+document.addEventListener(
+	'mouseover',
+	function (e) {
+		const link = e.target.closest('a')
+		if (!link || !link.href) return
+
+		const td = link.closest('td')
+		const tr = td && td.closest('tr')
+		const table = tr && tr.closest('table')
+		if (!table || !/^order-documents-/.test(table.id)) return
+
+		const href = link.href
+		const isImage = /\.(jpe?g|png|gif|bmp|webp)$/i.test(href)
+		const isPdf = /\.pdf$/i.test(href)
+
+		if (!isImage && !isPdf) return
+
+		let preview = document.createElement('div')
+		preview.className = 'file-preview-popup'
+		preview.style.position = 'fixed'
+		preview.style.zIndex = 99999
+		preview.style.background = '#fff'
+		preview.style.border = '1px solid #ccc'
+		preview.style.boxShadow = '0 2px 12px rgba(0,0,0,0.15)'
+		preview.style.padding = '6px'
+		preview.style.maxWidth = '400px'
+		preview.style.maxHeight = '400px'
+		preview.style.overflow = 'auto'
+
+		if (isImage) {
+			const img = document.createElement('img')
+			img.src = href
+			img.style.maxWidth = '380px'
+			img.style.maxHeight = '380px'
+			img.style.display = 'block'
+			preview.appendChild(img)
+		} else if (isPdf) {
+			const iframe = document.createElement('iframe')
+			iframe.src = href
+			iframe.style.width = '380px'
+			iframe.style.height = '380px'
+			iframe.style.border = 'none'
+			preview.appendChild(iframe)
+		}
+
+		document.body.appendChild(preview)
+
+		const movePreview = ev => {
+			const x = ev.clientX + 20
+			const y = ev.clientY + 20
+			preview.style.left = x + 'px'
+			preview.style.top = y + 'px'
+		}
+		movePreview(e)
+
+		const mouseMoveHandler = movePreview
+		document.addEventListener('mousemove', mouseMoveHandler)
+
+		const removePreview = () => {
+			if (preview && preview.parentNode) preview.parentNode.removeChild(preview)
+			document.removeEventListener('mousemove', mouseMoveHandler)
+			link.removeEventListener('mouseleave', removePreview)
+		}
+
+		link.addEventListener('mouseleave', removePreview)
+	},
+	true
+)

@@ -19,13 +19,17 @@ def manager_list(request):
 
     managers_qs = User.objects.filter(user_type__name="Менеджер по работе с клиентами")
 
-    if has_view_all_payments_perm:
+    role = request.GET.get("role")
+    if role == "viewer":
+        managers = list(managers_qs.exclude(id=current_user.id))
+    elif has_view_all_payments_perm:
         managers = list(managers_qs)
     else:
         managers = list(managers_qs.filter(id=current_user.id))
 
-    if not any(u.id == current_user.id for u in managers):
+    if role != "viewer" and not any(u.id == current_user.id for u in managers):
         managers.append(current_user)
+    # -------------------------------------
 
     types = [
         {"id": t.id, "name": t.last_name if t.last_name else t.username} for t in managers

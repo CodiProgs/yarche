@@ -1,1 +1,1 @@
-from models import Client, Document, FileType, Order, OrderStatus, Product, ClientObject, Contact, Department, OrderDepartmentWork, DepartmentStatus, OrderDepartmentWorkMessage
+from models import Client, Document, FileType, Order, OrderStatus, Product, ClientObject, Contact, Department, OrderDepartmentWork, OrderWorkStatus, OrderDepartmentWorkMessage

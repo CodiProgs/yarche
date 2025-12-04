@@ -12,53 +12,45 @@
             <a class="dropdown-item context-action"
                 id="delete-button"
                 data-action="delete">Удалить</a>
-            {% comment %} <div class="dropdown-divider">
-            </div>
             <a class="dropdown-item context-action"
-               id="hide-button"
-               data-action="hide">Скрыть</a>
-            <a class="dropdown-item context-action"
-               id="hide-all-button"
-               data-action="hide-all">Скрыть все</a>
-            <a class="dropdown-item context-action"
-               id="show-all-button"
-               data-action="show-all">Показать все</a> {% endcomment %}
+                id="add-viewer-button"
+                data-action="add-viewer">Дать доступ к заказу</a>
         </div>
         <div class="debtors-data">
             <ul class="debtors-office-list">
                 {% for client in clients %}
                     <li class="debtors-office-list__item">
-                        <div class="debtors-office-list__row" data-target="branch-{{ forloop.counter }}">
+                        <div class="debtors-office-list__row" data-target="branch-{{ client.id }}">
                             <button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
-                            <span class="debtors-office-list__title">{{ client.legal_name|default:client.name }}</span>
+                            <span class="debtors-office-list__title">{{ client.legal_name|default:client.name }}</span> 
                         </div>
-                        <div class="debtors-office-list__details" id="branch-{{ forloop.counter }}">
+                        <div class="debtors-office-list__details" id="branch-{{ client.id }}">
                             <ul>
                                 {% for obj in client.client_objects.all %}
                                     <li class="debtors-office-list__item">
-                                        <div class="debtors-office-list__row" data-target="object-{{ forloop.parentloop.counter }}-{{ forloop.counter }}" style="border-left-width: 16px;">
+                                        <div class="debtors-office-list__row" data-target="object-{{ client.id }}-{{ obj.id }}" style="border-left-width: 16px;">
                                             <button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
                                             <h4>{{ obj.name }}</h4>
                                         </div>
-                                        <div class="debtors-office-list__details" id="object-{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
+                                        <div class="debtors-office-list__details" id="object-{{ client.id }}-{{ obj.id }}">
                                             <ul>
                                                 {% for product in products %}
                                                     <li class="debtors-office-list__item">
                                                         <div class="debtors-office-list__row"
-                                                            data-target="product-{{ forloop.parentloop.parentloop.counter }}-{{ forloop.parentloop.counter }}-{{ forloop.counter }}"
+                                                            data-target="product-{{ client.id }}-{{ obj.id }}-{{ product.id }}"
                                                             data-product-id="{{ product.id }}"
                                                             data-client-id="{{ client.id }}"
                                                             data-object-id="{{ obj.id }}"
-                                                            style="border-left-width: 24px;">
+                                                            style="border-left-width: 32px;">
                                                             <button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
                                                             <span class="debtors-office-list__title">{{ product.name }}</span>
                                                         </div>
                                                         <div class="debtors-office-list__details"
-                                                            id="product-{{ forloop.parentloop.parentloop.counter }}-{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
+                                                            id="product-{{ client.id }}-{{ obj.id }}-{{ product.id }}">
                                                         </div>
                                                     </li>
                                                 {% empty %}
-                                                    <li class="debtors-office-list__row" style="border-left-width: 24px;">Нет продукции</li>
+                                                    <li class="debtors-office-list__row" style="border-left-width: 32px;">Нет продукции</li>
                                                 {% endfor %}
                                             </ul>
                                         </div>
@@ -79,4 +71,3 @@
     <script src="{% static 'commerce/js/commerce.js' %}" type="module"></script>
     <script src="{% static 'js/autonumeric.js' %}" defer></script>
 {% endblock extra_scripts %}
-

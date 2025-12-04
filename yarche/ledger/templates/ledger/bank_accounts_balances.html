@@ -1,0 +1,11 @@
+{% extends "layout.html" %}
+{% load static %}
+{% block content %}
+    <div class="page-table-container" id="bank_accounts_balances-container">
+        {% include "components/table.html" with id="bank_accounts_balances-table" fields=fields data=data is_grouped=is_grouped %}
+    </div>
+{% endblock content %}
+{% block extra_scripts %}
+    {{ block.super }}
+    <script src="{% static 'ledger/js/ledger.js' %}" type="module"></script>
+{% endblock extra_scripts %}

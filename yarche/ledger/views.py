@@ -1359,3 +1359,103 @@ def render_transaction_response(transaction):
 
 # endregion
 
+class BankAccountDataBalance:
+    def __init__(self, name, balance):
+        self.name = name
+        self.balance = balance
+
+
+@login_required
+def bank_accounts_balances(request):
+    accounts = BankAccount.objects.select_related('type').order_by('type__name', 'name')
+    grouped = {}
+    for acc in accounts:
+        acc_type = acc.type.name if acc.type else "Без типа"
+        acc.balance = format_currency(acc.balance)
+        grouped.setdefault(acc_type, []).append(acc)
+    fields = [
+        {"name": "name", "verbose_name": "Название счета"},
+        {"name": "balance", "verbose_name": "Баланс", "is_number": True},
+    ]
+    context = {
+        "fields": fields,
+        "data": grouped,
+        "is_grouped": {"bank_accounts_balances-table": True},
+        "id": "bank_accounts_balances-table",
+    }
+    return render(request, "ledger/bank_accounts_balances.html", context)
+
+
+@login_required
+def all_transactions(request):
+    page_number = request.GET.get("page", 1)
+    transactions = (
+        Transaction.objects
+        .select_related("bank_account", "created_by")
+        .order_by("-created")
+    )
+    paginator = Paginator(transactions, 200)
+    page_obj = paginator.get_page(page_number)
+
+    for tr in page_obj.object_list:
+        tr.type = tr.get_type_display()
+
+    fields = [
+        {"name": "created", "verbose_name": "Дата"},
+        {"name": "type", "verbose_name": "Тип"},
+        {"name": "bank_account", "verbose_name": "Счет"},
+        {"name": "amount", "verbose_name": "Сумма", "is_number": True},
+        {"name": "comment", "verbose_name": "Комментарий"},
+        {"name": "created_by", "verbose_name": "Пользователь"},
+    ]
+
+    context = {
+        "fields": fields,
+        "data": page_obj,
+        "context": {
+            "total_pages": paginator.num_pages,
+            "current_page": page_obj.number,
+            "transaction_ids": [tr.id for tr in page_obj.object_list],
+        },
+    }
+    return render(request, "ledger/all_transactions.html", context)
+
+@login_required
+def all_transactions_table(request):
+    page_number = request.GET.get("page", 1)
+    transactions = (
+        Transaction.objects
+        .select_related("bank_account", "created_by")
+        .order_by("-created")
+    )
+    paginator = Paginator(transactions, 200)
+    page_obj = paginator.get_page(page_number)
+
+    for tr in page_obj.object_list:
+        tr.type = tr.get_type_display()
+
+    fields = [
+        {"name": "created", "verbose_name": "Дата"},
+        {"name": "type", "verbose_name": "Тип"},
+        {"name": "bank_account", "verbose_name": "Счет"},
+        {"name": "amount", "verbose_name": "Сумма", "is_number": True},
+        {"name": "comment", "verbose_name": "Комментарий"},
+        {"name": "created_by", "verbose_name": "Пользователь"},
+    ]
+
+    html = "".join(
+        render_to_string(
+            "components/table_row.html",
+            {"item": tr, "fields": fields},
+        )
+        for tr in page_obj.object_list
+    )
+
+    return JsonResponse({
+        "html": html,
+        "context": {
+            "total_pages": paginator.num_pages,
+            "current_page": page_obj.number,
+            "transaction_ids": [tr.id for tr in page_obj.object_list],
+        }
+    })

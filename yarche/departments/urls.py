@@ -14,6 +14,7 @@ urlpatterns = [
     
     path('users/<slug:department_slug>/', views.department_users, name='department_users'),
     path('statuses/<slug:department_slug>/', views.department_statuses, name='department_statuses'),
+	path('list/', views.departments_list, name='departments_list'),
     path('<slug:department_slug>/orders/<int:order_id>/assign-executor/', 
          views.department_work_assign_executor, 
          name='department_work_assign_executor'),
@@ -31,4 +32,7 @@ urlpatterns = [
     path('work-messages/detail/<int:message_id>/', views.department_work_message_detail, name='department_work_message_detail'),
 	path('work-messages/edit/<int:message_id>/', views.department_work_message_edit, name='department_work_message_edit'),
     path('work-messages/delete/<int:message_id>/', views.department_work_message_delete, name='department_work_message_delete'),
+	
+    path('work/create/', views.department_work_create, name='department_work_create'),
+    path('work/delete/<int:work_id>/', views.department_work_delete, name='department_work_delete'),
 ]

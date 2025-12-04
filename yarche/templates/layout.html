@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 {% load static %}
 {% load components %}
+{% load menu_extras %}
 <html lang="en">
     <head>
         <meta charset="UTF-8" />
@@ -38,15 +39,12 @@
             {% if not request.user.user_type.name == "Поставщик" and request.user.user_type.name != "Ассистент" and request.user.user_type.name != "Филиал" %}
                 <nav class="sidebar-nav">
                     <ul class="nav-list">
-                        {% regroup request.user.user_type.type_menu_items.all by menu_item.category as categories %}
-                        {% for category in categories %}
-                            {% if category.grouper %}
-                                <li class="nav-item{% if request.path|slice:':6' == '/menu/' and category.grouper.name in request.path %} active{% endif %}">
-                                    <a href="{% url 'menu:category' category.grouper.name %}">
-                                        {{ category.grouper.display_name }}
-                                    </a>
-                                </li>
-                            {% endif %}
+                        {% for category in request.user.user_type.type_menu_items.all|unique_categories %}
+                            <li class="nav-item{% if request.path|slice:':6' == '/menu/' and category.name in request.path %} active{% endif %}">
+                                <a href="{% url 'menu:category' category.name %}">
+                                    {{ category.display_name }}
+                                </a>
+                            </li>
                         {% endfor %}
                     </ul>
                 </nav>
@@ -54,3 +52,5 @@
         </div>
     </body>
 </html>
+
+

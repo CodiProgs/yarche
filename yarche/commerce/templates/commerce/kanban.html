@@ -1,0 +1,347 @@
+{% extends "layout.html" %}
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/kanban.css' %}">
+{% block content %}
+<div class="kanban-container">
+    <div id="kanban-board-header">
+        <button id="edit-columns-btn" class="button" type="button">Редактировать столбцы</button>
+    </div>  
+    <div id="kanban-board">
+        {% for col in columns %}
+        <div class="kanban-column" data-column-id="{{ col.id }}">
+            <h3 class="kanban-column-title">
+                <span class="drag-handle" title="Перетащить столбец">
+                    <img src="{% static 'images/drag.svg' %}" alt="drag" width="18" height="18" draggable="false" />
+                </span>
+                <span class="kanban-column-name">{{ col.name }}</span>
+            </h3>
+            <ul class="kanban-list" data-column-id="{{ col.id }}">
+            {% if forloop.first %}
+            <li class="kanban-card kanban-quick-add ui-state-disabled" id="quick-add-btn">
+                Быстрое добавление
+            </li>
+            <li class="kanban-card kanban-quick-add-form" id="quick-add-form-card">
+                <form id="quick-add-form" autocomplete="off">
+                    <div>
+                        <input type="text" name="q_name" placeholder="Имя" class="kanban-input modal-form__input" required
+                            autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false">
+                        <input type="text" name="q_phone" placeholder="Телефон" class="kanban-input modal-form__input"
+                            autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false">
+                        <input type="email" name="q_email" placeholder="Email" class="kanban-input modal-form__input"
+                            autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false">
+                        <input type="text" name="q_company" placeholder="Название компании" class="kanban-input modal-form__input"
+                            autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false">
+                        <input type="text" name="q_address" placeholder="Адрес компании" class="kanban-input modal-form__input"
+                            autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false">
+                    </div>
+                    <div>
+                        <button type="submit" class="button">Добавить</button>
+                        <button type="button" class="button" id="quick-add-cancel">Отменить</button>
+                    </div>
+                </form>
+            </li>
+            {% endif %}
+                {% for placement in col.clients %}
+                <li class="kanban-card" data-client-id="{{ placement.client.id }}">
+                    {{ placement.client.name }}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+<script type="module">
+import { showError, showQuestion, showSuccess } from '/static/js/ui-utils.js';
+import { Modal } from '/static/js/modal.js';
+
+let editingColumns = false;
+let originalColumnNames = {};
+
+function enableColumnEditing() {
+    $(".kanban-column").each(function() {
+        const $col = $(this);
+        $col.addClass("editing");
+        const colId = $col.data("column-id");
+        const name = $col.find(".kanban-column-name").text();
+        originalColumnNames[colId] = name;
+        let deleteBtnHtml = `<button class="kanban-delete-column-btn" data-column-id="${colId}" title="Удалить столбец">
+            <img src="{% static 'images/delete.svg' %}" alt="Удалить" width="18" height="18">
+        </button>`;
+        $col.find(".kanban-column-title").html(
+            `<span class="drag-handle" title="Перетащить столбец">
+                <img src="{% static 'images/drag.svg' %}" alt="drag" width="18" height="18" draggable="false" />
+            </span>
+            <input type="text" class="kanban-column-input form-kanban-column-input" id="kanban-column-input-${colId}" value="${name}" data-column-id="${colId}" />
+            ${deleteBtnHtml}`
+        );
+    });
+
+    $(".kanban-add-column-btn").remove();
+
+    const $columns = $(".kanban-column");
+    $columns.each(function(idx) {
+        if (idx > 0) {
+            const $prevTitle = $columns.eq(idx - 1).find(".kanban-column-title");
+            const $currTitle = $(this).find(".kanban-column-title");
+            const addBtn = $(`
+                <button class="kanban-add-column-btn" data-insert-order="${idx}" title="Добавить столбец">
+                    <img src="{% static 'images/plus.svg' %}" alt="+" width="18" height="18">
+                </button>
+            `);
+            $prevTitle.append(addBtn);
+        }
+    });
+
+    if ($columns.length) {
+        const $lastTitle = $columns.last().find(".kanban-column-title");
+        const addBtn = $(`
+            <button class="kanban-add-column-btn" data-insert-order="${$columns.length}" title="Добавить столбец">
+                <img src="{% static 'images/plus.svg' %}" alt="+" width="18" height="18">
+            </button>
+        `);
+        $lastTitle.append(addBtn);
+    }
+
+    $("#kanban-board").sortable({
+        axis: "x",
+        items: ".kanban-column",
+        handle: ".drag-handle",
+        placeholder: "kanban-column-placeholder",
+        forcePlaceholderSize: true,
+        tolerance: "pointer",
+        start: function(event, ui) {
+            ui.placeholder.width(ui.item.outerWidth());
+            ui.placeholder.height(ui.item.outerHeight());
+        },
+        change: function(event, ui) {
+            ui.placeholder.width(ui.item.outerWidth());
+        },
+        helper: function(e, item) {
+            item.height(item.height());
+            return item;
+        }
+    });
+    $("#edit-columns-btn").text("Сохранить");
+    editingColumns = true;
+}
+
+function disableColumnEditing() {
+    $(".kanban-column").each(function() {
+        const $col = $(this);
+        $col.removeClass("editing"); 
+        const colId = $col.data("column-id");
+        const name = $col.find(".kanban-column-input").val() || originalColumnNames[colId];
+        $col.find(".kanban-column-title").html(
+            `<span class="drag-handle" title="Перетащить столбец">
+                <img src="{% static 'images/drag.svg' %}" alt="drag" width="18" height="18" draggable="false" />
+            </span>
+            <span class="kanban-column-name">${name}</span>`
+        );
+    });
+    
+    $(".kanban-add-column-btn").remove();
+    $("#kanban-board").sortable("destroy");
+    $("#edit-columns-btn").text("Редактировать столбцы");
+    editingColumns = false;
+}
+
+function saveColumns() {
+    let columns = [];
+    $("#kanban-board .kanban-column").each(function(idx) {
+        const $col = $(this);
+        const colId = $col.data("column-id");
+        let name = $col.find(".kanban-column-input").val();
+        if (!name) name = originalColumnNames[colId];
+        columns.push({id: colId, name: name, order: idx});
+    });
+    $.ajax({
+        url: "{% url 'commerce:kanban_update_columns' %}",
+        method: "POST",
+        data: {
+            columns: JSON.stringify(columns),
+            csrfmiddlewaretoken: '{{ csrf_token }}'
+        },
+        success: function() {
+            disableColumnEditing();
+            $(".kanban-column").each(function(idx) {
+                const $col = $(this);
+                const colId = $col.data("column-id");
+                const colData = columns.find(c => c.id == colId);
+                if (colData) {
+                    $col.find(".kanban-column-name").text(colData.name);
+                }
+            });
+        },
+        error: function() {
+            showError("Ошибка при сохранении столбцов");
+        }
+    });
+}
+
+$(function() {
+    $(".kanban-list").sortable({
+        connectWith: ".kanban-list",
+        placeholder: "kanban-placeholder",
+        items: "> .kanban-card:not(.kanban-quick-add):not(.kanban-quick-add-form)", 
+        receive: function(event, ui) {
+            updateKanban(ui.item, $(this));
+        },
+        update: function(event, ui) {
+            if (this === ui.item.parent()[0]) {
+                updateKanban(ui.item, $(this));
+            }
+        }
+    }).disableSelection();
+
+    function updateKanban($item, $list) {
+        var client_id = $item.data("client-id");
+        var column_id = $list.data("column-id");
+        var order = [];
+        $list.children(".kanban-card[data-client-id]").each(function() {
+            var cid = $(this).data("client-id");
+            if (cid) order.push(cid);
+        });
+        $.post("{% url 'commerce:kanban_move_client' %}", {
+            client_id: client_id,
+            column_id: column_id,
+            order: order,
+            csrfmiddlewaretoken: '{{ csrf_token }}'
+        });
+    }
+
+    $("#edit-columns-btn").on("click", function() {
+        if (!editingColumns) {
+            enableColumnEditing();
+        } else {
+            saveColumns();
+        }
+    });
+
+    $(document).on("click", ".kanban-delete-column-btn", function(e) {
+        e.preventDefault();
+        const colId = $(this).data("column-id");
+        showQuestion(
+            "Удалить этот столбец? Клиенты будут перенесены в первый столбец.",
+            "Удаление столбца",
+            function() {
+                $.post("{% url 'commerce:kanban_delete_column' pk=0 %}".replace("0", colId), {
+                    csrfmiddlewaretoken: '{{ csrf_token }}'
+                }, function(resp) {
+                    if (resp.status === "success") {
+                        $(`.kanban-column[data-column-id="${colId}"]`).remove();
+                        showSuccess("Столбец удалён");
+                    } else {
+                        showError(resp.message || "Ошибка при удалении столбца");
+                    }
+                }).fail(function(jqXHR) {
+                    let msg = "Ошибка при удалении столбца";
+                    if (jqXHR.responseJSON && jqXHR.responseJSON.message) {
+                        msg = jqXHR.responseJSON.message;
+                    } else if (jqXHR.responseText) {
+                        try {
+                            const data = JSON.parse(jqXHR.responseText);
+                            if (data.message) msg = data.message;
+                        } catch (e) {}
+                    }
+                    showError(msg);
+                });
+            }
+        );
+    });
+
+    $(document).on('click', '#quick-add-btn', function() {
+        $(this).hide();
+        $('#quick-add-form-card').show();
+        $('#quick-add-form input[name="q_name"]').focus();
+    });
+
+    $(document).on('click', '#quick-add-cancel', function() {
+        $('#quick-add-form-card').hide();
+        $('#quick-add-btn').show();
+        $('#quick-add-form')[0].reset();
+    });
+
+    $(document).on('submit', '#quick-add-form', function(e) {
+        e.preventDefault();
+        const $form = $(this);
+        const data = {
+            q_name: $form.find('[name="q_name"]').val(),
+            q_phone: $form.find('[name="q_phone"]').val(),
+            q_email: $form.find('[name="q_email"]').val(),
+            q_company: $form.find('[name="q_company"]').val(),
+            q_address: $form.find('[name="q_address"]').val(),
+            column_id: $('.kanban-list').first().data('column-id'),
+            csrfmiddlewaretoken: '{{ csrf_token }}'
+        };
+        $.post('{% url "commerce:kanban_quick_add_client" %}', data, function(resp) {
+            if (resp.status === "success") {
+                const $list = $('.kanban-list').first();
+                $list.append(`<li class="kanban-card" data-client-id="${resp.client_id}">${resp.client_name}</li>`);
+                $('#quick-add-form-card').hide();
+                $('#quick-add-btn').show();
+                $('#quick-add-form')[0].reset();
+                showSuccess("Клиент добавлен");
+            } else {
+                showError(resp.message || 'Ошибка при добавлении');
+            }
+        }).fail(function() {
+            showError('Ошибка при добавлении');
+        });
+    });
+    
+    $(document).on("click", ".kanban-add-column-btn", async function() {
+        const order = $(this).data("insert-order");
+        const modal = new Modal();
+        const resp = await fetch("/components/commerce/column_name/", {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const html = await resp.text();
+        await modal.open(html, "Добавить столбец");
+
+        const $form = $("#column_name-form");
+        $form.find("input[name='name']").focus();
+
+        $form.on("submit", function(e) {
+            e.preventDefault();
+            const name = $form.find("input[name='name']").val().trim();
+            if (!name) {
+                showError("Название столбца не указано");
+                return;
+            }
+            $.post("{% url 'commerce:kanban_create_column' %}", {
+                name: name,
+                order: order,
+                csrfmiddlewaretoken: '{{ csrf_token }}'
+            }, function(resp) {
+                if (resp.status === "success") {
+                    showSuccess("Столбец добавлен");
+                    location.reload();
+                } else {
+                    showError(resp.message || "Ошибка при добавлении столбца");
+                }
+            }).fail(function(jqXHR) {
+                let msg = "Ошибка при добавлении столбца";
+                if (jqXHR.responseJSON && jqXHR.responseJSON.message) {
+                    msg = jqXHR.responseJSON.message;
+                } else if (jqXHR.responseText) {
+                    try {
+                        const data = JSON.parse(jqXHR.responseText);
+                        if (data.message) msg = data.message;
+                    } catch (e) {}
+                }
+                showError(msg);
+            });
+        });
+
+        $form.find(".button--cancel").on("click", function() {
+            modal.close();
+        });
+    });
+});
+</script>
+{% endblock %}

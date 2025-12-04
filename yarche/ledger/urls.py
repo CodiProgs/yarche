@@ -6,6 +6,12 @@ app_name = "ledger"
 urlpatterns = [
 	path('current_shift/', views.current_shift, name='current_shift'),
     path('transactions/', views.transactions, name='transactions'),
+	path('transactions/all/', views.all_transactions, name='all_transactions'),
+    path(
+        "transactions/table/",
+        views.all_transactions_table,
+        name="all_transactions_table",
+    ),
     path('bank-accounts/', views.bank_accounts, name='bank-accounts'),
     path('transaction-categories/', views.transaction_categories, name='transaction-categories'),
     path('payments/', views.payments, name='payments'),
@@ -32,6 +38,11 @@ urlpatterns = [
         "bank-accounts/refresh/",
         views.refresh_bank_accounts,
         name="refresh_bank_accounts",
+    ),
+    path(
+        "bank-accounts/balances/",
+        views.bank_accounts_balances,
+        name="bank_accounts_balances",
     ),
     path(
         "transaction-categories/list/",

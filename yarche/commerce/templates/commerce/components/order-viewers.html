@@ -1,0 +1,12 @@
+<div class="order-viewers-documents modal-form">
+	<form id="order-viewers-form" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+		<div class="modal-form__group modal-form__group--horizontal">
+			{% include "components/select.html" with id="viewers" placeholder="Выберите пользователей" %}
+			<button id="order-viewers-btn" type="button" class="button">Добавить</button>
+		</div>
+	</form>
+
+	<div id="order-viewers-container">
+    </div>
+</div>

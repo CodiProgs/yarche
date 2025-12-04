@@ -201,40 +201,48 @@ body {
 .container.container--without-menu .content {
 	background-color: var(--color-background-secondary);
 }
-
 .button {
-	width: 75px;
+	min-width: 110px;
 	height: 28px;
-	padding: 4px 5px;
-	border-radius: 0.25rem;
-	border: 1px solid var(--color-button-primary-border-hover);
-	background-color: var(--color-button-tertiary-background);
-	transition: all 250ms;
+	padding: 0 18px;
+	border-radius: 4px;
+	border: 1px solid #b0b4bb;
+	background-color: #f5f6fa;
+	color: #23272f;
+	font-size: 14px;
+	font-weight: 500;
+	box-shadow: 0 1px 2px rgba(60, 60, 60, 0.04);
+	transition: background 0.18s, border-color 0.18s, color 0.18s,
+		box-shadow 0.18s;
 	user-select: none;
 	-webkit-user-select: none;
 	touch-action: manipulation;
+	outline: none;
 }
 
-.button:hover {
-	background-color: var(--color-button-primary-hover);
-	box-shadow: rgba(0, 0, 0, 0.16) 0px 1px 4px 0px;
-	border-color: var(--color-button-primary-border);
-}
-
+.button:hover,
 .button:focus-visible {
-	border-color: var(--color-primary);
+	background-color: #e9ebf0;
+	border-color: #8a8d94;
+	color: #1a1d22;
+	box-shadow: 0 2px 8px rgba(60, 60, 60, 0.08);
 }
 
 .button:active {
-	background-color: var(--color-button-primary-border);
-	border-color: var(--color-primary);
+	background-color: #e0e2e7;
+	border-color: #6c6f75;
+	color: #23272f;
+	box-shadow: 0 1px 2px rgba(60, 60, 60, 0.04);
 }
 
 .button:disabled,
 .button[disabled] {
-	opacity: 0.6;
+	opacity: 0.55;
 	cursor: not-allowed;
 	pointer-events: none;
+	background: #f5f6fa;
+	color: #b0b4bb;
+	border-color: #e0e2e7;
 }
 
 .select {
@@ -1502,4 +1510,480 @@ body.nav-menu-open {
 	.category-menu__card-title {
 		font-size: 0.875rem;
 	}
+}
+
+.departments-carousel {
+	display: flex;
+	width: 600px;
+	overflow-x: auto;
+	gap: 20px;
+	padding: 10px 20px;
+	scroll-snap-type: x mandatory;
+	background: #f7f7fa;
+	padding-bottom: 40px;
+}
+
+.department-card {
+	position: relative;
+	min-width: 140px;
+	max-width: 140px;
+	height: 140px;
+	background: #fff;
+	border-radius: 6px;
+	box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	scroll-snap-align: center;
+	transition: box-shadow 0.2s;
+}
+
+.department-card:hover {
+	box-shadow: 0 4px 24px rgba(0, 0, 0, 0.16);
+}
+
+.department-card__img {
+	width: 40px;
+	height: 40px;
+	object-fit: contain;
+	margin-top: 12px;
+}
+
+.department-card__title {
+	font-size: 1rem;
+	font-weight: 600;
+	margin-top: 12px;
+	text-align: center;
+	color: #222;
+}
+
+.department-card__delete {
+	position: absolute;
+	top: 8px;
+	left: 8px;
+	background: #fff;
+	border: none;
+	border-radius: 50%;
+	width: 28px;
+	height: 28px;
+	font-size: 1.2rem;
+	color: #e53e3e;
+	cursor: pointer;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+	z-index: 2;
+	transition: all 0.3s;
+	opacity: 0;
+}
+
+.department-card__delete:hover {
+	background: #ffeaea;
+}
+
+.department-card:hover .department-card__delete {
+	opacity: 1;
+}
+
+.department-card--add {
+	justify-content: center;
+	align-items: center;
+	background: #e0e7ff;
+	color: #3b82f6;
+	border: 2px dashed #3b82f6;
+	cursor: pointer;
+}
+
+.department-card__add {
+	background: none;
+	border: none;
+	font-size: 2.5rem;
+	color: #3b82f6;
+	cursor: pointer;
+	width: 100%;
+	height: 100%;
+	border-radius: 18px;
+	transition: background 0.2s;
+}
+
+.department-card__add:hover {
+	background: #dbeafe;
+}
+
+.department-card__work-status {
+	position: absolute;
+	bottom: 8px;
+	left: 50%;
+	transform: translateX(-50%);
+	background: #f3f4f6;
+	color: #374151;
+	padding: 2px 6px;
+	border-radius: 12px;
+	font-size: 0.75rem;
+	font-weight: 600;
+}
+
+.department-card__edit {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	background: #fff;
+	border: none;
+	border-radius: 50%;
+	width: 28px;
+	height: 28px;
+	font-size: 1.2rem;
+	color: #10b981;
+	cursor: pointer;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+	z-index: 2;
+	transition: all 0.3s;
+	opacity: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.department-card:hover .department-card__edit {
+	opacity: 1;
+}
+
+.department-card__edit:hover {
+	background: #d1fae5;
+}
+
+.department-card__edit img {
+	width: 12px;
+	height: 12px;
+}
+
+@media (max-width: 768px) {
+	.departments-carousel {
+		padding: 10px;
+		gap: 15px;
+		width: 70vw;
+	}
+
+	.department-card {
+		min-width: 120px;
+		max-width: 120px;
+		height: 120px;
+	}
+
+	.department-card__img {
+		width: 32px;
+		height: 32px;
+		margin-top: 8px;
+	}
+
+	.department-card__title {
+		font-size: 0.9rem;
+		margin-top: 8px;
+	}
+
+	.department-card__delete {
+		width: 24px;
+		height: 24px;
+		font-size: 1rem;
+		top: 6px;
+		left: 6px;
+		opacity: 1;
+	}
+
+	.department-card__edit {
+		width: 24px;
+		height: 24px;
+		font-size: 1rem;
+		top: 6px;
+		right: 6px;
+		opacity: 1;
+	}
+}
+
+@media (max-width: 560px) {
+	.departments-carousel {
+		width: 90vw;
+	}
+}
+
+.debtors-search-input {
+	box-sizing: border-box;
+	display: block;
+	width: 100%;
+	padding: 4px 8px;
+	font-size: 15px;
+	border: 1px solid #cfd8dc;
+	border-radius: 4px;
+	background: #f7fafc;
+	color: #222;
+	margin-bottom: 4px;
+	transition: border-color 0.2s;
+}
+
+.debtors-search-input:focus {
+	border-color: #2196f3;
+	outline: none;
+	background: #fff;
+}
+
+.debtors-search-input-wrapper {
+	margin-bottom: 8px;
+}
+
+.debtors-search-input-wrapper.clients {
+	margin-left: 0;
+}
+
+.debtors-search-input-wrapper.objects {
+	margin-left: 16px;
+}
+
+.debtors-search-input-wrapper.products {
+	margin-left: 32px;
+}
+
+.order-viewers-documents.modal-form {
+	padding: 20px;
+}
+
+#kanban-board {
+	display: flex;
+	align-items: flex-start;
+	padding: 24px 0;
+	height: 100%;
+}
+
+.kanban-column {
+	padding: 16px 12px 12px 12px;
+	min-width: 320px;
+	max-width: 320px;
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+	margin: 0 6px;
+}
+
+.kanban-column h3 {
+	margin-top: 0;
+	margin-bottom: 16px;
+	font-size: 1.2em;
+	color: #444;
+	text-align: center;
+	letter-spacing: 0.5px;
+	border-bottom: 2px solid #2b579a;
+	padding-bottom: 8px;
+}
+
+.kanban-list {
+	min-height: 40px;
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	height: 100%;
+}
+
+.kanban-card {
+	background: #fff;
+	margin-bottom: 10px;
+	padding: 12px 10px;
+	border-radius: 2px;
+	box-shadow: 0 1px 4px #d0d0d0;
+	font-size: 1em;
+	cursor: all-scroll;
+	transition: box-shadow 0.2s;
+	border: 1px solid #e0e0e0;
+	user-select: none;
+}
+
+.kanban-card:last-child {
+	margin-bottom: 0;
+}
+
+.kanban-card:active {
+	cursor: grabbing;
+	box-shadow: 0 2px 8px #b0b0b0;
+}
+
+.kanban-placeholder {
+	background: #e0e0e0;
+	border: 2px dashed #bbb;
+	min-height: 44px;
+	margin-bottom: 10px;
+	border-radius: 6px;
+}
+
+#edit-columns-btn.button {
+	width: 220px;
+}
+
+.kanban-container {
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+}
+
+.kanban-column-title {
+	display: flex;
+}
+
+.kanban-column-title input {
+	text-align: center;
+}
+
+#kanban-board-header {
+	padding: 12px 24px;
+	border-bottom: 1px solid var(--color-border-window);
+	display: flex;
+	justify-content: flex-start;
+	align-items: center;
+}
+
+.kanban-column-name {
+	text-align: center;
+	width: 100%;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.drag-handle {
+	display: inline-flex;
+	align-items: center;
+	cursor: grab;
+	margin-right: 8px;
+	user-select: none;
+}
+.kanban-column-placeholder {
+	background: #e9ebf0;
+	border: 2px dashed #b0b4bb;
+	border-radius: 8px;
+	min-height: 120px;
+	margin: 0 8px;
+	box-sizing: border-box;
+	margin-top: -2px;
+	margin-bottom: -2px;
+}
+
+.form-kanban-column-input {
+	width: 90%;
+	padding: 6px 10px;
+	border-bottom: 1px solid #b0b4bb;
+	font-size: 15px;
+	color: #23272f;
+	transition: border-color 0.18s, box-shadow 0.18s;
+	margin-left: 4px;
+}
+.form-kanban-column-input:focus {
+	border-color: #1976d2;
+	outline: none;
+	background: #fff;
+	box-shadow: 0 2px 8px rgba(60, 60, 60, 0.08);
+}
+
+#quick-add-form .button {
+	height: 28px;
+	padding: 0 8px;
+	font-size: 13px;
+}
+
+.file-preview-popup {
+	animation: fadeIn 0.3s;
+}
+@keyframes fadeIn {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+.kanban-quick-add-form.kanban-card {
+	cursor: default;
+	box-shadow: 0 2px 8px #b0b0b0;
+}
+
+.kanban-delete-column-btn {
+	border: none;
+	border-radius: 4px;
+	padding: 4px;
+	cursor: pointer;
+	margin-left: 8px;
+	vertical-align: middle;
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+}
+
+.kanban-delete-column-btn:hover {
+	background-color: #ffeaea;
+}
+
+.kanban-column .drag-handle {
+	display: none;
+}
+.kanban-column.editing .drag-handle {
+	display: inline-flex;
+}
+
+.kanban-quick-add {
+	cursor: pointer;
+	font-weight: 500;
+	text-align: center;
+	font-size: 14px;
+}
+
+.kanban-quick-add-form {
+	display: none;
+	padding: 16px;
+}
+
+.kanban-input,
+.modal-form__input {
+	width: 100%;
+	margin-bottom: 4px;
+}
+
+#quick-add-form button {
+	min-width: 90px;
+}
+
+#quick-add-form-card {
+	display: none;
+	padding: 16px;
+}
+
+#kanban-board-header {
+	margin-bottom: 16px;
+}
+
+.kanban-column-title {
+	position: relative;
+}
+.kanban-add-column-btn {
+	position: absolute;
+	right: -32px;
+	top: 0px;
+	z-index: 9;
+	margin: 0;
+	background: #fff;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	cursor: pointer;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+	padding: 0;
+	width: 30px;
+	height: 30px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: background 0.2s;
+}
+.kanban-column-title:last-child .kanban-add-column-btn {
+	right: -12px;
+}
+.kanban-add-column-btn:hover {
+	background: #f0f0f0;
 }

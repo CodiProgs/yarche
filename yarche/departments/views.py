@@ -1,13 +1,15 @@
 import json
 from django.db import transaction
 from django.contrib.auth.decorators import login_required
-from commerce.models import Department, OrderDepartmentWork, DepartmentStatus, Order, OrderDepartmentWorkMessage
+from commerce.models import Department, OrderDepartmentWork, OrderWorkStatus, Order, OrderDepartmentWorkMessage
 from users.models import User
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 from django.template.loader import render_to_string
-from django.utils.timezone import localtime
+from django.db import models
+from django.db.models import Q
+
 
 @login_required
 def department_orders(request, department_slug):
@@ -79,8 +81,9 @@ def department_users(request, department_slug):
 @login_required
 def department_statuses(request, department_slug):
     department = get_object_or_404(Department, slug=department_slug)
-    statuses = DepartmentStatus.objects.filter(department=department).values("id", "name")
-    
+    statuses = OrderWorkStatus.objects.filter(
+        models.Q(department=department) | models.Q(department__isnull=True)
+    ).values("id", "name")
     return JsonResponse(list(statuses), safe=False)
 
 @login_required
@@ -198,7 +201,7 @@ def department_work_update_status(request, order_id: int, department_slug: str):
             department = get_object_or_404(Department, slug=department_slug)
             
             try:
-                new_status = get_object_or_404(DepartmentStatus, id=int(status_id), department=department)
+                new_status = get_object_or_404(OrderWorkStatus, id=int(status_id))
             except (ValueError, TypeError):
                 return JsonResponse(
                     {"status": "error", "message": "Неверный ID статуса"},
@@ -756,3 +759,72 @@ def department_work_message_detail(request, message_id: int):
     }
     
     return JsonResponse({"data": data})
+
+@login_required
+@require_http_methods(["POST"])
+def department_work_create(request):
+    try:
+        with transaction.atomic():
+            order_id = request.POST.get("order")
+            department_id = request.POST.get("department")
+
+            if not order_id or not department_id:
+                return JsonResponse({"status": "error", "message": "Не передан order или department"}, status=400)
+
+            order = get_object_or_404(Order, id=order_id)
+            department = get_object_or_404(Department, id=department_id)
+
+            status = OrderWorkStatus.objects.filter(
+                name="Ожидает"
+            ).filter(
+                Q(department=department) | Q(department__isnull=True)
+            ).first()
+
+            if not status:
+                return JsonResponse({"status": "error", "message": "Статус 'Ожидает' не найден"}, status=400)
+
+            if OrderDepartmentWork.objects.filter(order=order, department=department).exists():
+                return JsonResponse({"status": "error", "message": "Такая работа уже существует"}, status=400)
+
+            work = OrderDepartmentWork.objects.create(
+                order=order,
+                department=department,
+                status=status
+            )
+
+            return JsonResponse({
+                "status": "success",
+                "id": work.id,
+                "order": work.order.id,
+                "department": work.department.id,
+                "status_name": work.status.name,
+                "department_name": work.department.name,
+            })
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+def entity_list(request, model_class):
+    entities = model_class.objects.all().values("id", "name")
+    return JsonResponse(list(entities), safe=False)
+
+
+def departments_list(request):
+    return entity_list(request, Department)
+
+@login_required
+@require_POST
+def department_work_delete(request, work_id: int):
+    try:
+        with transaction.atomic():
+            work = get_object_or_404(OrderDepartmentWork, id=work_id)
+            work.delete()
+            return JsonResponse({
+                "status": "success",
+                "message": "Работа отдела успешно удалена",
+                "id": work_id,
+            })
+    except Exception as e:
+        return JsonResponse({
+            "status": "error",
+            "message": str(e),
+        }, status=400)

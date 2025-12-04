@@ -1440,7 +1440,7 @@ export const TableManager = {
 		return await response.text()
 	},
 
-	async addTableRow(data, tableId) {
+	async addTableRow(data, tableId, prepend = false) {
 		const table = document.getElementById(tableId)
 		if (!table) return
 
@@ -1462,9 +1462,12 @@ export const TableManager = {
 			const summaryRow = tableBody.querySelector('.table__row--summary')
 			let newRow
 
-			if (summaryRow) {
+			if (summaryRow && !prepend) {
 				summaryRow.insertAdjacentHTML('beforebegin', data.html)
 				newRow = summaryRow.previousElementSibling
+			} else if (prepend) {
+				tableBody.insertAdjacentHTML('afterbegin', data.html)
+				newRow = tableBody.firstElementChild
 			} else {
 				tableBody.insertAdjacentHTML('beforeend', data.html)
 				newRow = tableBody.lastElementChild
@@ -1485,6 +1488,22 @@ export const TableManager = {
 
 			return newRow
 		}
+	},
+
+	formatAllNumbers(tableId) {
+		const table = document.getElementById(tableId)
+		if (!table) return
+
+		const cells = table.querySelectorAll('td')
+		cells.forEach(cell => {
+			const text = cell.textContent.trim()
+			if (/^-?\d[\d\s.,]*$/.test(text)) {
+				const num = parseFloat(text.replace(/\s/g, '').replace(',', '.'))
+				if (!isNaN(num)) {
+					cell.textContent = this.formatNumber(num)
+				}
+			}
+		})
 	},
 
 	updateTableRow(data, tableId) {

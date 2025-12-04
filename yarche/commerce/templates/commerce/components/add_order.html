@@ -13,11 +13,11 @@
             autocomplete="off"
             hidden
             name="client_object">
-        <div class="modal-form__group">
+        <div class="modal-form__group" hidden>
 			<label class="modal-form__label" for="client">Клиент</label>
             {% include "components/select.html" with id="client" placeholder="Выберите клиента" %}
         </div>
-        <div class="modal-form__group">
+        <div class="modal-form__group" hidden>
 			<label class="modal-form__label" for="product">Продукция</label>
             {% include "components/select.html" with id="product" placeholder="Выберите продукцию" %}
         </div>

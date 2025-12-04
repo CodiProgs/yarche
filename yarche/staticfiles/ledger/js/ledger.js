@@ -1935,13 +1935,38 @@ const initCurrentShiftPage = () => {
 	})
 }
 
+function colorizeAllTransactionTableAmounts() {
+	const table = document.getElementById('all_transaction-table')
+	if (!table) return
+
+	const ths = table.querySelectorAll('thead th')
+	let amountIndex = -1
+	ths.forEach((th, idx) => {
+		if (th.dataset.name === 'amount') amountIndex = idx
+	})
+	if (amountIndex === -1) return
+
+	const rows = table.querySelectorAll('tbody tr:not(.table__row--summary)')
+	rows.forEach(row => {
+		const cells = row.querySelectorAll('td')
+		const amountCell = cells[amountIndex]
+		if (!amountCell) return
+		const value = parseNumeric(amountCell.textContent)
+		amountCell.classList.remove('text-red', 'text-green')
+		if (value < 0) {
+			amountCell.classList.add('text-red')
+		} else if (value > 0) {
+			amountCell.classList.add('text-green')
+		}
+	})
+}
+
 document.addEventListener('DOMContentLoaded', () => {
 	const pathname = window.location.pathname
 
-	const regex = /^(?:\/[\w-]+)?\/([\w-]+)\/?$/
-	const match = pathname.match(regex)
-
-	const urlName = match ? match[1].replace(/-/g, '_') : null
+	const parts = pathname.split('/').filter(Boolean)
+	const urlName =
+		parts.length > 0 ? parts[parts.length - 1].replace(/-/g, '_') : null
 
 	TableManager.init()
 	addMenuHandler()
@@ -1959,6 +1984,174 @@ document.addEventListener('DOMContentLoaded', () => {
 			initTransactionsPage()
 		} else if (urlName === 'current_shift') {
 			initCurrentShiftPage()
+		} else if (urlName === 'balances') {
+			TableManager.init()
+
+			TableManager.calculateTableSummary(
+				'bank_accounts_balances-table',
+				['balance'],
+				{ grouped: true, total: true }
+			)
+		} else if (urlName === 'all') {
+			if (document.getElementById('all_transaction-table')) {
+				colorizeAllTransactionTableAmounts()
+
+				const nextPageButton = document.getElementById('next-page')
+				const lastPageButton = document.getElementById('last-page')
+				const prevPageButton = document.getElementById('prev-page')
+				const firstPageButton = document.getElementById('first-page')
+				const currentPageInput = document.getElementById('current-page')
+				const totalPagesSpan = document.getElementById('total-pages')
+				const refreshButton = document.getElementById('refresh')
+				const tableContainer = document.getElementById(
+					'all_transaction-container'
+				)
+
+				const fetchAndUpdateAllTransactionsTable = async page => {
+					const loader = createLoader()
+					document.body.appendChild(loader)
+					try {
+						const response = await fetch(
+							`/ledger/transactions/table/?page=${page}`,
+							{ headers: { 'X-Requested-With': 'XMLHttpRequest' } }
+						)
+						const data = await response.json()
+						if (response.ok && data.html && data.context) {
+							const table = document.getElementById('all_transaction-table')
+							if (table) {
+								const tbody = table.querySelector('tbody')
+								if (tbody) {
+									tbody.innerHTML = data.html
+								}
+							}
+							colorizeAllTransactionTableAmounts()
+							const {
+								current_page,
+								total_pages,
+								transaction_ids = [],
+							} = data.context
+
+							if (currentPageInput) {
+								currentPageInput.value = current_page
+								currentPageInput.max = total_pages
+								currentPageInput.disabled = total_pages <= 0
+							}
+							if (totalPagesSpan) {
+								totalPagesSpan.textContent = total_pages
+							}
+
+							const isFirstPage = current_page <= 1
+							const isLastPage = current_page >= total_pages
+
+							if (nextPageButton) nextPageButton.disabled = isLastPage
+							if (lastPageButton) lastPageButton.disabled = isLastPage
+							if (prevPageButton) prevPageButton.disabled = isFirstPage
+							if (firstPageButton) firstPageButton.disabled = isFirstPage
+
+							const tableRows = document.querySelectorAll(
+								'#all_transaction-table tbody tr:not(.table__row--summary)'
+							)
+							if (tableRows && transaction_ids.length === tableRows.length) {
+								tableRows.forEach((row, index) => {
+									row.setAttribute('data-id', transaction_ids[index])
+								})
+							}
+						} else {
+							const table = document.getElementById('all_transaction-table')
+							if (table) {
+								const tbody = table.querySelector('tbody')
+								if (tbody) tbody.innerHTML = ''
+							}
+							if (currentPageInput) {
+								currentPageInput.value = 1
+								currentPageInput.max = 1
+								currentPageInput.disabled = true
+							}
+							if (totalPagesSpan) totalPagesSpan.textContent = '1'
+							;[
+								nextPageButton,
+								lastPageButton,
+								prevPageButton,
+								firstPageButton,
+							].forEach(btn => {
+								if (btn) btn.disabled = true
+							})
+						}
+					} catch (error) {
+						console.error('Ошибка при загрузке таблицы транзакций:', error)
+						const table = document.getElementById('all_transaction-table')
+						if (table) {
+							const tbody = table.querySelector('tbody')
+							if (tbody) tbody.innerHTML = ''
+						}
+					} finally {
+						loader.remove()
+					}
+				}
+
+				refreshButton?.addEventListener('click', () => {
+					const currentPage = parseInt(currentPageInput?.value, 10) || 1
+					fetchAndUpdateAllTransactionsTable(currentPage)
+				})
+
+				nextPageButton?.addEventListener('click', () => {
+					const currentPage = parseInt(currentPageInput?.value, 10) || 1
+					fetchAndUpdateAllTransactionsTable(currentPage + 1)
+				})
+
+				lastPageButton?.addEventListener('click', () => {
+					const totalPages =
+						parseInt(
+							totalPagesSpan?.textContent || currentPageInput?.max,
+							10
+						) || 1
+					fetchAndUpdateAllTransactionsTable(totalPages)
+				})
+
+				prevPageButton?.addEventListener('click', () => {
+					const currentPage = parseInt(currentPageInput?.value, 10) || 1
+					fetchAndUpdateAllTransactionsTable(currentPage - 1)
+				})
+
+				firstPageButton?.addEventListener('click', () =>
+					fetchAndUpdateAllTransactionsTable(1)
+				)
+
+				currentPageInput?.addEventListener('input', () => {
+					const totalPages =
+						parseInt(
+							totalPagesSpan?.textContent || currentPageInput?.max,
+							10
+						) || 1
+					let currentPage = parseInt(currentPageInput.value, 10)
+
+					if (isNaN(currentPage) || currentPage < 1) {
+						currentPageInput.value = 1
+					} else if (currentPage > totalPages) {
+						currentPageInput.value = totalPages
+					}
+				})
+
+				currentPageInput?.addEventListener('change', () => {
+					const totalPages =
+						parseInt(
+							totalPagesSpan?.textContent || currentPageInput?.max,
+							10
+						) || 1
+					let targetPage = parseInt(currentPageInput.value, 10)
+
+					if (isNaN(targetPage) || targetPage < 1) {
+						targetPage = 1
+					} else if (targetPage > totalPages) {
+						targetPage = totalPages
+					}
+					currentPageInput.value = targetPage
+					fetchAndUpdateAllTransactionsTable(targetPage)
+				})
+
+				// Инициализация первой страницы при загрузке
+				fetchAndUpdateAllTransactionsTable(1)
+			}
 		} else {
 			console.error(
 				`No specific initialization logic defined for URL segment: ${urlName}`

@@ -43,7 +43,6 @@ class ClientObject(models.Model):
         verbose_name = "Объект клиента"
         verbose_name_plural = "Объекты клиентов"
 
-
 class Contact(models.Model):
     client = models.ForeignKey(
         Client, on_delete=models.CASCADE, related_name='contacts', verbose_name="Клиент"
@@ -71,3 +70,31 @@ class Contact(models.Model):
     class Meta:
         verbose_name = "Контакт клиента"
         verbose_name_plural = "Контакты клиентов"
+
+class KanbanColumn(models.Model):
+    name = models.CharField(max_length=255, verbose_name="Название столбца")
+    order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Столбец Kanban"
+        verbose_name_plural = "Столбцы Kanban"
+        ordering = ['order']
+
+class KanbanClientPlacement(models.Model):
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="kanban_placements", verbose_name="Клиент")
+    column = models.ForeignKey(KanbanColumn, on_delete=models.CASCADE, related_name="clients", verbose_name="Столбец")
+    order = models.PositiveIntegerField(default=0, verbose_name="Порядок в столбце")
+    added_at = models.DateTimeField(auto_now_add=True, verbose_name="Добавлен")
+
+    def __str__(self):
+        return f"{self.client.name} в {self.column.name}"
+
+    class Meta:
+        verbose_name = "Клиент на доске"
+        verbose_name_plural = "Клиенты на доске"
+        unique_together = ('client',)
+        ordering = ['order']
+

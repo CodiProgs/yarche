@@ -118,7 +118,9 @@ export class DynamicFormHandler {
 
 			if (!response.ok) throw new Error('Failed to load edit data')
 
-			const { data } = await response.json()
+			const { data, department_works } = await response.json()
+
+			this.departmentWorks = department_works
 
 			this.fillFormFields(data)
 		} catch (error) {
@@ -158,7 +160,7 @@ export class DynamicFormHandler {
 			}
 
 			if (element.type === 'date' && value) {
-				value = value.split(' ')[0]
+				value = value.split('T')[0].split(' ')[0]
 				if (/^\d{2}\.\d{2}\.\d{4}$/.test(value)) {
 					const [day, month, year] = value.split('.')
 					value = `${year}-${month}-${day}`
