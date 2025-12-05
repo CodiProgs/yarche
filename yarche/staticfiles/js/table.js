@@ -1090,8 +1090,19 @@ export const TableManager = {
 					valueB = new Date(cellB.textContent)
 					break
 				default:
-					valueA = cellA.textContent.toLowerCase()
-					valueB = cellB.textContent.toLowerCase()
+					const numA = parseFloat(
+						cellA.textContent.replace(/\s/g, '').replace(',', '.')
+					)
+					const numB = parseFloat(
+						cellB.textContent.replace(/\s/g, '').replace(',', '.')
+					)
+					if (!isNaN(numA) && !isNaN(numB)) {
+						valueA = numA
+						valueB = numB
+					} else {
+						valueA = cellA.textContent.toLowerCase()
+						valueB = cellB.textContent.toLowerCase()
+					}
 			}
 
 			if (valueA < valueB) return direction === 'asc' ? -1 : 1
