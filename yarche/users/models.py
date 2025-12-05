@@ -1,1 +1,1 @@
-from models import Permission, UserType, User, UserTypeMenuItem, SiteBlock
+from models import Permission, UserType, User, UserTypeMenuItem, SiteBlock, FileAccessToken

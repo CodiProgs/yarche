@@ -1,7 +1,7 @@
-from .models import User
-from django.http import JsonResponse
 from users.models import Permission
 from django.contrib.auth.decorators import login_required
+from .models import User
+from django.http import JsonResponse
 
 
 def manager_list(request):
@@ -62,3 +62,5 @@ def check_permission(request):
         {"has_permission": False, "message": f"Нет прав: {permission_codename}"},
         status=403,
     )
+
+

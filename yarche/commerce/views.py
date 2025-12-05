@@ -11,6 +11,7 @@ from django.db.models import (
     Subquery,
     ExpressionWrapper,
 )
+from datetime import timedelta
 from django.db import transaction
 from django.core.paginator import Paginator
 from django.db.models.functions import Coalesce
@@ -1538,6 +1539,8 @@ def order_detail(request, pk: int):
         item = model_to_dict(dw)
         item['department_name'] = dw.department.name if dw.department else ''
         item['status_name'] = dw.status.name if dw.status else ''
+        if hasattr(dw, 'completed_at') and dw.completed_at:
+            item['completed_at'] = localtime(dw.completed_at).strftime("%d-%m-%Y %H:%M")
         department_works.append(item)
     data = model_to_dict(order)
     if "viewers" in data:

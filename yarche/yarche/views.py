@@ -76,3 +76,53 @@ class ComponentView(TemplateView):
         context = request.GET.dict()
         return super().render_to_response(context=context)
 
+from django.shortcuts import get_object_or_404, redirect
+from django.utils import timezone
+from commerce.models import Document
+from django.http import HttpResponse, Http404
+import mimetypes
+from users.models import FileAccessToken
+from django.contrib.auth.decorators import login_required
+
+def generate_file_token(request, file_id):
+    doc = get_object_or_404(Document, id=file_id)
+    user = request.user if request.user.is_authenticated else None
+    token = FileAccessToken.objects.create(
+        file=doc,
+        expires_at=timezone.now() + timezone.timedelta(minutes=5),
+        created_by=user
+    )
+    file_url = request.build_absolute_uri(f"/file-access/{token.token}/")
+    ext = doc.file.name.split('.')[-1].lower()
+    if ext in ['doc', 'docx', 'xls', 'xlsx']:
+        viewer_url = f"https://view.officeapps.live.com/op/view.aspx?src={file_url}"
+        return redirect(viewer_url)
+    return redirect(file_url)
+
+def file_access(request, token):
+    try:
+        access = FileAccessToken.objects.select_related('file').get(token=token)
+    except FileAccessToken.DoesNotExist:
+        raise Http404()
+    if not access.is_valid():
+        raise Http404()
+    file_field = access.file.file
+    mime, _ = mimetypes.guess_type(file_field.name)
+    response = HttpResponse(file_field, content_type=mime or 'application/octet-stream')
+    response['Content-Disposition'] = f'inline; filename="{file_field.name}"'
+    return response
+
+def file_online_view(request, file_id):
+    doc = get_object_or_404(Document, id=file_id)
+    ext = doc.file.name.split('.')[-1].lower()
+    office_exts = ['doc', 'docx', 'xls', 'xlsx']
+    if ext not in office_exts:
+        return redirect(doc.file.url)
+    token = FileAccessToken.objects.create(
+        file=doc,
+        expires_at=timezone.now() + timezone.timedelta(minutes=5),
+        created_by=request.user if request.user.is_authenticated else None
+    )
+    file_url = request.build_absolute_uri(f"/file-access/{token.token}/")
+    viewer_url = f"https://view.officeapps.live.com/op/view.aspx?src={file_url}"
+    return redirect(viewer_url)

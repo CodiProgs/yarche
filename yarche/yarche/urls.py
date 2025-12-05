@@ -28,6 +28,9 @@ urlpatterns = [
         views.ComponentView.as_view(),
         name="global_component_view",
     ),
+    path('file-view/<int:file_id>/', views.generate_file_token, name='file_view'),
+    path('file-access/<uuid:token>/', views.file_access, name='file_access'),
+    path('file-online-view/<int:file_id>/', views.file_online_view, name='file_online_view'),
     path(
         "components/<str:app_name>/<str:template_name>/",
         views.ComponentView.as_view(),

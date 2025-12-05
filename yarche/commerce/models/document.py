@@ -34,7 +34,7 @@ class Document(models.Model):
     )
 
     def __str__(self):
-        return f"{self.name} ({self.user})"
+        return f"{self.name} ({self.user}) ({self.id})"
 
     def save(self, *args, **kwargs):
         if self.file and not (self.name and str(self.name).strip()):

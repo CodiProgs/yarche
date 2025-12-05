@@ -1565,12 +1565,21 @@ const initWorksPage = () => {
 						const card = document.createElement('div')
 						card.className = 'department-card'
 						card.dataset.id = dw.id
+
+						const statusIndicator =
+							dw.status_name === 'Готово'
+								? `<span style="position:absolute;top:10px;right:10px;display:inline-block;width:14px;height:14px;background:#4caf50;border-radius:50%;border:2px solid #fff;" title="Готово${
+										dw.completed_at ? ' — ' + dw.completed_at : ''
+								  }"></span>`
+								: ''
+
 						card.innerHTML = `
-            <button class="department-card__delete" title="Удалить отдел">&times;</button>
-            <img src="/static/images/departments/${dep.img}" alt="${dep.name}" class="department-card__img">
-            <div class="department-card__title">${dep.name}</div>
-			<p class="department-card__work-status">${dw.status_name}</p>
-        `
+							<button class="department-card__delete" title="Удалить отдел">&times;</button>
+							<img src="/static/images/departments/${dep.img}" alt="${dep.name}" class="department-card__img">
+							<div class="department-card__title">${dep.name}</div>
+							<p class="department-card__work-status">${dw.status_name}</p>
+							${statusIndicator}
+						`
 						card.querySelector('.department-card__delete').onclick = () => {
 							deleteDepartmentWork(dw.id, card)
 						}
@@ -4342,6 +4351,9 @@ document.addEventListener('DOMContentLoaded', () => {
 	}
 })
 
+let currentPreview = null
+let previewCloseHandler = null
+
 document.addEventListener(
 	'mouseover',
 	function (e) {
@@ -4356,8 +4368,13 @@ document.addEventListener(
 		const href = link.href
 		const isImage = /\.(jpe?g|png|gif|bmp|webp)$/i.test(href)
 		const isPdf = /\.pdf$/i.test(href)
+		const isTxt = /\.txt$/i.test(href)
+		const isWord = /\.(docx?|odt)$/i.test(href)
+		const isExcel = /\.(xlsx?|ods)$/i.test(href)
 
-		if (!isImage && !isPdf) return
+		if (!isImage && !isPdf && !isTxt && !isWord && !isExcel) return
+
+		if (currentPreview && currentPreview.dataset.contextmenu === 'true') return
 
 		let preview = document.createElement('div')
 		preview.className = 'file-preview-popup'
@@ -4379,8 +4396,35 @@ document.addEventListener(
 			img.style.display = 'block'
 			preview.appendChild(img)
 		} else if (isPdf) {
+			const pdfjsUrl =
+				'/static/pdfjs/web/viewer.html?file=' + encodeURIComponent(href)
 			const iframe = document.createElement('iframe')
-			iframe.src = href
+			iframe.src = pdfjsUrl
+			iframe.style.width = '380px'
+			iframe.style.height = '380px'
+			iframe.style.border = 'none'
+			preview.appendChild(iframe)
+		} else if (isTxt) {
+			const pre = document.createElement('pre')
+			pre.textContent = 'Загрузка...'
+			pre.style.maxWidth = '380px'
+			pre.style.maxHeight = '380px'
+			pre.style.overflow = 'auto'
+			preview.appendChild(pre)
+			fetch(href)
+				.then(r => r.text())
+				.then(text => {
+					pre.textContent = text
+				})
+				.catch(() => {
+					pre.textContent = 'Не удалось загрузить файл'
+				})
+		} else if (isWord || isExcel) {
+			const officeUrl =
+				'https://view.officeapps.live.com/op/view.aspx?src=' +
+				encodeURIComponent(href)
+			const iframe = document.createElement('iframe')
+			iframe.src = officeUrl
 			iframe.style.width = '380px'
 			iframe.style.height = '380px'
 			iframe.style.border = 'none'
@@ -4407,6 +4451,114 @@ document.addEventListener(
 		}
 
 		link.addEventListener('mouseleave', removePreview)
+	},
+	true
+)
+
+document.addEventListener(
+	'contextmenu',
+	function (e) {
+		const link = e.target.closest('a')
+		if (!link || !link.href) return
+
+		const td = link.closest('td')
+		const tr = td && td.closest('tr')
+		const table = tr && tr.closest('table')
+		if (!table || !/^order-documents-/.test(table.id)) return
+
+		e.preventDefault()
+
+		const href = link.href
+		const isImage = /\.(jpe?g|png|gif|bmp|webp)$/i.test(href)
+		const isPdf = /\.pdf$/i.test(href)
+		const isTxt = /\.txt$/i.test(href)
+		const isWord = /\.(docx?|odt)$/i.test(href)
+		const isExcel = /\.(xlsx?|ods)$/i.test(href)
+
+		if (!isImage && !isPdf && !isTxt && !isWord && !isExcel) return
+
+		if (currentPreview && currentPreview.parentNode) {
+			currentPreview.parentNode.removeChild(currentPreview)
+		}
+		if (previewCloseHandler) {
+			document.removeEventListener('mousedown', previewCloseHandler, true)
+			previewCloseHandler = null
+		}
+
+		let preview = document.createElement('div')
+		preview.className = 'file-preview-popup'
+		preview.style.position = 'fixed'
+		preview.style.zIndex = 99999
+		preview.style.background = '#fff'
+		preview.style.border = '1px solid #ccc'
+		preview.style.boxShadow = '0 2px 12px rgba(0,0,0,0.15)'
+		preview.style.padding = '6px'
+		preview.style.maxWidth = '400px'
+		preview.style.maxHeight = '400px'
+		preview.style.overflow = 'auto'
+		preview.dataset.contextmenu = 'true'
+
+		if (isImage) {
+			const img = document.createElement('img')
+			img.src = href
+			img.style.maxWidth = '380px'
+			img.style.maxHeight = '380px'
+			img.style.display = 'block'
+			preview.appendChild(img)
+		} else if (isPdf) {
+			const pdfjsUrl =
+				'/static/pdfjs/web/viewer.html?file=' + encodeURIComponent(href)
+			const iframe = document.createElement('iframe')
+			iframe.src = pdfjsUrl
+			iframe.style.width = '380px'
+			iframe.style.height = '380px'
+			iframe.style.border = 'none'
+			preview.appendChild(iframe)
+		} else if (isTxt) {
+			const pre = document.createElement('pre')
+			pre.textContent = 'Загрузка...'
+			pre.style.maxWidth = '380px'
+			pre.style.maxHeight = '380px'
+			pre.style.overflow = 'auto'
+			preview.appendChild(pre)
+			fetch(href)
+				.then(r => r.text())
+				.then(text => {
+					pre.textContent = text
+				})
+				.catch(() => {
+					pre.textContent = 'Не удалось загрузить файл'
+				})
+		} else if (isWord || isExcel) {
+			const officeUrl =
+				'https://view.officeapps.live.com/op/view.aspx?src=' +
+				encodeURIComponent(href)
+			const iframe = document.createElement('iframe')
+			iframe.src = officeUrl
+			iframe.style.width = '380px'
+			iframe.style.height = '380px'
+			iframe.style.border = 'none'
+			preview.appendChild(iframe)
+		}
+
+		document.body.appendChild(preview)
+		preview.style.left = e.clientX + 20 + 'px'
+		preview.style.top = e.clientY + 20 + 'px'
+
+		currentPreview = preview
+
+		previewCloseHandler = function (ev) {
+			if (!preview.contains(ev.target)) {
+				if (preview && preview.parentNode)
+					preview.parentNode.removeChild(preview)
+				document.removeEventListener('mousedown', previewCloseHandler, true)
+				currentPreview = null
+				previewCloseHandler = null
+			}
+		}
+		setTimeout(() => {
+			document.addEventListener('mousedown', previewCloseHandler, true)
+		}, 0)
 	},
 	true
 )
