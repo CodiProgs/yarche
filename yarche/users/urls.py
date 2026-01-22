@@ -10,4 +10,12 @@ urlpatterns = [
         views.check_permission,
         name="check_permission",
     ),
+	path("notifications/", views.notifications_list, name="notifications_list"),
+    path(
+        "notifications/mark-all-read/",
+        views.notifications_mark_all_read,
+        name="notifications_mark_all_read",
+    ),
+	
+	path('orders/<int:order_id>/users/', views.order_related_users, name='order_related_users'),
 ]

@@ -11,23 +11,25 @@ from django.db.models import (
     Subquery,
     ExpressionWrapper,
 )
-from datetime import timedelta
 from django.db import transaction
 from django.core.paginator import Paginator
 from django.db.models.functions import Coalesce
 from django.template.loader import render_to_string
 from yarche.utils import get_model_fields
 from django.contrib.auth.decorators import login_required
-from .models import Product, Client, Order, OrderStatus, Contact, FileType, Document, ClientObject, OrderDepartmentWork, KanbanClientPlacement, KanbanColumn
+from .models import Product, Client, Order, OrderStatus, Contact, FileType, Document, ClientObject, OrderDepartmentWork, KanbanClientPlacement, KanbanColumn, OrderWorkStatus
 from ledger.models import Transaction, BankAccount
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.http import require_http_methods, require_POST
 import json
-from users.models import User
+from users.models import User, Notification
 import os
 from django.utils.timezone import localtime
 from django.utils.text import get_valid_filename
-
+from django.utils.dateparse import parse_datetime
+from django.utils import timezone
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 
 # region Helpers
 def get_base_order_queryset():
@@ -66,7 +68,7 @@ def get_base_order_queryset():
     )
 
 
-def get_client_balance_data():
+def get_client_balance_data(request):
     first_deposit_subquery = (
         Transaction.objects.filter(
             type="client_account_deposit", client=OuterRef("client")
@@ -85,6 +87,7 @@ def get_client_balance_data():
         Transaction.objects.filter(
             type__in=["client_account_deposit", "client_account_payment"],
             completed_date__isnull=True,
+            created_by=request.user,
         )
         .values("client", "type")
         .annotate(total=Sum("amount"))
@@ -101,7 +104,6 @@ def get_client_balance_data():
     bank_accounts = dict(BankAccount.objects.values_list("id", "name"))
 
     return deposits, payments, first_deposits, bank_accounts
-
 
 def render_client_table(clients):
     excluded_fields = [
@@ -136,7 +138,6 @@ def render_client_table(clients):
 
 # endregion
 
-
 # region Views
 def entity_list(request, model_class):
     entities = model_class.objects.all().values("id", "name")
@@ -153,7 +154,6 @@ def document_types(request):
 def client_list(request):
     return entity_list(request, Client)
 
-
 def order_debt(request, pk):
     try:
         order = Order.objects.get(pk=pk)
@@ -162,6 +162,7 @@ def order_debt(request, pk):
                 order_id=pk,
                 type__in=["order_payment", "client_account_payment"],
                 completed_date__isnull=True,
+                created_by=request.user,  
             )
             .annotate(
                 adjusted_amount=Case(
@@ -181,6 +182,7 @@ def order_debt(request, pk):
         return JsonResponse(
             {"status": "error", "message": "Заказ не найден"}, status=404
         )
+
 
 def order_ids(request):
     client_id = request.GET.get("client")
@@ -203,9 +205,8 @@ def order_ids(request):
             pass
         return JsonResponse([], safe=False)
 
-    query = get_base_order_queryset().filter(
-        Q(transactions_total__isnull=True, paid_amount__lt=F("amount"))
-        | Q(total_paid__lt=F("amount"))
+    query = Order.objects.filter(
+        paid_amount__lt=F("amount")
     )
 
     if client_id:
@@ -220,16 +221,15 @@ def order_ids(request):
             if client_id:
                 order_query = order_query.filter(client_id=int(client_id))
             if order_query.exists():
-                query = query | get_base_order_queryset().filter(id=int(order_id_param))
+                query = query | Order.objects.filter(id=int(order_id_param))
         except (ValueError, TypeError):
             pass
 
     order_ids = query.distinct().values_list("id", flat=True)
     return JsonResponse([{"id": oid, "name": oid} for oid in order_ids], safe=False)
 
-
 def client_balances(request):
-    deposits, payments, first_deposits, bank_accounts = get_client_balance_data()
+    deposits, payments, first_deposits, bank_accounts = get_client_balance_data(request)
     client_id_param = request.GET.get("client")
 
     clients = []
@@ -265,7 +265,6 @@ def client_balances(request):
 
 # endregion
 
-
 @login_required
 def works(request):
     clients = Client.objects.prefetch_related('client_objects').all()
@@ -277,8 +276,6 @@ def works(request):
     }
 
     return render(request, "commerce/works.html", context)
-
-from django.db.models import Q
 
 @login_required
 def product_orders(request):
@@ -347,7 +344,9 @@ def get_order_fields():
         "documents",
         "paid_amount",
         "comment",
-        "archived_at"
+        "archived_at",
+        "viewers",
+        "required_documents"
     ]
     field_order = [
         "id",
@@ -1004,8 +1003,7 @@ def order_documents_table(request, pk: int):
         except Exception:
             file_url = ""
         urls.append(file_url)
-    return JsonResponse({"html": html, "urls": urls})
-
+    return JsonResponse({"html": html, "urls": urls, "ids": [d.id for d in docs], "table_id": f"order-documents-{order.id}"})
 
 @login_required
 @require_http_methods(["POST"])
@@ -1044,6 +1042,10 @@ def document_upload(request):
                     desired_name = desired_name + orig_ext
                 if desired_name:
                     uploaded_file.name = desired_name
+
+            final_name = desired_name if desired_name else uploaded_file.name
+            if Document.objects.filter(order=order, name=final_name).exists():
+                return JsonResponse({"status": "error", "message": "Файл с таким именем уже существует в заказе"}, status=400)
 
             doc = Document(user=request.user, order=order, file_type=file_type)
 
@@ -1115,7 +1117,6 @@ def document_upload(request):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
-@login_required
 @login_required
 @require_http_methods(["POST"])
 def client_object_create(request):
@@ -1319,10 +1320,7 @@ def order_create(request):
             
             deadline_str = (request.POST.get("deadline") or "").strip()
             deadline = None
-            if deadline_str:
-                from django.utils.dateparse import parse_datetime
-                from django.utils import timezone
-                
+            if deadline_str:                
                 deadline = parse_datetime(deadline_str)
                 if deadline and timezone.is_naive(deadline):
                     deadline = timezone.make_aware(deadline)
@@ -1408,6 +1406,17 @@ def order_create(request):
                 client_object=client_object,
                 required_documents=required_documents,
             )
+
+            wait_status = OrderWorkStatus.objects.filter(name__iexact="Ожидает", department__isnull=True).first()
+
+            departments = product.departments.all()
+            for department in departments:
+                dep_status = OrderWorkStatus.objects.filter(name__iexact="Ожидает", department=department).first() or wait_status
+                OrderDepartmentWork.objects.create(
+                    order=order,
+                    department=department,
+                    status=dep_status,
+                )
             
             order.legal_name = order.client.legal_name if order.client else None
             order.paid_percent = int(order.paid_amount / order.amount * 100) if order.amount else 0
@@ -1482,8 +1491,6 @@ def order_update(request, pk: int):
                         except Exception:
                             val = None
                     elif field == "deadline":
-                        from django.utils.dateparse import parse_datetime
-                        from django.utils import timezone
                         val = parse_datetime(str(val).strip())
                         if val and timezone.is_naive(val):
                             val = timezone.make_aware(val)
@@ -1719,7 +1726,6 @@ def kanban_quick_add_client(request):
                 )
 
             if column_id:
-                from .models import KanbanClientPlacement
                 max_order = KanbanClientPlacement.objects.filter(column_id=column_id).aggregate(max_order=models.Max('order'))['max_order'] or 0
                 KanbanClientPlacement.objects.create(
                     client=client,
@@ -1740,8 +1746,6 @@ def kanban_quick_add_client(request):
 def kanban_delete_column(request, pk: int):
     try:
         with transaction.atomic():
-            from .models import KanbanColumn, KanbanClientPlacement
-
             column = get_object_or_404(KanbanColumn, id=pk)
 
             first_column = KanbanColumn.objects.exclude(id=column.id).order_by('order').first()
@@ -1795,5 +1799,219 @@ def kanban_create_column(request):
             "name": column.name,
             "order": column.order,
         })
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["GET"])
+def product_departments(request, product_id):
+    product = get_object_or_404(Product, id=product_id)
+    departments = product.departments.all().values("id", "name", 'slug')
+    return JsonResponse(list(departments), safe=False)
+
+# Уведомления
+
+@login_required
+def notifications_list(request):
+    notifications = Notification.objects.filter(user=request.user).order_by('-created')
+    return render(request, "commerce/notifications.html", {"notifications": notifications})
+
+@login_required
+@require_http_methods(["POST"])
+def notifications_mark_all_read(request):
+    Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+    return JsonResponse({"status": "success"})
+
+@login_required
+@require_http_methods(["GET"])
+def order_files_cards(request, order_id: int):
+    """
+    Возвращает файлы заказа в формате для отображения: изображения как карточки, остальные как список.
+    """
+    try:
+        order = get_object_or_404(Order, id=order_id)
+        
+        files = Document.objects.filter(order=order).select_related('file_type', 'user')
+        
+        images = []
+        others = []
+        
+        for file in files:
+            file_data = {
+                "id": file.id,
+                "name": file.name,
+                "url": file.url or getattr(file.file, 'url', None),
+                "size": file.size,
+                "created": file.uploaded_at.isoformat() if file.uploaded_at else None,
+            }
+            
+            file_name = file.name.lower() if file.name else ""
+            if file_name.endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')):
+                images.append(file_data)
+            else:
+                others.append(file_data)
+        
+        return JsonResponse({
+            "status": "success",
+            "images": images,
+            "others": others,
+            "order_id": order.id,
+        })
+        
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+
+@login_required
+@require_http_methods(["POST"])
+def document_rename(request, pk: int):
+    try:
+        doc = get_object_or_404(Document, id=pk)
+        new_name_raw = (request.POST.get("name") or "").strip()
+        if not new_name_raw:
+            return JsonResponse({"status": "error", "message": "Не указано новое имя файла"}, status=400)
+
+        allowed = False
+        if getattr(doc, "user_id", None) == request.user.id:
+            allowed = True
+
+        order = getattr(doc, "order", None)
+        if order and getattr(order, "manager_id", None) == request.user.id:
+            allowed = True
+
+        if order and getattr(order, "product", None):
+            for dep in order.product.departments.all():
+                if dep.chief_user_type and getattr(request.user, "user_type", None) and request.user.user_type_id == dep.chief_user_type_id:
+                    allowed = True
+                    break
+
+        if not allowed:
+            return JsonResponse({"status": "error", "message": "Нет прав на переименование"}, status=403)
+
+        new_filename = get_valid_filename(new_name_raw)
+        old_display = doc.name or ""
+        old_file_name = getattr(doc.file, "name", None) if getattr(doc, "file", None) else None
+
+        orig_ext = os.path.splitext(old_display)[1] or os.path.splitext(old_file_name or "")[1]
+        if orig_ext and not os.path.splitext(new_filename)[1]:
+            new_filename = new_filename + orig_ext
+
+        if doc.file and old_file_name:
+            dirpath = os.path.dirname(old_file_name)
+            new_path = os.path.join(dirpath, new_filename) if dirpath else new_filename
+
+            if default_storage.exists(new_path):
+                return JsonResponse({"status": "error", "message": "Файл с таким именем уже существует"}, status=400)
+
+            try:
+                storage_old_path = None
+                try:
+                    storage_old_path = default_storage.path(old_file_name)
+                except Exception:
+                    storage_old_path = None
+
+                if storage_old_path:
+                    try:
+                        storage_new_path = default_storage.path(new_path)
+                        os.makedirs(os.path.dirname(storage_new_path), exist_ok=True)
+                        os.rename(storage_old_path, storage_new_path)
+                    except Exception as e:
+                        raise
+
+                    doc.file.name = new_path
+                    doc.name = os.path.basename(new_path)
+                    try:
+                        doc.size = default_storage.size(new_path)
+                    except Exception:
+                        pass
+                    try:
+                        doc.url = default_storage.url(new_path)
+                    except Exception:
+                        pass
+                    doc.save(update_fields=["file", "name", "size", "url"])
+                    return JsonResponse({"status": "success", "id": doc.id, "name": doc.name, "url": getattr(doc, "url", "")})
+
+                data = None
+                try:
+                    with default_storage.open(old_file_name, "rb") as f:
+                        data = f.read()
+                except Exception:
+                    try:
+                        doc.file.open("rb")
+                        data = doc.file.read()
+                        doc.file.close()
+                    except Exception:
+                        data = None
+
+                if data is None:
+                    return JsonResponse({"status": "error", "message": "Не удалось прочитать содержимое файла"}, status=500)
+
+                default_storage.save(new_path, ContentFile(data))
+
+                try:
+                    if old_file_name and default_storage.exists(old_file_name):
+                        default_storage.delete(old_file_name)
+                except Exception:
+                    pass
+
+                doc.file.name = new_path
+                doc.name = os.path.basename(new_path)
+                try:
+                    doc.size = len(data)
+                except Exception:
+                    pass
+                try:
+                    doc.url = getattr(doc.file, "url", None)
+                except Exception:
+                    pass
+                doc.save(update_fields=["file", "name", "size", "url"])
+                return JsonResponse({"status": "success", "id": doc.id, "name": doc.name, "url": getattr(doc, "url", "")})
+            
+
+            except Exception as e:
+                return JsonResponse({"status": "error", "message": str(e)}, status=500)
+        else:
+            doc.name = new_filename
+            doc.save(update_fields=["name"])
+            return JsonResponse({"status": "success", "id": doc.id, "name": doc.name})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["POST"])
+def document_delete(request, pk: int):
+    try:
+        with transaction.atomic():
+            doc = get_object_or_404(Document, id=pk)
+
+            allowed = False
+            if getattr(doc, "user_id", None) == request.user.id:
+                allowed = True
+
+            order = getattr(doc, "order", None)
+            if order and getattr(order, "manager_id", None) == request.user.id:
+                allowed = True
+
+            if order and getattr(order, "product", None):
+                for dep in order.product.departments.all():
+                    if dep.chief_user_type and getattr(request.user, "user_type", None) and request.user.user_type_id == dep.chief_user_type_id:
+                        allowed = True
+                        break
+
+            if not allowed:
+                return JsonResponse({"status": "error", "message": "Нет прав на удаление"}, status=403)
+
+            try:
+                file_name = getattr(getattr(doc, "file", None), "name", None)
+                if file_name and default_storage.exists(file_name):
+                    try:
+                        default_storage.delete(file_name)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+            doc.delete()
+            return JsonResponse({"status": "success", "id": pk})
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)

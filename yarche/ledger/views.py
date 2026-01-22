@@ -13,7 +13,9 @@ from django.db.models import Sum
 import locale
 import json
 from decimal import Decimal
-
+from users.models import Notification
+import calendar
+from types import SimpleNamespace
 from commerce.models import Order, Client
 from yarche.utils import get_model_fields
 from .models import BankAccount, BankAccountType, TransactionCategory, Transaction
@@ -972,6 +974,7 @@ def get_payment_fields():
         "completed_date",
         "product",
         "amount",
+        "remaining_debt",
         "order",
         "client",
         "legal_name",
@@ -994,9 +997,10 @@ def get_payment_fields():
     insertions = [
         (1, {"name": "manager", "verbose_name": "Менеджер", "is_relation": True}),
         (3, {"name": "product", "verbose_name": "Продукция", "is_relation": True}),
-        (5, {"name": "order", "verbose_name": "Заказ", "is_number": True}),
-        (6, {"name": "client", "verbose_name": "Клиент", "is_relation": True}),
-        (7, {"name": "legal_name", "verbose_name": "Фирма"}),
+        (5, {"name": "remaining_debt", "verbose_name": "Остаток", "is_amount": True}),
+        (6, {"name": "order", "verbose_name": "Заказ", "is_number": True}),
+        (7, {"name": "client", "verbose_name": "Клиент", "is_relation": True}),
+        (8, {"name": "legal_name", "verbose_name": "Фирма"}),
     ]
 
     for pos, field in insertions:
@@ -1014,6 +1018,7 @@ def prepare_payment_data(transactions):
         )
         # tr.order = tr.order.id if tr.order else None
         tr.manager = tr.order.manager.last_name or tr.order.manager.username if tr.order and tr.order.manager else None
+        tr.remaining_debt = tr.order.amount - tr.order.paid_amount if tr.order else 0
         data.append(tr)
     return data
 
@@ -1078,36 +1083,6 @@ def prepare_shift_transactions(transactions):
         data.append(tr)
     return data
 
-
-@login_required
-@require_http_methods(["POST"])
-def close_shift(request):
-    try:
-        with transaction.atomic():
-            user = request.user
-            if not check_permission(user, "close_current_shift"):
-                return JsonResponse(
-                    {"status": "error", "message": "Нет прав на закрытие смены"},
-                    status=403,
-                )
-
-            transactions = Transaction.objects.filter(completed_date__isnull=True)
-            if not check_permission(user, "view_all_shift_transactions"):
-                transactions = transactions.filter(created_by=user)
-
-            if not transactions.exists():
-                return JsonResponse(
-                    {"status": "error", "message": "Нет открытых транзакций"},
-                    status=400,
-                )
-
-            current_date = timezone.now().date()
-            update_balances(transactions)
-            transactions.update(completed_date=current_date)
-
-            return JsonResponse({"html": render_updated_accounts_table()})
-    except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 
 def update_balances(transactions):
@@ -1176,14 +1151,14 @@ def order_payment_create(request):
                 "report_date": report_date_value,
             }
 
-            validate_payment_data(data)
+            validate_payment_data(data, request.user)
             tr = Transaction.objects.create(**data)
             return render_transaction_response(tr)
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 
-def validate_payment_data(data):
+def validate_payment_data(data, user):
     if not data["bank_account_id"]:
         raise ValidationError("Не указан счет")
     if data["amount"] <= 0:
@@ -1192,23 +1167,23 @@ def validate_payment_data(data):
         raise ValidationError("Не указан заказ")
 
     order = Order.objects.get(id=data["order_id"])
-    debt = calculate_remaining_debt(order)
+    debt = calculate_remaining_debt(order, user)
 
     if data["amount"] > debt:
         raise ValidationError(f"Сумма превышает долг ({format_currency(debt)} р.)")
 
 
-def calculate_remaining_debt(order):
+def calculate_remaining_debt(order, user):
     payments = (
         Transaction.objects.filter(
-            order=order, type="order_payment", completed_date__isnull=True
+            order=order, type="order_payment", completed_date__isnull=True, created_by=user
         ).aggregate(total=Sum("amount"))["total"]
         or 0
     )
 
     client_payments = (
         Transaction.objects.filter(
-            order=order, type="client_account_payment", completed_date__isnull=True
+            order=order, type="client_account_payment", completed_date__isnull=True, created_by=user
         ).aggregate(total=Sum("amount"))["total"]
         or 0
     )
@@ -1230,7 +1205,7 @@ def client_balance_payment(request):
                 "created_by": request.user,
             }
 
-            validate_client_payment(data)
+            validate_client_payment(data, request.user)
 
             first_deposit_transaction = (
                 Transaction.objects.filter(
@@ -1258,8 +1233,7 @@ def client_balance_payment(request):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
-
-def validate_client_payment(data):
+def validate_client_payment(data, user):
     if not data["client_id"]:
         raise ValidationError("Не указан клиент")
     if data["amount"] <= 0:
@@ -1270,26 +1244,26 @@ def validate_client_payment(data):
     client = Client.objects.get(id=data["client_id"])
     order = Order.objects.get(id=data["order_id"])
 
-    balance = calculate_client_balance(client)
+    balance = calculate_client_balance(client, user)
     
     if data["amount"] > balance:
         raise ValidationError(f"Недостаточно средств: {format_currency(balance)} р.")
 
-    debt = calculate_order_debt(order)
+    debt = calculate_order_debt(order, user)
     if data["amount"] > debt:
         raise ValidationError(f"Сумма превышает долг ({format_currency(debt)} р.)")
 
 
-def calculate_client_balance(client):
+def calculate_client_balance(client, user):
     deposits = (
         Transaction.objects.filter(
-            client=client, type="client_account_deposit", completed_date__isnull=True
+            client=client, type="client_account_deposit", completed_date__isnull=True, created_by=user
         ).aggregate(total=Sum("amount"))["total"]
         or 0
     )
     payments = (
         Transaction.objects.filter(
-            client=client, type="client_account_payment", completed_date__isnull=True
+            client=client, type="client_account_payment", completed_date__isnull=True, created_by=user
         ).aggregate(total=Sum("amount"))["total"]
         or 0
     )
@@ -1297,9 +1271,9 @@ def calculate_client_balance(client):
     return client.balance + deposits + payments
 
 
-def calculate_order_debt(order):
+def calculate_order_debt(order, user):
     order_payments = (
-        Transaction.objects.filter(order=order, type="order_payment").aggregate(
+        Transaction.objects.filter(order=order, type="order_payment", created_by=user).aggregate(
             total=Sum("amount")
         )["total"]
         or 0
@@ -1307,7 +1281,7 @@ def calculate_order_debt(order):
 
     client_payments = (
         Transaction.objects.filter(
-            order=order, type="client_account_payment"
+            order=order, type="client_account_payment", created_by=user
         ).aggregate(total=Sum("amount"))["total"]
         or 0
     )
@@ -1459,3 +1433,153 @@ def all_transactions_table(request):
             "transaction_ids": [tr.id for tr in page_obj.object_list],
         }
     })
+
+@login_required
+@require_http_methods(["POST"])
+def close_shift(request):
+    try:
+        with transaction.atomic():
+            user = request.user
+            if not check_permission(user, "close_current_shift"):
+                return JsonResponse(
+                    {"status": "error", "message": "Нет прав на закрытие смены"},
+                    status=403,
+                )
+
+            transactions = Transaction.objects.filter(completed_date__isnull=True)
+            if not check_permission(user, "view_all_shift_transactions"):
+                transactions = transactions.filter(created_by=user)
+
+            if not transactions.exists():
+                return JsonResponse(
+                    {"status": "error", "message": "Нет открытых транзакций"},
+                    status=400,
+                )
+
+            orders_to_check = transactions.filter(
+                type__in=["order_payment", "client_account_payment"]
+            ).values_list("order", flat=True).distinct()
+
+            for order_id in orders_to_check:
+                order = Order.objects.get(id=order_id)
+                involved_transactions = transactions.filter(
+                    order=order, type__in=["order_payment", "client_account_payment"]
+                )
+                total_payment = sum(
+                    abs(tr.amount) for tr in involved_transactions
+                )
+                current_debt = order.amount - order.paid_amount
+                if total_payment > current_debt:
+                    return JsonResponse(
+                        {
+                            "status": "error",
+                            "message": f"Сумма платежей по заказу {order.id} превышает долг ({format_currency(current_debt)} р.)",
+                        },
+                        status=400,
+                    )
+
+            orders_affected = set()
+            for tr in transactions:
+                if tr.type in ["order_payment", "client_account_payment"] and tr.order:
+                    orders_affected.add(tr.order)
+            old_paid = {order: order.paid_amount for order in orders_affected}
+
+            current_date = timezone.now().date()
+            update_balances(transactions)
+            transactions.update(completed_date=current_date)
+
+            for order in orders_affected:
+                new_paid = order.paid_amount
+                old = old_paid[order]
+                if new_paid > old:
+                    payment_amount = new_paid - old
+                    percentage = (new_paid / order.amount) * 100 if order.amount else 0
+                    message = f"По заказу №{order.id} поступил платеж в размере {format_currency(payment_amount)} р. Оплачено {percentage:.2f}%."
+                    client_id = order.client.id if order.client else ""
+                    product_id = order.product.id if order.product else ""
+                    client_object_id = order.client_object.id if order.client_object else ""
+                    Notification.objects.create(
+                        user=order.manager,
+                        message=message,
+                        url=f"/commerce/works/?order_id={order.id}&client_id={client_id}&product_id={product_id}&client_object_id={client_object_id}",
+                        type="Оплата по заказу",
+                        order=order
+                    )
+
+            return JsonResponse({"html": render_updated_accounts_table()})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+def cash_report_table(request):
+    """
+    Рендерит страницу отчета денежных средств и передает в контекст готовую таблицу (HTML).
+    Параметр year можно передать GET-параметром.
+    """
+    year = int(request.GET.get("year", timezone.now().year))
+    months = [
+        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+    ]
+
+    fields = [{"name": "category", "verbose_name": "Категория"}]
+    for i, mname in enumerate(months, start=1):
+        fields.append({"name": f"m{i}", "verbose_name": mname, "is_number": True})
+    fields.append({"name": "total", "verbose_name": "Итого", "is_number": True})
+
+    incomes = list(TransactionCategory.objects.filter(type="income").order_by("name"))
+    expenses = list(TransactionCategory.objects.filter(type="expense").order_by("name"))
+    categories = incomes + expenses
+
+    rows = []
+    monthly_totals = [0] * 12
+    grand_total = 0
+
+    for cat in categories:
+        month_values = []
+        row_total = 0
+        for m in range(1, 13):
+            s = (
+                Transaction.objects.filter(
+                    category=cat,
+                    report_date__year=year,
+                    report_date__month=m,
+                    completed_date__isnull=False
+                )
+                .aggregate(total=Sum("amount"))["total"]
+                or 0
+            )
+            val = float(s)
+            month_values.append(val)
+            row_total += val
+            monthly_totals[m - 1] += val
+        grand_total += row_total
+
+        row = {"category": cat.name}
+        for idx, v in enumerate(month_values, start=1):
+            row[f"m{idx}"] = format_currency(v)
+        row["total"] = format_currency(row_total)
+        rows.append(SimpleNamespace(**row))
+
+    total_row = {"category": "Итого"}
+    for idx, v in enumerate(monthly_totals, start=1):
+        total_row[f"m{idx}"] = format_currency(v)
+    total_row["total"] = format_currency(grand_total)
+    rows.append(SimpleNamespace(**total_row))
+
+    table_html = render_to_string(
+        "components/table.html",
+        {
+            "fields": fields,
+            "data": rows,
+            "id": "cash-report-table",
+        },
+    )
+
+    context = {
+        "year": year,
+        "table_html": table_html,
+        "fields": fields,
+        "data": rows,
+    }
+    return render(request, "ledger/cash_report.html", context)

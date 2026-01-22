@@ -1550,6 +1550,7 @@ export const TableManager = {
 				}
 
 				this.formatCurrencyValuesForRow(tableId, updatedRow)
+				this.applyColumnWidthsForRow(tableId, updatedRow)
 
 				return updatedRow
 			}

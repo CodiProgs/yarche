@@ -1230,6 +1230,11 @@ const initGenericLedgerPage = pageConfig => {
 	initTableHandlers(pageConfig)
 }
 
+const getQueryParam = name => {
+	const url = new URL(window.location.href)
+	return url.searchParams.get(name)
+}
+
 const initPaymentsPage = async () => {
 	await TableManager.init()
 
@@ -1239,11 +1244,23 @@ const initPaymentsPage = async () => {
 		{ name: 'completed_date' },
 		{ name: 'product', url: '/commerce/products/list/' },
 		{ name: 'amount' },
+		{ name: 'remaining_debt' },
 		{ name: 'order' },
 		{ name: 'client', url: '/commerce/clients/list/' },
 		{ name: 'legal_name' },
 		{ name: 'comment' },
 	])
+
+	const orderId = getQueryParam('order_id')
+	if (orderId) {
+		const orderInput = document.querySelector(
+			'input[name="order"].create-form__input'
+		)
+		if (orderInput) {
+			orderInput.value = orderId
+			orderInput.dispatchEvent(new Event('input', { bubbles: true }))
+		}
+	}
 
 	try {
 		const restrictedUserData =

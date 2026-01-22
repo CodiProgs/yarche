@@ -11,14 +11,15 @@ urlpatterns = [
     path('nakatka/', views.department_orders, {'department_slug': 'nakatka'}, name='nakatka'),
     path('raskroy/', views.department_orders, {'department_slug': 'raskroy'}, name='raskroy'),
     path('pechat/', views.department_orders, {'department_slug': 'pechat'}, name='pechat'),
+	path('zamer/', views.department_orders, {'department_slug': 'zamer'}, name='zamer'),
     
     path('users/<slug:department_slug>/', views.department_users, name='department_users'),
     path('statuses/<slug:department_slug>/', views.department_statuses, name='department_statuses'),
 	path('list/', views.departments_list, name='departments_list'),
-    path('<slug:department_slug>/orders/<int:order_id>/assign-executor/', 
+    path('<slug:department_slug>/orders/assign-executor/<int:order_id>/', 
          views.department_work_assign_executor, 
          name='department_work_assign_executor'),
-    path('<slug:department_slug>/orders/<int:order_id>/update-status/', 
+    path('<slug:department_slug>/orders/update-status/<int:order_id>/', 
          views.department_work_update_status, 
          name='department_work_update_status'),
     path('<slug:department_slug>/orders/<int:order_id>/', views.department_work_detail, name='department_work_detail'),
@@ -35,4 +36,7 @@ urlpatterns = [
 	
     path('work/create/', views.department_work_create, name='department_work_create'),
     path('work/delete/<int:work_id>/', views.department_work_delete, name='department_work_delete'),
+
+    path('orders/<int:order_id>/departments/', views.order_departments_list, name='order_departments_list'),
+
 ]

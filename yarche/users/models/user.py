@@ -54,3 +54,32 @@ class User(AbstractUser):
         default_permissions = ()
         verbose_name = "Пользователь"
         verbose_name_plural = "Пользователи"
+
+class Notification(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+        verbose_name="Получатель"
+    )
+    created = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    message = models.TextField(verbose_name="Текст уведомления")
+    url = models.CharField(max_length=512, blank=True, null=True, verbose_name="Ссылка")
+    is_read = models.BooleanField(default=False, verbose_name="Прочитано")
+    type = models.CharField(max_length=64, blank=True, null=True, verbose_name="Тип уведомления")
+    order = models.ForeignKey(
+        'commerce.Order',
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name="notifications",
+        verbose_name="Заказ"
+    )
+
+    class Meta:
+        verbose_name = "Уведомление"
+        verbose_name_plural = "Уведомления"
+        ordering = ['-created']
+
+    def __str__(self):
+        return f"Уведомление для {self.user}: {self.message[:50]}"

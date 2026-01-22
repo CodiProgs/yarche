@@ -7,11 +7,25 @@
             class="dropdown-menu"
             data-is-admin="{% if request.user.user_type and request.user.user_type.name == 'Администратор' %}true{% else %}false{% endif %}">
             <a class="dropdown-item context-action"
+               id="view_order_files-button"
+               data-action="view_order_files">Файлы заказа</a>
+            <a class="dropdown-item context-action"
+               id="view_order_payments-button"
+               data-action="view_order_payments">Транзакции по заказу</a>
+            <a class="dropdown-item context-action"
                id="hide-button"
                data-action="hide">Скрыть</a>
             <a class="dropdown-item context-action"
                id="show-all-button"
                data-action="show-all">Показать все</a>
+            <a class="dropdown-item context-action"
+                id="rename-order-document-button"
+                data-action="rename_order_document"
+                style="display: none;">Переименовать</a>
+            <a class="dropdown-item context-action"
+                id="delete-order-document-button"
+                data-action="delete_order_document"
+                style="display: none;">Удалить</a>
         </div>
     </div>
 {% endblock content %}

@@ -9,7 +9,8 @@ from django.views.decorators.http import require_http_methods, require_POST
 from django.template.loader import render_to_string
 from django.db import models
 from django.db.models import Q
-
+from types import SimpleNamespace
+from users.models import Notification
 
 @login_required
 def department_orders(request, department_slug):
@@ -44,28 +45,65 @@ def department_orders(request, department_slug):
         {"name": "id", "verbose_name": "№ Заказа"},
         {"name": "department_executor", "verbose_name": "Исполнитель", "is_relation": True},
         {"name": "client", "verbose_name": "Клиент", "is_relation": True},
+        {"name": "legal_name", "verbose_name": "Юрлицо"},
         {"name": "product", "verbose_name": "Продукт", "is_relation": True},
         {"name": "department_status", "verbose_name": f"Состояние заказа", "is_relation": True},
         {"name": "created", "verbose_name": "Создан", "is_date": True},
         {"name": "department_started", "verbose_name": "Начало работы"},
         {"name": "department_completed", "verbose_name": "Завершен"},
-        {"name": "legal_name", "verbose_name": "Юрлицо"},
     ]
-    
+
+    is_chief = False
+    user_type = getattr(request.user, "user_type", None)
+    if user_type:
+        if department.chief_user_type and user_type.id == department.chief_user_type.id:
+            is_chief = True
+        if user_type.name.lower() == "администратор":
+            is_chief = True
+
     context = {
         "fields": fields,
         "data": data,
+        "is_chief": is_chief,
     }
     
     return render(request, "departments/department_orders.html", context)
 
 @login_required
 def department_users(request, department_slug):
-    from commerce.models import Department
-    
+    """
+    Возвращает пользователей отдела, связанных с определённым заказом или работой отдела.
+    Если не передан order_id и order_work_id, возвращает всех пользователей отдела.
+    """
+    from commerce.models import Department, Order, OrderDepartmentWork
+    from users.models import User
+
     department = get_object_or_404(Department, slug=department_slug)
-    users = department.get_department_users()
-    
+    order_id = request.GET.get("order_id")
+    order_work_id = request.GET.get("order_work_id")
+
+    if not order_id and not order_work_id:
+        users = User.objects.filter(user_type=department.worker_user_type) if department.worker_user_type else User.objects.none()
+    else:
+        if order_work_id:
+            order_work = get_object_or_404(OrderDepartmentWork, id=order_work_id)
+            order = order_work.order
+        else:
+            order = get_object_or_404(Order, id=order_id)
+        users = User.objects.none()
+        if order.manager and department.worker_user_type and order.manager.user_type_id == department.worker_user_type.id:
+            users = users | User.objects.filter(id=order.manager.id)
+        if department.worker_user_type:
+            viewers = order.viewers.filter(user_type=department.worker_user_type)
+            users = users | viewers
+        executors = OrderDepartmentWork.objects.filter(
+            order=order,
+            department=department,
+            executor__isnull=False
+        ).values_list('executor_id', flat=True)
+        users = users | User.objects.filter(id__in=executors)
+        users = users.distinct()
+
     users_data = [
         {
             "id": user.id,
@@ -75,7 +113,7 @@ def department_users(request, department_slug):
         }
         for user in users
     ]
-    
+
     return JsonResponse(users_data, safe=False)
 
 @login_required
@@ -128,14 +166,31 @@ def department_work_assign_executor(request, order_id: int, department_slug: str
                 department=department,
                 defaults={"executor": executor}
             )
+
+            url = f"/departments/{department_slug}/?order_id={order.id}"
             
             if not created:
                 old_executor = department_work.executor
                 department_work.executor = executor
                 department_work.save(update_fields=["executor"])
+
+                Notification.objects.create(
+                    user=executor,
+                    message=f"Вы назначены исполнителем по заказу №{order.id} ({department.name})",
+                    url=url,
+                    type="Назначение",
+                    order=order,
+                )
                 
                 message = f"Исполнитель изменен с {old_executor} на {executor}" if old_executor else f"Назначен исполнитель {executor}"
             else:
+                Notification.objects.create(
+                    user=executor,
+                    message=f"Вы назначены исполнителем по заказу №{order.id} ({department.name})",
+                    url=url,
+                    type="Назначение",
+                    order=order,
+                )
                 message = f"Назначен исполнитель {executor}"
             
             order.department_status = department_work.get_current_status()
@@ -148,12 +203,12 @@ def department_work_assign_executor(request, order_id: int, department_slug: str
                 {"name": "id", "verbose_name": "№ Заказа"},
                 {"name": "department_executor", "verbose_name": "Исполнитель", "is_relation": True},
                 {"name": "client", "verbose_name": "Клиент", "is_relation": True},
+                {"name": "legal_name", "verbose_name": "Юрлицо"},
                 {"name": "product", "verbose_name": "Продукт", "is_relation": True},
                 {"name": "department_status", "verbose_name": "Состояние заказа", "is_relation": True},
                 {"name": "created", "verbose_name": "Создан", "is_date": True},
                 {"name": "department_started", "verbose_name": "Начало работы"},
                 {"name": "department_completed", "verbose_name": "Завершен"},
-                {"name": "legal_name", "verbose_name": "Юрлицо"},
             ]
             
             html = render_to_string("components/table_row.html", {"item": order, "fields": fields})
@@ -247,6 +302,20 @@ def department_work_update_status(request, order_id: int, department_slug: str):
                     message = f"Установлен статус '{new_status}'"
             
             department_work.refresh_from_db()
+
+            # notif_message = (
+            #     f"Статус отдела '{department.name}' по заказу №{order.id} изменён на '{new_status.name}'."
+            # )
+            # notif_url = f"/departments/{department.slug}/?order_id={order.id}"
+
+            # # if order.manager:
+            # #     Notification.objects.create(
+            # #         user=order.manager,
+            # #         message=notif_message,
+            # #         url=notif_url,
+            # #         type="Статус отдела",
+            # #         order=order,
+            # #     )
             
             from types import SimpleNamespace
             
@@ -268,12 +337,12 @@ def department_work_update_status(request, order_id: int, department_slug: str):
                 {"name": "id", "verbose_name": "№ Заказа"},
                 {"name": "department_executor", "verbose_name": "Исполнитель", "is_relation": True},
                 {"name": "client", "verbose_name": "Клиент", "is_relation": True},
+                {"name": "legal_name", "verbose_name": "Юрлицо"},
                 {"name": "product", "verbose_name": "Продукт", "is_relation": True},
                 {"name": "department_status", "verbose_name": "Состояние заказа"},
                 {"name": "created", "verbose_name": "Создан", "is_date": True},
                 {"name": "department_started", "verbose_name": "Начало работы"},
                 {"name": "department_completed", "verbose_name": "Завершен"},
-                {"name": "legal_name", "verbose_name": "Юрлицо"},
             ]
             
             html = render_to_string("components/table_row.html", {"item": order_data, "fields": fields})
@@ -339,20 +408,34 @@ def department_work_detail(request, order_id: int, department_slug: str):
 
 @login_required
 @require_http_methods(["GET"])
-def department_work_messages_list(request, order_work_id: int):
-    """Список сообщений по работе отдела"""
+def department_work_messages_list(request, order_work_id=None):
     try:
         from types import SimpleNamespace
-        
-        order_work = get_object_or_404(OrderDepartmentWork, id=order_work_id)
-        
-        messages_qs = OrderDepartmentWorkMessage.objects.filter(
-            order_work=order_work
-        ).select_related("author", "recipient").order_by("-created")
+
+        messages_qs = None
+        order_id = request.GET.get("order_id")
+        if order_work_id is not None and str(order_work_id) != "0":
+            order_work = get_object_or_404(OrderDepartmentWork, id=order_work_id)
+            messages_qs = OrderDepartmentWorkMessage.objects.filter(
+                order_work=order_work
+            ).select_related("author", "recipient").order_by("-created")
+        elif order_id:
+            messages_qs = OrderDepartmentWorkMessage.objects.filter(
+                order_work__isnull=True,
+                order_id=order_id
+            ).select_related("author", "recipient").order_by("-created")
+        else:
+            return JsonResponse({"status": "error", "message": "Не передан order_work_id или order_id"}, status=400)
+
+        messages_qs = messages_qs.filter(
+            models.Q(author=request.user, recipient__isnull=False) |  
+            models.Q(recipient=request.user) |                        
+            models.Q(recipient__isnull=True)                          
+        )
 
         messages_data = []
         messages_meta = []
-        
+
         for msg in messages_qs:
             msg_obj = SimpleNamespace(
                 id=msg.id,
@@ -365,25 +448,35 @@ def department_work_messages_list(request, order_work_id: int):
                 is_read=msg.is_read,
             )
             messages_data.append(msg_obj)
-            
+
             unread_type = None
-            if not msg.is_read:
-                if msg.recipient and msg.recipient.id == request.user.id:
-                    unread_type = "received"
-                elif msg.author.id == request.user.id and msg.recipient:
-                    unread_type = "sent"
-            
+            if msg.recipient and msg.author.id == request.user.id:
+                if msg.is_read:
+                    unread_type = "sent_read" 
+                else:
+                    unread_type = "sent"      
+            elif not msg.is_read and msg.recipient and msg.recipient.id == request.user.id:
+                unread_type = "received"
+
             messages_meta.append({
                 "id": msg.id,
                 "is_read": msg.is_read,
                 "unread_type": unread_type,
             })
 
-        OrderDepartmentWorkMessage.objects.filter(
-            order_work=order_work,
-            recipient=request.user,
-            is_read=False
-        ).update(is_read=True)
+        if order_work_id is not None and str(order_work_id) != "0":
+            OrderDepartmentWorkMessage.objects.filter(
+                order_work=order_work,
+                recipient=request.user,
+                is_read=False
+            ).update(is_read=True)
+        elif order_id:
+            OrderDepartmentWorkMessage.objects.filter(
+                order_work__isnull=True,
+                order_id=order_id,
+                recipient=request.user,
+                is_read=False
+            ).update(is_read=True)
 
         fields = [
             {"name": "author", "verbose_name": "Автор"},
@@ -397,7 +490,7 @@ def department_work_messages_list(request, order_work_id: int):
             {
                 "fields": fields,
                 "data": messages_data,
-                "id": f"order-work-messages-{order_work_id}",
+                "id": f"order-work-messages-{order_work_id or order_id}",
             },
         )
 
@@ -406,14 +499,14 @@ def department_work_messages_list(request, order_work_id: int):
                 "html": html,
                 "messages_meta": messages_meta,
                 "order_work_id": order_work_id,
-                "order_id": order_work.order.id,
+                "order_id": order_work.order.id if order_work_id is not None and str(order_work_id) != "0" else order_id,
                 "messages_id_list": [msg.id for msg in messages_qs],
             }
         )
 
     except Exception as e:
         return JsonResponse(
-            {"status": "error", "message": str(e)}, 
+            {"status": "error", "message": str(e)},
             status=400
         )
 
@@ -500,12 +593,13 @@ def department_work_message_create(request):
     try:
         with transaction.atomic():
             order_work_id = request.POST.get("order_work") or request.POST.get("order_work_id")
+            order_id = request.POST.get("order") or request.POST.get("order_id")
             message_text = (request.POST.get("message") or "").strip()
             recipient_id = request.POST.get("recipient") or request.POST.get("recipient_id")
 
-            if not order_work_id:
+            if not order_work_id and not order_id:
                 return JsonResponse(
-                    {"status": "error", "message": "Не указана работа отдела"},
+                    {"status": "error", "message": "Не указана работа отдела или заказ"},
                     status=400,
                 )
 
@@ -515,13 +609,26 @@ def department_work_message_create(request):
                     status=400,
                 )
 
-            try:
-                order_work = get_object_or_404(OrderDepartmentWork, id=int(order_work_id))
-            except (ValueError, TypeError):
-                return JsonResponse(
-                    {"status": "error", "message": "Неверный ID работы отдела"},
-                    status=400,
-                )
+            order_work = None
+            order = None
+
+            if order_work_id:
+                try:
+                    order_work = get_object_or_404(OrderDepartmentWork, id=int(order_work_id))
+                except (ValueError, TypeError):
+                    return JsonResponse(
+                        {"status": "error", "message": "Неверный ID работы отдела"},
+                        status=400,
+                    )
+            elif order_id:
+                try:
+                    from commerce.models import Order
+                    order = get_object_or_404(Order, id=int(order_id))
+                except (ValueError, TypeError):
+                    return JsonResponse(
+                        {"status": "error", "message": "Неверный ID заказа"},
+                        status=400,
+                    )
 
             recipient = None
             if recipient_id:
@@ -534,25 +641,28 @@ def department_work_message_create(request):
                         status=400,
                     )
 
+            from commerce.models import OrderDepartmentWorkMessage
             message = OrderDepartmentWorkMessage.objects.create(
                 order_work=order_work,
+                order=order if order_work is None else None,
                 author=request.user,
                 recipient=recipient,
                 message=message_text,
             )
 
-            message_data = {
-                "id": message.id,
-                "author": str(message.author),
-                "author_id": message.author.id,
-                "recipient": str(message.recipient) if message.recipient else None,
-                "recipient_id": message.recipient.id if message.recipient else None,
-                "created": message.get_formatted_created(),
-                "message": message.message,
-                "is_read": message.is_read,
-                "order_work_id": message.order_work.id,
-                "order_id": message.order_work.order.id,
-            }
+            from types import SimpleNamespace
+            message_obj = SimpleNamespace(
+                id=message.id,
+                author=str(message.author),
+                author_id=message.author.id,
+                recipient=str(message.recipient) if message.recipient else "Всем",
+                recipient_id=message.recipient.id if message.recipient else None,
+                created=message.get_formatted_created(),
+                message=message.message,
+                is_read=message.is_read,
+                order_work_id=message.order_work.id if message.order_work else None,
+                order_id=message.order.id if message.order else (message.order_work.order.id if message.order_work else None),
+            )
 
             fields = [
                 {"name": "author", "verbose_name": "Автор"},
@@ -561,20 +671,37 @@ def department_work_message_create(request):
                 {"name": "message", "verbose_name": "Сообщение"},
             ]
 
+            from django.template.loader import render_to_string
             html = render_to_string(
                 "components/table_row.html",
                 {
-                    "item": message_data,
+                    "item": message_obj,
                     "fields": fields,
                 },
             )
+
+            unread_type = None
+            if message.recipient and message.author.id == request.user.id:
+                if message.is_read:
+                    unread_type = "sent_read"
+                else:
+                    unread_type = "sent"
+            elif not message.is_read and message.recipient and message.recipient.id == request.user.id:
+                unread_type = "received"
+
+            message_meta = {
+                "id": message.id,
+                "is_read": message.is_read,
+                "unread_type": unread_type,
+            }
 
             return JsonResponse(
                 {
                     "status": "success",
                     "id": message.id,
                     "html": html,
-                    "message": message_data,
+                    "message": vars(message_obj),
+                    "message_meta": message_meta,
                 }
             )
 
@@ -627,9 +754,7 @@ def department_work_message_edit(request, message_id: int):
             message.is_read = False
             
             message.save(update_fields=["message", "recipient", "is_read"])
-            
-            from types import SimpleNamespace
-            
+                        
             message_obj = SimpleNamespace(
                 id=message.id,
                 author=str(message.author),
@@ -766,42 +891,83 @@ def department_work_create(request):
     try:
         with transaction.atomic():
             order_id = request.POST.get("order")
-            department_id = request.POST.get("department")
+            departments_raw = request.POST.get("department")
 
-            if not order_id or not department_id:
-                return JsonResponse({"status": "error", "message": "Не передан order или department"}, status=400)
+            errors = []
+
+            if not order_id or not departments_raw:
+                errors.append({"message": "Не передан order или department"})
+                return JsonResponse({
+                    "status": "error",
+                    "errors": errors,
+                    "message": errors[0]["message"]
+                }, status=400)
+
+            department_ids = [d.strip() for d in departments_raw.split(",") if d.strip()]
 
             order = get_object_or_404(Order, id=order_id)
-            department = get_object_or_404(Department, id=department_id)
+            created_works = []
 
-            status = OrderWorkStatus.objects.filter(
-                name="Ожидает"
-            ).filter(
-                Q(department=department) | Q(department__isnull=True)
-            ).first()
+            for department_id in department_ids:
+                department = get_object_or_404(Department, id=department_id)
+                status = OrderWorkStatus.objects.filter(
+                    name="Ожидает"
+                ).filter(
+                    Q(department=department) | Q(department__isnull=True)
+                ).first()
 
-            if not status:
-                return JsonResponse({"status": "error", "message": "Статус 'Ожидает' не найден"}, status=400)
+                if not status:
+                    errors.append({
+                        "department": department_id,
+                        "message": f"Статус 'Ожидает' не найден для отдела '{department.name}'"
+                    })
+                    continue
 
-            if OrderDepartmentWork.objects.filter(order=order, department=department).exists():
-                return JsonResponse({"status": "error", "message": "Такая работа уже существует"}, status=400)
+                if OrderDepartmentWork.objects.filter(order=order, department=department).exists():
+                    existing_work = OrderDepartmentWork.objects.get(order=order, department=department)
+                    errors.append({
+                        "department": department_id,
+                        "message": (
+                            f"Работа для отдела '{department.name}' уже существует "
+                            f"статус: '{existing_work.status.name}')"
+                        )
+                    })
+                    continue
 
-            work = OrderDepartmentWork.objects.create(
-                order=order,
-                department=department,
-                status=status
-            )
+                work = OrderDepartmentWork.objects.create(
+                    order=order,
+                    department=department,
+                    status=status
+                )
+                created_works.append({
+                    "id": work.id,
+                    "order": work.order.id,
+                    "department": work.department.id,
+                    "status_name": work.status.name,
+                    "department_name": work.department.name,
+                })
 
-            return JsonResponse({
-                "status": "success",
-                "id": work.id,
-                "order": work.order.id,
-                "department": work.department.id,
-                "status_name": work.status.name,
-                "department_name": work.department.name,
-            })
+            if created_works:
+                return JsonResponse({
+                    "status": "success",
+                    "created": created_works,
+                    "errors": errors,
+                }, status=200)
+            else:
+                message = errors[0]["message"] if errors else "Ошибка создания работы отдела"
+                return JsonResponse({
+                    "status": "error",
+                    "created": [],
+                    "errors": errors,
+                    "message": message
+                }, status=400)
     except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+        return JsonResponse({
+            "status": "error",
+            "errors": [{"message": str(e)}],
+            "message": str(e)
+        }, status=400)
+
 
 def entity_list(request, model_class):
     entities = model_class.objects.all().values("id", "name")
@@ -828,3 +994,24 @@ def department_work_delete(request, work_id: int):
             "status": "error",
             "message": str(e),
         }, status=400)
+
+@login_required
+@require_http_methods(["GET"])
+def order_departments_list(request, order_id: int):
+    """
+    Возвращает список отделов, участвующих в работах по заказу.
+    """
+    try:
+        order = get_object_or_404(Order, id=order_id)
+        works = OrderDepartmentWork.objects.filter(order=order).select_related('department')
+        departments = [
+            {
+                "id": work.department.id,
+                "name": work.department.name,
+                "slug": work.department.slug,
+            }
+            for work in works
+        ]
+        return JsonResponse({"departments": departments, "order_id": order.id})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)

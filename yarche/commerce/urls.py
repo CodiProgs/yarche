@@ -32,10 +32,13 @@ urlpatterns = [
 	path("products/add/", views.product_create, name="product_add"),
 	path("products/edit/<int:pk>/", views.product_update, name="product_edit"),
 	path("products/delete/<int:pk>/", views.product_delete, name="product_delete"),
+	path("products/<int:product_id>/departments/", views.product_departments, name="product_departments"),
 	path("orders/archive/", views.orders_archive, name="orders_archive"),
 	path("documents/types/", views.document_types, name="document_types"),
 	path("documents/table/<int:pk>/", views.order_documents_table, name="order_documents_table"),
 	path("documents/upload/", views.document_upload, name="document_upload"),
+	path("documents/rename/<int:pk>/", views.document_rename, name="document_rename"),
+	path("documents/delete/<int:pk>/", views.document_delete, name="document_delete"),
 	path("clients/objects/<int:pk>/", views.client_object_detail, name="client_object_detail"),
 	path("clients/objects/add/", views.client_object_create, name="client_object_add"),
 	path("clients/objects/edit/<int:pk>/", views.client_object_update, name="client_object_edit"),
@@ -50,4 +53,6 @@ urlpatterns = [
 	path('kanban/quick_add_client/', views.kanban_quick_add_client, name='kanban_quick_add_client'),
 	path('kanban/delete_column/<int:pk>/', views.kanban_delete_column, name='kanban_delete_column'),
 	path("kanban/create_column/", views.kanban_create_column, name="kanban_create_column"),
+
+	path("order/<int:order_id>/files/cards/", views.order_files_cards, name="order_file_cards"),
 ]

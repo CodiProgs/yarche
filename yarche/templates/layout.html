@@ -46,11 +46,20 @@
                                 </a>
                             </li>
                         {% endfor %}
+                        <li class="nav-item notification-item">
+                            <a href="{% url 'users:notifications_list' %}" title="Уведомления" style="position:relative;display:inline-block;">
+                                <img src="{% static 'images/notification.svg' %}" alt="Уведомления" style="width:20px;height:20px;">
+                                {% if unread_notifications_count and unread_notifications_count > 0 %}
+                                    <span class="notification-badge">
+                                        {% if unread_notifications_count > 9 %}9+{% else %}{{ unread_notifications_count }}{% endif %}
+                                    </span>
+                                {% endif %}
+                            </a>
+                        </li>
                     </ul>
                 </nav>
             {% endif %}
         </div>
     </body>
 </html>
-
 

@@ -12,13 +12,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-!-6%7^-jv5o212#!^n)e9p8n$p*(htyxt^+u^l=5l0()=*kvq&"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
-ALLOWED_HOSTS = [
-    "CodiProgs.mysql.pythonanywhere-services.com",
-    "CodiProgs.pythonanywhere.com",
-]
-# ALLOWED_HOSTS = ["*"]
+# ALLOWED_HOSTS = [
+#     "CodiProgs.mysql.pythonanywhere-services.com",
+#     "CodiProgs.pythonanywhere.com",
+# ]
+ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
@@ -62,6 +62,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+				"yarche.context_processors.notifications_count",
             ],
         },
     },
@@ -73,34 +74,34 @@ WSGI_APPLICATION = "yarche.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.mysql",
-#         "NAME": "yarche2",
-#         "USER": "root",
-#         "PASSWORD": "root",
-#         "HOST": "localhost",
-#         "PORT": "3306",
-#         "OPTIONS": {
-#             "charset": "utf8mb4",
-#             "init_command": "SET foreign_key_checks = 0;",
-#         },
-#     }
-# }
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": "CodiProgs$TestDb2",
-        "USER": "CodiProgs",
-        "PASSWORD": "PFMPDifo",
-        "HOST": "CodiProgs.mysql.pythonanywhere-services.com",
+        "NAME": "yarche2",
+        "USER": "root",
+        "PASSWORD": "root",
+        "HOST": "localhost",
         "PORT": "3306",
         "OPTIONS": {
-            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
             "charset": "utf8mb4",
+            "init_command": "SET foreign_key_checks = 0;",
         },
     }
 }
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.mysql",
+#         "NAME": "CodiProgs$TestDb2",
+#         "USER": "CodiProgs",
+#         "PASSWORD": "PFMPDifo",
+#         "HOST": "CodiProgs.mysql.pythonanywhere-services.com",
+#         "PORT": "3306",
+#         "OPTIONS": {
+#             "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+#             "charset": "utf8mb4",
+#         },
+#     }
+# }
 
 
 # Password validation
@@ -161,3 +162,59 @@ LOGOUT_REDIRECT_URL = "login"
 
 MEDIA_URL = "/uploads/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "uploads")
+
+# Отчет денежных средств.  столбцы месяцы, итого. строки -> приходы, расходы. TODO:
+# Отчет Экономика предприятия, tr.report_date
+# Отчет Баланс. 
+
+# Страница ддс и снизу история ддс
+
+# телефония
+
+# {% comment %} добавлять сразу несколько отделов {% endcomment %}
+# {% comment %} добавить в сделку доп человека {% endcomment %}
+# {% comment %} оповещения {% endcomment %}
+
+
+# витая пата, комутатор, симка, 
+# ип телеметрия
+# превью файлов и комментарий в документах, переименовать файл
+
+# сделать отображение даты когда отдел выполнился
+# и сделать уведомления по чату
+# добавлять несколько отделов сразу
+
+# когда даешь доступ к заказу нужно уведомление
+
+
+# Ярче для отдела продаж
+# 1.	До продажи:
+# ˗	Предусмотреть вкладку Замер (как этап или как отдел производства);
+# ˗	Формирование документов для продажи: счет, договор, спецификация;
+# ˗	Предусмотреть возможность перевода сделки, либо назначение соответственного лица;
+# ˗	добавить дизайнеру кнопку «Пауза»;
+# ˗	автоответ при отсутствии на рабочем месте;
+# ˗	вести коммуникацию с дизайнером не через почту (а именно, запуск в производство);
+# ˗	утм метки для определения откуда обращение, вид запроса.
+# 2.	При передаче в производство:
+# +    разворачивать все участки производства (выбор отделов);
+# +    возможность переименовывать файлы уже прикрепленные в Ярче;
+# +    вид файлов, прикрепленных в Ярче в виде «содержимого»
+# +   подгружать файлы в сделку перетаскиванием.
+# 3.	Приход денежных средств
+#       + Поиск по номеру сделки;
+#       + остаток в рублях;
+#       + Возможность сортировки;
+#       + либо обратный порядок (сначала новые);
+#       + связанная задача, чтобы смотреть непосредственно из сделки;
+#       + уведомление ответственному менеджеру при поступлении дс.
+# Контроль ДЗ (мб отдельной воронкой).?
+
+# 4.	В производстве:  добавить возможность при переводе сделки в статус «готово» указать фамилии ответственных (исполнителей – не выбор, а ввод текста)).
+# 5.	Общие:
+#                     - Возможность постановки задач и контроль их исполнения;
+#                     - Кнопка «Призвать» («Авария»?) с возможностью адресовать определенному пользователю;
+#                    - Возможность просматривать заказ другого менеджера (нужно прописать условия, при которых будет дан доступ);                
+#                   - Рекламации нужно ли отражать?  и в какой воронке, мб отдельная?
+#                   - Шаблоны писем и автоматическая отправка Клиенту при срабатывании триггера (заказ готов)?
+#                  - прогноз даты готовности (на основе анализа загруженности участков)?

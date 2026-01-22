@@ -12,6 +12,7 @@ urlpatterns = [
         views.all_transactions_table,
         name="all_transactions_table",
     ),
+	path("cash-report/table/", views.cash_report_table, name="cash_report_table"),
     path('bank-accounts/', views.bank_accounts, name='bank-accounts'),
     path('transaction-categories/', views.transaction_categories, name='transaction-categories'),
     path('payments/', views.payments, name='payments'),

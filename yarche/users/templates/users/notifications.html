@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+{% block title %}Уведомления{% endblock %}
+{% block content %}
+<h2 class="notifications-title">Уведомления</h2>
+<ul class="notifications-list">
+    {% for n in notifications %}
+        <li class="notification{% if not n.is_read %} notification--unread{% endif %}">
+            <div>
+                <span class="notification-date">{{ n.created|date:"d.m.Y H:i" }}</span>
+                {% if n.type %}<span class="notification-type">{{ n.type }}</span>{% endif %}
+            </div>
+            <div>
+                {% if n.url %}
+                    <a href="{{ n.url }}">{{ n.message|linebreaksbr }}</a>
+                {% else %}
+                    {{ n.message|linebreaksbr }}
+                {% endif %}
+            </div>
+        </li>
+    {% empty %}
+        <li>Нет уведомлений</li>
+    {% endfor %}
+</ul>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    fetch("{% url 'users:notifications_mark_all_read' %}", {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": "{{ csrf_token }}",
+        },
+    });
+});
+</script>
+{% endblock extra_scripts %}

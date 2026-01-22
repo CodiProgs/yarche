@@ -2,7 +2,7 @@ from django.db import models
 from .client import Client
 from .product import Product
 from .document import Document
-from users.models import User
+from users.models import User, UserType
 
 
 class OrderStatus(models.Model):
@@ -24,6 +24,24 @@ class Department(models.Model):
         help_text="URL-идентификатор отдела (например: printing, cutting)",
         blank=True,
         null=True,
+    )
+    chief_user_type = models.ForeignKey(
+        UserType,
+        on_delete=models.SET_NULL,
+        verbose_name="Главный в отделе (тип пользователя)",
+        blank=True,
+        null=True,
+        related_name="chief_departments",
+        help_text="Тип пользователя, который считается главным в отделе"
+    )
+    worker_user_type = models.ForeignKey(
+        UserType,
+        on_delete=models.SET_NULL,
+        verbose_name="Работник отдела (тип пользователя)",
+        blank=True,
+        null=True,
+        related_name="worker_departments",
+        help_text="Тип пользователя, который считается работником отдела"
     )
     
     def __str__(self):
@@ -244,6 +262,16 @@ class OrderDepartmentWorkMessage(models.Model):
         on_delete=models.CASCADE,
         verbose_name="Работа отдела",
         related_name="messages",
+        blank=True,
+        null=True,
+    )
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        verbose_name="Заказ",
+        related_name="department_work_messages",
+        blank=True,
+        null=True,
     )
     author = models.ForeignKey(
         User,

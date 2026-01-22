@@ -1,10 +1,11 @@
 from django.contrib import admin
-from .models import Permission, User, UserType, UserTypeMenuItem, FileAccessToken
+from .models import Permission, User, UserType, UserTypeMenuItem, FileAccessToken, Notification
 
 admin.site.register(Permission)
 admin.site.register(UserType)
 admin.site.register(UserTypeMenuItem)
 admin.site.register(FileAccessToken)
+admin.site.register(Notification)
 
 class UserAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
