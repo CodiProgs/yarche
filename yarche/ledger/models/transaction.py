@@ -55,7 +55,7 @@ class Transaction(models.Model):
     bank_account = models.ForeignKey(
         BankAccount, on_delete=models.CASCADE, verbose_name="Счет"
     )
-    amount = models.DecimalField(decimal_places=2, verbose_name="Сумма", max_digits=12)
+    amount = models.DecimalField(decimal_places=0, verbose_name="Сумма", max_digits=12)
     client = models.ForeignKey(
         Client, on_delete=models.CASCADE, verbose_name="Клиент", blank=True, null=True
     )

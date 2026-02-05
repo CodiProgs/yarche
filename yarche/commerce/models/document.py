@@ -23,6 +23,7 @@ class Document(models.Model):
     size = models.BigIntegerField(verbose_name="Размер файла (в байтах)", null=True, blank=True)
     url = models.URLField(verbose_name="URL файла", blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата загрузки")
+    comment = models.TextField(verbose_name="Комментарий", blank=True, null=True)
 
     order = models.ForeignKey(
         'Order',

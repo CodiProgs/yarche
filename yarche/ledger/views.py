@@ -1,56 +1,71 @@
-from django.shortcuts import render, get_object_or_404
-from django.http import HttpResponse, JsonResponse
-from django.template.loader import render_to_string
-from django.db import transaction
-from django.forms.models import model_to_dict
-from django.core.paginator import Paginator
-from django.utils.dateparse import parse_date
-from django.views.decorators.http import require_http_methods
-from django.contrib.auth.decorators import login_required
-from django.utils import timezone
-from django.core.exceptions import ValidationError
-from django.db.models import Sum
+from decimal import Decimal
+from types import SimpleNamespace
+from typing import List, Optional
+
 import locale
 import json
-from decimal import Decimal
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
+from django.db import transaction
+from django.db.models import Sum
+from django.forms.models import model_to_dict
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, render
+from django.template.loader import render_to_string
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.dateparse import parse_date
+from django.views.decorators.http import require_http_methods
+
+from commerce.models import Client, Order
 from users.models import Notification
-import calendar
-from types import SimpleNamespace
-from commerce.models import Order, Client
 from yarche.utils import get_model_fields
-from .models import BankAccount, BankAccountType, TransactionCategory, Transaction
+
+from .models import BankAccount, BankAccountType, Transaction, TransactionCategory
 
 locale.setlocale(locale.LC_ALL, "ru_RU.UTF-8")
 CURRENCY_SUFFIX = " р."
-DEFAULT_VALUE = f"0,00{CURRENCY_SUFFIX}"
+DEFAULT_VALUE = f"0{CURRENCY_SUFFIX}"
 
 
 # region Helpers
 def parse_amount(amount_str: str) -> float:
+    """
+    Parse amount string to float, handling currency suffix and formatting.
+    """
     if not amount_str:
-        return 0.00
-    clean_amount = amount_str.replace(CURRENCY_SUFFIX, "").replace(" ", "")
-    if clean_amount == "" or clean_amount == ",":
-        return 0.00
+        return 0.0
+    clean_amount = amount_str.replace(CURRENCY_SUFFIX, "").replace(" ", "").replace(",", ".")
     try:
-        return round(float(clean_amount.replace(",", ".")), 2)
+        return round(float(clean_amount), 0)
     except (ValueError, TypeError):
-        return 0.00
+        return 0.0
 
 
 def format_currency(amount: float) -> str:
-    sum_str = locale.format_string("%.2f", amount, grouping=True)
-    return sum_str.replace('\xa0', ' ')
+    """
+    Format amount as currency string.
+    """
+    rounded_amount = round(amount)
+    sum_str = locale.format_string("%.0f", rounded_amount, grouping=True)
+    return sum_str.replace('\xa0', ' ') + CURRENCY_SUFFIX
 
 
-def check_permission(user, codename):
+def check_permission(user, codename: str) -> bool:
+    """
+    Check if user has the specified permission.
+    """
     if hasattr(user, "user_type") and user.user_type:
         return user.user_type.permissions.filter(codename=codename).exists()
     return False
 
 
 class BankAccountData:
-    def __init__(self, name, balance, shift_amount, total_amount):
+    """
+    Data class for bank account information.
+    """
+    def __init__(self, name: str, balance: str, shift_amount: str, total_amount: str):
         self.name = name
         self.balance = balance
         self.shift_amount = shift_amount
@@ -58,6 +73,9 @@ class BankAccountData:
 
 
 def get_transaction_fields():
+    """
+    Get fields for transaction table.
+    """
     excluded_fields = [
         "id",
         "created",
@@ -80,7 +98,9 @@ def get_transaction_fields():
     ]
 
     fields = get_model_fields(
-        model=Transaction, excluded_fields=excluded_fields, field_order=field_order
+        model=Transaction,
+        excluded_fields=excluded_fields,
+        field_order=field_order
     )
 
     fields.insert(
@@ -89,7 +109,6 @@ def get_transaction_fields():
             "name": "amount",
             "verbose_name": "Сумма",
             "is_number": True,
-            "is_currency": True,
         },
     )
 
@@ -98,7 +117,10 @@ def get_transaction_fields():
     return fields
 
 
-def handle_transaction_update(tr, data):
+def handle_transaction_update(tr: Transaction, data: dict):
+    """
+    Handle updating a transaction based on provided data.
+    """
     trans_type = tr.type
     comment = data.get("comment", "").strip()
     amount_str = data.get("amount")
@@ -180,9 +202,7 @@ def handle_transaction_update(tr, data):
             else -abs(amount)
         )
         tr.comment = comment
-
         tr.report_date = report_date_value
-        
         tr.save()
         return tr, None
 
@@ -193,6 +213,9 @@ def handle_transaction_update(tr, data):
 # region Bank Accounts
 @login_required
 def bank_accounts(request):
+    """
+    View for bank accounts list.
+    """
     context = {
         "fields": get_model_fields(BankAccount, excluded_fields=["balance"]),
         "data": BankAccount.objects.all(),
@@ -201,13 +224,30 @@ def bank_accounts(request):
 
 
 @login_required
+def bank_account_detail(request, pk: int):
+    """
+    Get bank account details.
+    """
+    account = get_object_or_404(BankAccount, id=pk)
+    data = model_to_dict(account)
+    data["balance"] = format_currency(account.balance)
+    return JsonResponse({"data": data})
+
+
+@login_required
 def bank_account_types(request):
+    """
+    Get list of bank account types.
+    """
     types_data = [{"id": t.id, "name": t.name} for t in BankAccountType.objects.all()]
     return JsonResponse(types_data, safe=False)
 
 
 @login_required
 def bank_account_list(request):
+    """
+    Get list of bank accounts.
+    """
     accounts_data = [
         {"id": acc.id, "name": acc.name} for acc in BankAccount.objects.all()
     ]
@@ -215,14 +255,11 @@ def bank_account_list(request):
 
 
 @login_required
-def bank_account_detail(request, pk: int):
-    account = get_object_or_404(BankAccount, id=pk)
-    return JsonResponse({"data": model_to_dict(account)})
-
-
-@login_required
 @require_http_methods(["POST"])
 def bank_account_create(request):
+    """
+    Create a new bank account.
+    """
     try:
         with transaction.atomic():
             name = request.POST.get("name", "")
@@ -257,6 +294,9 @@ def bank_account_create(request):
 @login_required
 @require_http_methods(["PUT", "PATCH", "POST"])
 def bank_account_update(request, pk: int):
+    """
+    Update a bank account.
+    """
     try:
         account = get_object_or_404(BankAccount, id=pk)
         data = (
@@ -294,6 +334,9 @@ def bank_account_update(request, pk: int):
 @login_required
 @require_http_methods(["POST"])
 def bank_account_delete(request, pk: int):
+    """
+    Delete a bank account.
+    """
     try:
         with transaction.atomic():
             account = get_object_or_404(BankAccount, id=pk)
@@ -322,6 +365,9 @@ def bank_account_delete(request, pk: int):
 
 @login_required
 def refresh_bank_accounts(request):
+    """
+    Refresh bank accounts table.
+    """
     accounts = BankAccount.objects.all()
     html = "".join(
         render_to_string(
@@ -342,6 +388,9 @@ def refresh_bank_accounts(request):
 # region Transaction Categories
 @login_required
 def transaction_categories(request):
+    """
+    View for transaction categories list.
+    """
     context = {
         "fields": get_model_fields(TransactionCategory),
         "data": TransactionCategory.objects.all(),
@@ -351,6 +400,9 @@ def transaction_categories(request):
 
 @login_required
 def transaction_category_list(request):
+    """
+    Get list of transaction categories, filtered by type if provided.
+    """
     transaction_type = request.GET.get("type")
     categories = TransactionCategory.objects.all()
 
@@ -364,6 +416,9 @@ def transaction_category_list(request):
 
 @login_required
 def transaction_category_detail(request, pk: int):
+    """
+    Get transaction category details.
+    """
     category = get_object_or_404(TransactionCategory, id=pk)
     return JsonResponse({"data": model_to_dict(category)})
 
@@ -371,6 +426,9 @@ def transaction_category_detail(request, pk: int):
 @login_required
 @require_http_methods(["POST"])
 def transaction_category_create(request):
+    """
+    Create a new transaction category.
+    """
     try:
         with transaction.atomic():
             name = request.POST.get("name", "")
@@ -410,6 +468,9 @@ def transaction_category_create(request):
 @login_required
 @require_http_methods(["PUT", "PATCH", "POST"])
 def transaction_category_update(request, pk: int):
+    """
+    Update a transaction category.
+    """
     try:
         category = get_object_or_404(TransactionCategory, id=pk)
         data = (
@@ -448,6 +509,9 @@ def transaction_category_update(request, pk: int):
 @login_required
 @require_http_methods(["POST"])
 def transaction_category_delete(request, pk: int):
+    """
+    Delete a transaction category.
+    """
     try:
         with transaction.atomic():
             category = get_object_or_404(TransactionCategory, id=pk)
@@ -468,6 +532,9 @@ def transaction_category_delete(request, pk: int):
 
 @login_required
 def refresh_transaction_categories(request):
+    """
+    Refresh transaction categories table.
+    """
     categories = TransactionCategory.objects.all()
     html = "".join(
         render_to_string(
@@ -485,6 +552,9 @@ def refresh_transaction_categories(request):
 # region Transactions
 @login_required
 def transaction_types(request):
+    """
+    Get list of transaction types.
+    """
     types_data = [
         {"id": t[0], "name": t[1]} for t in Transaction.TransactionType.choices
     ]
@@ -493,13 +563,18 @@ def transaction_types(request):
 
 @login_required
 def transactions(request):
+    """
+    View for transactions list.
+    """
     context = {"fields": get_transaction_fields(), "data": None}
-
     return render(request, "ledger/transactions.html", context)
 
 
 @login_required
 def transaction_list(request):
+    """
+    Get paginated list of transactions.
+    """
     start_date = parse_date(request.GET.get("start_date", ""))
     end_date = parse_date(request.GET.get("end_date", ""))
 
@@ -507,7 +582,7 @@ def transaction_list(request):
         return JsonResponse({"error": "Необходимо указать даты"}, status=400)
 
     transactions = Transaction.objects.filter(
-        created__date__range=(start_date, end_date), completed_date__isnull=False
+        completed_date__range=(start_date, end_date), completed_date__isnull=False
     )
 
     page_number = request.GET.get("page", 1)
@@ -539,6 +614,9 @@ def transaction_list(request):
 @login_required
 @require_http_methods(["POST"])
 def transaction_create(request):
+    """
+    Create a new transaction.
+    """
     try:
         with transaction.atomic():
             report_date_value = request.POST.get("report_date", "")
@@ -584,6 +662,7 @@ def transaction_create(request):
 
             tr = Transaction.objects.create(**data)
             tr.order = tr.order.id if tr.order else None
+            tr.amount = format_currency(tr.amount)
 
             context = {"item": tr, "fields": get_transaction_fields()}
 
@@ -600,6 +679,9 @@ def transaction_create(request):
 @login_required
 @require_http_methods(["POST"])
 def transfer_create(request):
+    """
+    Create a transfer transaction.
+    """
     try:
         with transaction.atomic():
             source_id = request.POST.get("source_bank_account")
@@ -667,6 +749,9 @@ def transfer_create(request):
 
 @login_required
 def transaction_detail(request, pk: int):
+    """
+    Get transaction details.
+    """
     tr = get_object_or_404(Transaction, id=pk)
     data = model_to_dict(tr)
 
@@ -678,7 +763,10 @@ def transaction_detail(request, pk: int):
     return JsonResponse({"data": data})
 
 
-def handle_transfer_details(tr):
+def handle_transfer_details(tr: Transaction) -> dict:
+    """
+    Handle details for transfer transactions.
+    """
     data = {}
     if tr.amount < 0:
         data["source_bank_account"] = tr.bank_account.id
@@ -686,13 +774,16 @@ def handle_transfer_details(tr):
     else:
         data["source_bank_account"] = tr.related_transaction.bank_account.id
         data["destination_bank_account"] = tr.bank_account.id
-    data["amount"] = abs(tr.amount)
+    data["amount"] = format_currency(abs(tr.amount))
     return data
 
 
 @login_required
 @require_http_methods(["PUT", "PATCH", "POST"])
 def transaction_update(request, pk: int):
+    """
+    Update a transaction.
+    """
     try:
         with transaction.atomic():
             tr = Transaction.objects.select_for_update().get(id=pk)
@@ -780,6 +871,9 @@ def transaction_update(request, pk: int):
 @login_required
 @require_http_methods(["PUT", "PATCH", "POST"])
 def closed_transaction_update(request, pk: int):
+    """
+    Update a closed transaction.
+    """
     try:
         with transaction.atomic():
             tr = Transaction.objects.select_for_update().get(id=pk)
@@ -804,7 +898,20 @@ def closed_transaction_update(request, pk: int):
                 return result
 
             updated_tr, related_tr = result
-            fields = get_transaction_fields()
+
+            table = request.GET.get('table', 'transactions')
+            if table == 'all':
+                fields = [
+                    {"name": "created", "verbose_name": "Дата"},
+                    {"name": "type", "verbose_name": "Тип"},
+                    {"name": "category", "verbose_name": "Категория"},
+                    {"name": "bank_account", "verbose_name": "Счет"},
+                    {"name": "amount", "verbose_name": "Сумма", "is_number": True},
+                    {"name": "comment", "verbose_name": "Комментарий"},
+                    {"name": "created_by", "verbose_name": "Пользователь"},
+                ]
+            else:
+                fields = get_transaction_fields()
 
             if tr.type != "transfer":
                 if old_bank_account:
@@ -836,10 +943,10 @@ def closed_transaction_update(request, pk: int):
                 updated_tr.order.save()
 
             if tr.type == "client_account_payment" and tr.client:
-                tr.client.balance += abs(Decimal(str(old_amount)))  
+                tr.client.balance += abs(Decimal(str(old_amount)))
                 tr.client.save()
             if updated_tr and updated_tr.type == "client_account_payment" and updated_tr.client:
-                updated_tr.client.balance -= abs(Decimal(str(updated_tr.amount))) 
+                updated_tr.client.balance -= abs(Decimal(str(updated_tr.amount)))
                 updated_tr.client.save()
 
             if tr.type == "client_account_deposit" and tr.client:
@@ -903,6 +1010,9 @@ def closed_transaction_update(request, pk: int):
 @login_required
 @require_http_methods(["POST"])
 def transaction_delete(request, pk: int):
+    """
+    Delete a transaction.
+    """
     try:
         with transaction.atomic():
             tr = get_object_or_404(Transaction, id=pk)
@@ -928,12 +1038,66 @@ def transaction_delete(request, pk: int):
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
 
+@login_required
+@require_http_methods(["POST"])
+def closed_transaction_delete(request, pk: int):
+    """
+    Delete a closed transaction.
+    """
+    try:
+        with transaction.atomic():
+            tr = get_object_or_404(Transaction, id=pk)
+            if not tr.completed_date:
+                return JsonResponse(
+                    {
+                        "status": "error",
+                        "message": "Нельзя удалить незавершенную транзакцию этим методом",
+                    },
+                    status=400,
+                )
+
+            if tr.bank_account:
+                tr.bank_account.balance -= Decimal(str(tr.amount))
+                tr.bank_account.save()
+
+            if tr.type == "order_payment" and tr.order:
+                tr.order.paid_amount -= abs(Decimal(str(tr.amount)))
+                tr.order.save()
+            elif tr.type == "client_account_deposit" and tr.client:
+                tr.client.balance -= abs(Decimal(str(tr.amount)))
+                tr.client.save()
+            elif tr.type == "client_account_payment" and tr.client and tr.order:
+                tr.client.balance += abs(Decimal(str(tr.amount)))
+                tr.client.save()
+                tr.order.paid_amount -= abs(Decimal(str(tr.amount)))
+                tr.order.save()
+
+            related_id = None
+            if tr.type == "transfer" and tr.related_transaction:
+                related_tr = tr.related_transaction
+                related_id = related_tr.id
+                if related_tr.bank_account:
+                    related_tr.bank_account.balance -= Decimal(str(related_tr.amount))
+                    related_tr.bank_account.save()
+                related_tr.delete()
+
+            tr.delete()
+            return JsonResponse(
+                {"status": "success", "related_transaction_id": related_id}
+            )
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+
 # endregion
 
 
 # region Payments
 @login_required
 def payments(request):
+    """
+    View for payments list.
+    """
     user = request.user
     has_perm = check_permission(user, "view_all_payments")
 
@@ -956,6 +1120,9 @@ def payments(request):
 
 
 def get_payment_fields():
+    """
+    Get fields for payment table.
+    """
     excluded = [
         "category",
         "type",
@@ -997,7 +1164,7 @@ def get_payment_fields():
     insertions = [
         (1, {"name": "manager", "verbose_name": "Менеджер", "is_relation": True}),
         (3, {"name": "product", "verbose_name": "Продукция", "is_relation": True}),
-        (5, {"name": "remaining_debt", "verbose_name": "Остаток", "is_amount": True}),
+        (5, {"name": "remaining_debt", "verbose_name": "Остаток", "is_amount": True, "is_currency": True}),
         (6, {"name": "order", "verbose_name": "Заказ", "is_number": True}),
         (7, {"name": "client", "verbose_name": "Клиент", "is_relation": True}),
         (8, {"name": "legal_name", "verbose_name": "Фирма"}),
@@ -1006,9 +1173,18 @@ def get_payment_fields():
     for pos, field in insertions:
         fields.insert(pos, field)
 
+    for field in fields:
+        if field.get("name") == "amount":
+            field["is_currency"] = True
+            break
+
     return fields
 
+
 def prepare_payment_data(transactions):
+    """
+    Prepare data for payments table.
+    """
     data = []
     for tr in transactions:
         tr.product = tr.order.product if tr.order else None
@@ -1016,7 +1192,6 @@ def prepare_payment_data(transactions):
         tr.legal_name = (
             tr.order.client.legal_name if tr.order and tr.order.client else None
         )
-        # tr.order = tr.order.id if tr.order else None
         tr.manager = tr.order.manager.last_name or tr.order.manager.username if tr.order and tr.order.manager else None
         tr.remaining_debt = tr.order.amount - tr.order.paid_amount if tr.order else 0
         data.append(tr)
@@ -1029,6 +1204,9 @@ def prepare_payment_data(transactions):
 # region Current Shift
 @login_required
 def current_shift(request):
+    """
+    View for current shift.
+    """
     user = request.user
     accounts = BankAccount.objects.all().order_by("type")
     transactions = Transaction.objects.filter(completed_date__isnull=True)
@@ -1037,7 +1215,14 @@ def current_shift(request):
         transactions = transactions.filter(created_by=user)
 
     accounts_data = prepare_accounts_data(accounts, transactions)
-    # transactions_data = prepare_shift_transactions(transactions)
+
+    for tr in transactions:
+        tr.amount = format_currency(tr.amount)
+
+    fields = get_transaction_fields()
+    for field in fields:
+        if field['name'] == 'amount':
+            field.pop('is_currency', None)
 
     context = {
         "fields": {
@@ -1047,7 +1232,7 @@ def current_shift(request):
                 {"name": "shift_amount", "verbose_name": "Сегодня", "is_number": True},
                 {"name": "total_amount", "verbose_name": "Сумма", "is_number": True},
             ],
-            "transactions": get_transaction_fields(),
+            "transactions": fields,
         },
         "data": {"bank_accounts": accounts_data, "transactions": transactions},
         "is_grouped": {"transactions-bank-accounts-table": True},
@@ -1057,6 +1242,9 @@ def current_shift(request):
 
 
 def prepare_accounts_data(accounts, transactions):
+    """
+    Prepare data for bank accounts in current shift.
+    """
     data = {}
     for acc in accounts:
         sum_tr = (
@@ -1077,15 +1265,19 @@ def prepare_accounts_data(accounts, transactions):
 
 
 def prepare_shift_transactions(transactions):
+    """
+    Prepare data for shift transactions.
+    """
     data = []
     for tr in transactions:
-        # tr.order = tr.order.id if tr.order else None
         data.append(tr)
     return data
 
 
-
 def update_balances(transactions):
+    """
+    Update balances based on transactions.
+    """
     for tr in transactions:
         if tr.bank_account:
             tr.bank_account.balance += tr.amount
@@ -1105,6 +1297,9 @@ def update_balances(transactions):
 
 
 def render_updated_accounts_table():
+    """
+    Render updated accounts table after shift close.
+    """
     accounts = BankAccount.objects.all().order_by("type")
     data = prepare_accounts_data(accounts, Transaction.objects.none())
 
@@ -1131,6 +1326,9 @@ def render_updated_accounts_table():
 @login_required
 @require_http_methods(["POST"])
 def order_payment_create(request):
+    """
+    Create an order payment.
+    """
     try:
         with transaction.atomic():
             report_date_value = request.POST.get("report_date", "")
@@ -1159,6 +1357,9 @@ def order_payment_create(request):
 
 
 def validate_payment_data(data, user):
+    """
+    Validate payment data.
+    """
     if not data["bank_account_id"]:
         raise ValidationError("Не указан счет")
     if data["amount"] <= 0:
@@ -1170,10 +1371,13 @@ def validate_payment_data(data, user):
     debt = calculate_remaining_debt(order, user)
 
     if data["amount"] > debt:
-        raise ValidationError(f"Сумма превышает долг ({format_currency(debt)} р.)")
+        raise ValidationError(f"Сумма превышает долг ({format_currency(debt)})")
 
 
 def calculate_remaining_debt(order, user):
+    """
+    Calculate remaining debt for an order.
+    """
     payments = (
         Transaction.objects.filter(
             order=order, type="order_payment", completed_date__isnull=True, created_by=user
@@ -1194,6 +1398,9 @@ def calculate_remaining_debt(order, user):
 @login_required
 @require_http_methods(["POST"])
 def client_balance_payment(request):
+    """
+    Create a client balance payment.
+    """
     try:
         with transaction.atomic():
             data = {
@@ -1233,7 +1440,11 @@ def client_balance_payment(request):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
+
 def validate_client_payment(data, user):
+    """
+    Validate client payment data.
+    """
     if not data["client_id"]:
         raise ValidationError("Не указан клиент")
     if data["amount"] <= 0:
@@ -1245,16 +1456,19 @@ def validate_client_payment(data, user):
     order = Order.objects.get(id=data["order_id"])
 
     balance = calculate_client_balance(client, user)
-    
+
     if data["amount"] > balance:
-        raise ValidationError(f"Недостаточно средств: {format_currency(balance)} р.")
+        raise ValidationError(f"Недостаточно средств: {format_currency(balance)}")
 
     debt = calculate_order_debt(order, user)
     if data["amount"] > debt:
-        raise ValidationError(f"Сумма превышает долг ({format_currency(debt)} р.)")
+        raise ValidationError(f"Сумма превышает долг ({format_currency(debt)})")
 
 
 def calculate_client_balance(client, user):
+    """
+    Calculate client balance.
+    """
     deposits = (
         Transaction.objects.filter(
             client=client, type="client_account_deposit", completed_date__isnull=True, created_by=user
@@ -1272,6 +1486,9 @@ def calculate_client_balance(client, user):
 
 
 def calculate_order_debt(order, user):
+    """
+    Calculate order debt.
+    """
     order_payments = (
         Transaction.objects.filter(order=order, type="order_payment", created_by=user).aggregate(
             total=Sum("amount")
@@ -1292,6 +1509,9 @@ def calculate_order_debt(order, user):
 @login_required
 @require_http_methods(["POST"])
 def client_balance_deposit(request):
+    """
+    Create a client balance deposit.
+    """
     try:
         with transaction.atomic():
             data = {
@@ -1323,6 +1543,9 @@ def client_balance_deposit(request):
 
 
 def render_transaction_response(transaction):
+    """
+    Render response for transaction creation.
+    """
     context = {"item": transaction, "fields": get_transaction_fields()}
     return JsonResponse(
         {
@@ -1331,16 +1554,24 @@ def render_transaction_response(transaction):
         }
     )
 
+
 # endregion
 
+
 class BankAccountDataBalance:
-    def __init__(self, name, balance):
+    """
+    Data class for bank account balance.
+    """
+    def __init__(self, name: str, balance: str):
         self.name = name
         self.balance = balance
 
 
 @login_required
 def bank_accounts_balances(request):
+    """
+    View for bank accounts balances.
+    """
     accounts = BankAccount.objects.select_related('type').order_by('type__name', 'name')
     grouped = {}
     for acc in accounts:
@@ -1362,10 +1593,13 @@ def bank_accounts_balances(request):
 
 @login_required
 def all_transactions(request):
+    """
+    View for all transactions.
+    """
     page_number = request.GET.get("page", 1)
     transactions = (
         Transaction.objects
-        .select_related("bank_account", "created_by")
+        .select_related("bank_account", "created_by", "category")
         .order_by("-created")
     )
     paginator = Paginator(transactions, 200)
@@ -1377,8 +1611,9 @@ def all_transactions(request):
     fields = [
         {"name": "created", "verbose_name": "Дата"},
         {"name": "type", "verbose_name": "Тип"},
+        {"name": "category", "verbose_name": "Категория"},
         {"name": "bank_account", "verbose_name": "Счет"},
-        {"name": "amount", "verbose_name": "Сумма", "is_number": True},
+        {"name": "amount", "verbose_name": "Сумма", "is_number": True, "is_currency": True},
         {"name": "comment", "verbose_name": "Комментарий"},
         {"name": "created_by", "verbose_name": "Пользователь"},
     ]
@@ -1394,12 +1629,16 @@ def all_transactions(request):
     }
     return render(request, "ledger/all_transactions.html", context)
 
+
 @login_required
 def all_transactions_table(request):
+    """
+    Get paginated table for all transactions.
+    """
     page_number = request.GET.get("page", 1)
     transactions = (
         Transaction.objects
-        .select_related("bank_account", "created_by")
+        .select_related("bank_account", "created_by", "category")
         .order_by("-created")
     )
     paginator = Paginator(transactions, 200)
@@ -1411,8 +1650,9 @@ def all_transactions_table(request):
     fields = [
         {"name": "created", "verbose_name": "Дата"},
         {"name": "type", "verbose_name": "Тип"},
+        {"name": "category", "verbose_name": "Категория"},
         {"name": "bank_account", "verbose_name": "Счет"},
-        {"name": "amount", "verbose_name": "Сумма", "is_number": True},
+        {"name": "amount", "verbose_name": "Сумма", "is_number": True, "is_currency": True},
         {"name": "comment", "verbose_name": "Комментарий"},
         {"name": "created_by", "verbose_name": "Пользователь"},
     ]
@@ -1434,9 +1674,13 @@ def all_transactions_table(request):
         }
     })
 
+
 @login_required
 @require_http_methods(["POST"])
 def close_shift(request):
+    """
+    Close the current shift.
+    """
     try:
         with transaction.atomic():
             user = request.user
@@ -1473,7 +1717,7 @@ def close_shift(request):
                     return JsonResponse(
                         {
                             "status": "error",
-                            "message": f"Сумма платежей по заказу {order.id} превышает долг ({format_currency(current_debt)} р.)",
+                            "message": f"Сумма платежей по заказу {order.id} превышает долг ({format_currency(current_debt)})",
                         },
                         status=400,
                     )
@@ -1494,7 +1738,7 @@ def close_shift(request):
                 if new_paid > old:
                     payment_amount = new_paid - old
                     percentage = (new_paid / order.amount) * 100 if order.amount else 0
-                    message = f"По заказу №{order.id} поступил платеж в размере {format_currency(payment_amount)} р. Оплачено {percentage:.2f}%."
+                    message = f"По заказу №{order.id} поступил платеж в размере {format_currency(payment_amount)}. Оплачено {percentage:.2f}%."
                     client_id = order.client.id if order.client else ""
                     product_id = order.product.id if order.product else ""
                     client_object_id = order.client_object.id if order.client_object else ""
@@ -1510,11 +1754,11 @@ def close_shift(request):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
+
 @login_required
 def cash_report_table(request):
     """
-    Рендерит страницу отчета денежных средств и передает в контекст готовую таблицу (HTML).
-    Параметр year можно передать GET-параметром.
+    Render cash report table.
     """
     year = int(request.GET.get("year", timezone.now().year))
     months = [
@@ -1524,8 +1768,8 @@ def cash_report_table(request):
 
     fields = [{"name": "category", "verbose_name": "Категория"}]
     for i, mname in enumerate(months, start=1):
-        fields.append({"name": f"m{i}", "verbose_name": mname, "is_number": True})
-    fields.append({"name": "total", "verbose_name": "Итого", "is_number": True})
+        fields.append({"name": f"m{i}", "verbose_name": mname, "is_number": True, "is_currency": True})
+    fields.append({"name": "total", "verbose_name": "Итого", "is_number": True, "is_currency": True})
 
     incomes = list(TransactionCategory.objects.filter(type="income").order_by("name"))
     expenses = list(TransactionCategory.objects.filter(type="expense").order_by("name"))
@@ -1583,3 +1827,100 @@ def cash_report_table(request):
         "data": rows,
     }
     return render(request, "ledger/cash_report.html", context)
+
+
+@login_required
+def enterprise_economy_report(request):
+    """
+    Render enterprise economy report.
+    """
+    year = int(request.GET.get("year", timezone.now().year))
+    months = [
+        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+    ]
+
+    fields = [{"name": "category", "verbose_name": "Категория"}]
+    for i, mname in enumerate(months, start=1):
+        fields.append({"name": f"m{i}", "verbose_name": mname, "is_number": True, "is_currency": True})
+    fields.append({"name": "total", "verbose_name": "Итого", "is_number": True, "is_currency": True})
+
+    incomes = list(TransactionCategory.objects.filter(type="income").exclude(name="Возврат от поставщиков").order_by("name"))
+    refund_category = TransactionCategory.objects.filter(type="income", name="Возврат от поставщиков").first()
+
+    rows = []
+    monthly_totals = [0] * 12
+    grand_total = 0
+
+    for cat in incomes:
+        month_values = []
+        row_total = 0
+        for m in range(1, 13):
+            s = (
+                Transaction.objects.filter(
+                    category=cat,
+                    report_date__year=year,
+                    report_date__month=m,
+                    completed_date__isnull=False
+                )
+                .aggregate(total=Sum("amount"))["total"]
+                or 0
+            )
+            val = float(s)
+            month_values.append(val)
+            row_total += val
+            monthly_totals[m - 1] += val
+        grand_total += row_total
+
+        row = {"category": cat.name}
+        for idx, v in enumerate(month_values, start=1):
+            row[f"m{idx}"] = format_currency(v)
+        row["total"] = format_currency(row_total)
+        rows.append(SimpleNamespace(**row))
+
+    total_row = {"category": "Итого"}
+    for idx, v in enumerate(monthly_totals, start=1):
+        total_row[f"m{idx}"] = format_currency(v)
+    total_row["total"] = format_currency(grand_total)
+    rows.append(SimpleNamespace(**total_row))
+
+    if refund_category:
+        month_values = []
+        row_total = 0
+        for m in range(1, 13):
+            s = (
+                Transaction.objects.filter(
+                    refund_category,
+                    report_date__year=year,
+                    report_date__month=m,
+                    completed_date__isnull=False
+                )
+                .aggregate(total=Sum("amount"))["total"]
+                or 0
+            )
+            val = float(s)
+            month_values.append(val)
+            row_total += val
+
+        row = {"category": refund_category.name}
+        for idx, v in enumerate(month_values, start=1):
+            row[f"m{idx}"] = format_currency(v)
+        row["total"] = format_currency(row_total)
+        rows.append(SimpleNamespace(**row))
+
+    table_html = render_to_string(
+        "components/table.html",
+        {
+            "fields": fields,
+            "data": rows,
+            "id": "enterprise-economy-table",
+        },
+    )
+
+    context = {
+        "year": year,
+        "table_html": table_html,
+        "fields": fields,
+        "data": rows,
+    }
+    return render(request, "ledger/enterprise_economy_report.html", context)

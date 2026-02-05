@@ -982,6 +982,7 @@ def order_documents_table(request, pk: int):
         {"name": "file_display", "verbose_name": "Файл"},
         {"name": "uploaded", "verbose_name": "Загружен", "is_date": True},
         {"name": "size_display", "verbose_name": "Размер"},
+        {"name": "comment", "verbose_name": "Комментарий"},
     ]
 
     html = render_to_string(
@@ -1013,6 +1014,7 @@ def document_upload(request):
             uploaded_file = request.FILES.get("file")
             order_id = request.POST.get("order") or request.POST.get("order_id")
             file_type_id = request.POST.get("file_type")
+            comment = (request.POST.get("comment") or "").strip() 
 
             desired_name = (request.POST.get("filename") or request.POST.get("name") or "").strip()
 
@@ -1047,7 +1049,7 @@ def document_upload(request):
             if Document.objects.filter(order=order, name=final_name).exists():
                 return JsonResponse({"status": "error", "message": "Файл с таким именем уже существует в заказе"}, status=400)
 
-            doc = Document(user=request.user, order=order, file_type=file_type)
+            doc = Document(user=request.user, order=order, file_type=file_type, comment=comment)
 
             if hasattr(doc, "store_file") and callable(getattr(doc, "store_file")):
                 doc = doc.store_file(uploaded_file, replace_existing=True)
@@ -1102,6 +1104,7 @@ def document_upload(request):
                 {"name": "file_display", "verbose_name": "Файл"},
                 {"name": "uploaded", "verbose_name": "Загружен", "is_date": True},
                 {"name": "size_display", "verbose_name": "Размер"},
+                {"name": "comment", "verbose_name": "Комментарий"},
             ]
 
             html = render_to_string("components/table_row.html", {"item": doc, "fields": fields})
@@ -1116,6 +1119,7 @@ def document_upload(request):
             )
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
 
 @login_required
 @require_http_methods(["POST"])
@@ -1631,6 +1635,18 @@ def order_add_viewers(request, pk: int):
         users = User.objects.filter(id__in=viewers_ids)
         order.viewers.set(users)
 
+        notifications = [
+            Notification(
+                user=user,
+                message=f"Вы были добавлены к заказу #{order.id}",
+                url=f"/orders/{order.id}/",  # TODO: проверить ссылку # по типу пользователя фильтровать route
+                type="order_viewer",
+                order=order
+            )
+            for user in users
+        ]
+        Notification.objects.bulk_create(notifications) 
+
         fields = [
             {"name": "id", "verbose_name": "ID"},
             {"name": "username", "verbose_name": "Логин"},
@@ -1649,7 +1665,6 @@ def order_add_viewers(request, pk: int):
         })
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
-    
 
 @login_required
 def kanban_board(request):
@@ -1868,6 +1883,8 @@ def document_rename(request, pk: int):
     try:
         doc = get_object_or_404(Document, id=pk)
         new_name_raw = (request.POST.get("name") or "").strip()
+        new_comment = (request.POST.get("comment") or "").strip()
+
         if not new_name_raw:
             return JsonResponse({"status": "error", "message": "Не указано новое имя файла"}, status=400)
 
@@ -1900,7 +1917,7 @@ def document_rename(request, pk: int):
             dirpath = os.path.dirname(old_file_name)
             new_path = os.path.join(dirpath, new_filename) if dirpath else new_filename
 
-            if default_storage.exists(new_path):
+            if new_path != old_file_name and default_storage.exists(new_path):
                 return JsonResponse({"status": "error", "message": "Файл с таким именем уже существует"}, status=400)
 
             try:
@@ -1920,6 +1937,7 @@ def document_rename(request, pk: int):
 
                     doc.file.name = new_path
                     doc.name = os.path.basename(new_path)
+                    doc.comment = new_comment  
                     try:
                         doc.size = default_storage.size(new_path)
                     except Exception:
@@ -1928,8 +1946,8 @@ def document_rename(request, pk: int):
                         doc.url = default_storage.url(new_path)
                     except Exception:
                         pass
-                    doc.save(update_fields=["file", "name", "size", "url"])
-                    return JsonResponse({"status": "success", "id": doc.id, "name": doc.name, "url": getattr(doc, "url", "")})
+                    doc.save(update_fields=["file", "name", "size", "url", "comment"])  # Обновляем поле comment
+                    return JsonResponse({"status": "success", "id": doc.id, "name": doc.name, "comment": doc.comment, "url": getattr(doc, "url", "")})
 
                 data = None
                 try:
@@ -1956,6 +1974,7 @@ def document_rename(request, pk: int):
 
                 doc.file.name = new_path
                 doc.name = os.path.basename(new_path)
+                doc.comment = new_comment
                 try:
                     doc.size = len(data)
                 except Exception:
@@ -1964,18 +1983,19 @@ def document_rename(request, pk: int):
                     doc.url = getattr(doc.file, "url", None)
                 except Exception:
                     pass
-                doc.save(update_fields=["file", "name", "size", "url"])
-                return JsonResponse({"status": "success", "id": doc.id, "name": doc.name, "url": getattr(doc, "url", "")})
-            
+                doc.save(update_fields=["file", "name", "size", "url", "comment"])  # Обновляем поле comment
+                return JsonResponse({"status": "success", "id": doc.id, "name": doc.name, "comment": doc.comment, "url": getattr(doc, "url", "")})
 
             except Exception as e:
                 return JsonResponse({"status": "error", "message": str(e)}, status=500)
         else:
             doc.name = new_filename
-            doc.save(update_fields=["name"])
-            return JsonResponse({"status": "success", "id": doc.id, "name": doc.name})
+            doc.comment = new_comment 
+            doc.save(update_fields=["name", "comment"])  
+            return JsonResponse({"status": "success", "id": doc.id, "name": doc.name, "comment": doc.comment})
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
 
 @login_required
 @require_http_methods(["POST"])

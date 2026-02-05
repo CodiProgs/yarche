@@ -4,19 +4,21 @@ from . import views
 app_name = "ledger"
 
 urlpatterns = [
-	path('current_shift/', views.current_shift, name='current_shift'),
-    path('transactions/', views.transactions, name='transactions'),
-	path('transactions/all/', views.all_transactions, name='all_transactions'),
+    # Основные страницы
+    path("current_shift/", views.current_shift, name="current_shift"),
+    path("transactions/", views.transactions, name="transactions"),
+    path("transactions/all/", views.all_transactions, name="all_transactions"),
     path(
         "transactions/table/",
         views.all_transactions_table,
         name="all_transactions_table",
     ),
-	path("cash-report/table/", views.cash_report_table, name="cash_report_table"),
-    path('bank-accounts/', views.bank_accounts, name='bank-accounts'),
-    path('transaction-categories/', views.transaction_categories, name='transaction-categories'),
-    path('payments/', views.payments, name='payments'),
-    # 
+    path("cash-report/table/", views.cash_report_table, name="cash_report_table"),
+    path("bank-accounts/", views.bank_accounts, name="bank-accounts"),
+    path("transaction-categories/", views.transaction_categories, name="transaction-categories"),
+    path("payments/", views.payments, name="payments"),
+
+    # Bank accounts
     path("bank-accounts/types/", views.bank_account_types, name="bank_account_types"),
     path("bank-accounts/list/", views.bank_account_list, name="bank_account_list"),
     path(
@@ -45,6 +47,8 @@ urlpatterns = [
         views.bank_accounts_balances,
         name="bank_accounts_balances",
     ),
+
+    # Transaction categories
     path(
         "transaction-categories/list/",
         views.transaction_category_list,
@@ -75,6 +79,8 @@ urlpatterns = [
         views.refresh_transaction_categories,
         name="refresh_transaction_categories",
     ),
+
+    # Transactions
     path("transaction-types/", views.transaction_types, name="transaction_types"),
     path("transactions/list/", views.transaction_list, name="transaction_list"),
     path("transactions/add/", views.transaction_create, name="transaction_create"),
@@ -84,7 +90,7 @@ urlpatterns = [
         views.transaction_update,
         name="transaction_update",
     ),
-	path(
+    path(
         "transactions/closed/edit/<int:pk>/",
         views.closed_transaction_update,
         name="closed_transaction_update",
@@ -94,6 +100,13 @@ urlpatterns = [
         views.transaction_delete,
         name="transaction_delete",
     ),
+    path(
+        "transactions/closed/delete/<int:pk>/",
+        views.closed_transaction_delete,
+        name="closed_transaction_delete",
+    ),
+
+    # Transfers and payments
     path("transfers/add/", views.transfer_create, name="transfer_create"),
     path(
         "order-payments/add/",
@@ -110,9 +123,12 @@ urlpatterns = [
         views.client_balance_payment,
         name="client_balance_payment",
     ),
+
+    # Other
+    path("close-shift/", views.close_shift, name="close_shift"),
     path(
-        "close-shift/",
-        views.close_shift,
-        name="close_shift",
+        "enterprise-economy-report/",
+        views.enterprise_economy_report,
+        name="enterprise_economy_report",
     ),
 ]

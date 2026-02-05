@@ -3,6 +3,29 @@
 {% block content %}
     <div class="page-table-container" id="all_transaction-container">
         {% include "components/table.html" with id="all_transaction-table" fields=fields data=data is_grouped=is_grouped %}
+        <div id="context-menu"
+            class="dropdown-menu"
+            data-is-admin="{% if request.user.user_type and request.user.user_type.name == 'Администратор' %}true{% else %}false{% endif %}">
+            {% if request.user.user_type.name == 'Администратор' %}
+                <a class="dropdown-item context-action"
+                id="add-button"
+                data-action="add">Добавить</a>
+                <a class="dropdown-item context-action"
+                id="edit-button"
+                data-action="edit">Редактировать</a>
+                <a class="dropdown-item context-action"
+                id="delete-button"
+                data-action="delete">Удалить</a>
+            {% endif %}
+            <div class="dropdown-divider">
+            </div>
+            <a class="dropdown-item context-action"
+               id="hide-button"
+               data-action="hide">Скрыть</a>
+            <a class="dropdown-item context-action"
+               id="show-all-button"
+               data-action="show-all">Показать все</a>
+        </div>
         <div class="pagination-controls">
             <button class="pagination-button"
                     id="first-page"
@@ -49,5 +72,6 @@
 {% endblock content %}
 {% block extra_scripts %}
     {{ block.super }}
-    <script src="{% static 'ledger/js/ledger.js' %}" type="module"></script>
+    <script src="{% static 'ledger/js/ledger2.js' %}" type="module"></script>
+    <script src="{% static 'js/autonumeric.js' %}" defer></script>
 {% endblock extra_scripts %}

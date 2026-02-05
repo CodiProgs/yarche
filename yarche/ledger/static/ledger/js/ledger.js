@@ -105,7 +105,7 @@ const addMenuHandler = () => {
 	if (menu) {
 		document.addEventListener('contextmenu', function (e) {
 			const row = e.target.closest(
-				'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+				'tbody tr:not(.table__row--summary):not(.table__row--empty)',
 			)
 
 			const table = e.target.closest('table')
@@ -149,11 +149,11 @@ const addMenuHandler = () => {
 						settleDebtButton.style.display = 'none'
 					} else if (table.id === 'investors-table') {
 						const selectedCell = document.querySelector(
-							'td.table__cell--selected'
+							'td.table__cell--selected',
 						)
 						if (selectedCell) {
 							const cellIndex = Array.from(
-								selectedCell.parentNode.children
+								selectedCell.parentNode.children,
 							).indexOf(selectedCell)
 							const th = table.querySelectorAll('thead th')[cellIndex]
 							const colName = th ? th.dataset.name : null
@@ -244,7 +244,7 @@ const addMenuHandler = () => {
 				if (
 					h4 &&
 					['Оборудование', 'Кредит', 'Краткосрочные обязательства'].includes(
-						h4.textContent.trim()
+						h4.textContent.trim(),
 					)
 				) {
 					if (settleDebtButton) {
@@ -290,7 +290,7 @@ const addMenuHandler = () => {
 					touchTimer = null
 				}, LONG_PRESS_DELAY)
 			},
-			{ passive: true }
+			{ passive: true },
 		)
 
 		document.addEventListener(
@@ -301,7 +301,7 @@ const addMenuHandler = () => {
 					touchTimer = null
 				}
 			},
-			{ passive: true }
+			{ passive: true },
 		)
 
 		document.addEventListener(
@@ -312,7 +312,7 @@ const addMenuHandler = () => {
 					touchTimer = null
 				}
 			},
-			{ passive: true }
+			{ passive: true },
 		)
 
 		document.addEventListener('click', () => {
@@ -324,17 +324,18 @@ const addMenuHandler = () => {
 const parseNumeric = text => {
 	if (text === null || typeof text === 'undefined') return 0
 	const cleaned = String(text)
-		.replace(/[^\d,-]/g, '')
+		.replace(' р.', '')
+		.replace(/\s/g, '')
 		.replace(',', '.')
-	return parseFloat(cleaned) || 0
+	return Math.round(parseFloat(cleaned) || 0)
 }
 
 const formatCurrency = (value, withSuffix = true) => {
-	const numericValue =
-		typeof value === 'string' ? parseNumeric(value) : Number(value)
-	const formatted = (numericValue || 0)
-		.toFixed(2)
-		.replace('.', ',')
+	const numericValue = Math.round(
+		typeof value === 'string' ? parseNumeric(value) : Number(value),
+	)
+	const formatted = numericValue
+		.toString()
 		.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 	return withSuffix ? formatted + CURRENCY_SUFFIX : formatted
 }
@@ -359,7 +360,7 @@ const initDatePicker = (inputSelector, iconSelector, defaultDateStr) => {
 
 	if (!inputElement || !iconElement) {
 		console.warn(
-			`Date picker elements not found for: ${inputSelector} / ${iconSelector}`
+			`Date picker elements not found for: ${inputSelector} / ${iconSelector}`,
 		)
 		return null
 	}
@@ -405,14 +406,14 @@ const setupCurrencyInput = inputId => {
 	}
 
 	const anElement = new AutoNumeric(input, {
-		allowDecimalPadding: true,
-		alwaysAllowDecimalCharacter: true,
+		allowDecimalPadding: false,
+		alwaysAllowDecimalCharacter: false,
 		currencySymbol: CURRENCY_SUFFIX,
 		currencySymbolPlacement: 's',
 		decimalCharacter: ',',
 		decimalCharacterAlternative: '.',
-		decimalPlacesRawValue: 2,
-		decimalPlaces: 2,
+		decimalPlacesRawValue: 0,
+		decimalPlaces: 0,
 		digitGroupSeparator: ' ',
 		emptyInputBehavior: 'null',
 		minimumValue: '0',
@@ -426,12 +427,12 @@ const setupCurrencyInput = inputId => {
 
 const findAndUpdateBankAccountRow = (accountName, amountChange) => {
 	const bankAccountsTable = document.getElementById(
-		'transactions-bank-accounts-table'
+		'transactions-bank-accounts-table',
 	)
 	if (!bankAccountsTable) return
 
 	const accountRow = Array.from(
-		bankAccountsTable.querySelectorAll('tbody tr:not(.table__row--summary)')
+		bankAccountsTable.querySelectorAll('tbody tr:not(.table__row--summary)'),
 	).find(row => {
 		const accountCell = row.querySelector('td:first-child')
 		return accountCell?.textContent?.trim() === accountName
@@ -452,18 +453,18 @@ const findAndUpdateBankAccountRow = (accountName, amountChange) => {
 
 	const currentShift = parseNumeric(accountCells[2]?.textContent) || 0
 	const newShift = currentShift + (Number(amountChange) || 0)
-	accountCells[2].textContent = formatCurrency(newShift, false)
-	accountCells[3].textContent = formatCurrency(baseBalance + newShift, false)
+	accountCells[2].textContent = formatCurrency(newShift, true)
+	accountCells[3].textContent = formatCurrency(baseBalance + newShift, true)
 }
 
 const recomputeBankAccountsFromTransactions = () => {
 	const bankAccountsTable = document.getElementById(
-		'transactions-bank-accounts-table'
+		'transactions-bank-accounts-table',
 	)
 	if (!bankAccountsTable) return
 
 	const accountRows = Array.from(
-		bankAccountsTable.querySelectorAll('tbody tr:not(.table__row--summary)')
+		bankAccountsTable.querySelectorAll('tbody tr:not(.table__row--summary)'),
 	)
 
 	const baseMap = {}
@@ -491,20 +492,19 @@ const recomputeBankAccountsFromTransactions = () => {
 			const cells = row.querySelectorAll('td')
 			const accountName = cells[0]?.textContent?.trim()
 			const base = baseMap[accountName] || 0
-			cells[2].textContent = formatCurrency(0, false)
-
-			cells[3].textContent = formatCurrency(base, false)
+			cells[2].textContent = formatCurrency(0, true)
+			cells[3].textContent = formatCurrency(base, true)
 		})
 		TableManager.calculateTableSummary(
 			'transactions-bank-accounts-table',
 			['balance', 'shift_amount', 'total_amount'],
-			{ grouped: true, total: true }
+			{ grouped: true, total: true },
 		)
 		return
 	}
 
 	const transactionRows = Array.from(
-		transactionsTable.querySelectorAll('tbody tr:not(.table__row--summary)')
+		transactionsTable.querySelectorAll('tbody tr:not(.table__row--summary)'),
 	)
 	transactionRows.forEach(tr => {
 		const cells = tr.querySelectorAll('td')
@@ -525,10 +525,10 @@ const recomputeBankAccountsFromTransactions = () => {
 		const base = baseMap[accountName] || 0
 		const shift = shiftMap[accountName] || 0
 		if (cells[2] && cells[3]) {
-			cells[2].textContent = formatCurrency(shift, false)
+			cells[2].textContent = formatCurrency(shift, true)
 			cells[3].textContent = formatCurrency(
 				shift + parseNumeric(cells[1].textContent),
-				false
+				true,
 			)
 		}
 	})
@@ -536,7 +536,7 @@ const recomputeBankAccountsFromTransactions = () => {
 	TableManager.calculateTableSummary(
 		'transactions-bank-accounts-table',
 		['balance', 'shift_amount', 'total_amount'],
-		{ grouped: true, total: true }
+		{ grouped: true, total: true },
 	)
 }
 
@@ -550,14 +550,14 @@ const updateBankAccountSummaryAfterEdit = (
 	outgoingPreviousAccountName,
 	outgoingPreviousAmount,
 	incomingPreviousAccountName = null,
-	incomingPreviousAmount = null
+	incomingPreviousAmount = null,
 ) => {
 	recomputeBankAccountsFromTransactions()
 }
 
 const updateBankAccountSummaryAfterDelete = (
 	transactionRow,
-	relatedTransactionRow = null
+	relatedTransactionRow = null,
 ) => {
 	if (transactionRow) transactionRow.remove()
 	if (relatedTransactionRow) relatedTransactionRow.remove()
@@ -571,7 +571,7 @@ const initTransactionForm = async (config, editId = null) => {
 	await formHandler.init(editId)
 
 	const formElement = document.getElementById(
-		config.formId || 'transactions-form'
+		config.formId || 'transactions-form',
 	)
 	if (formElement) {
 		const amountInput = formElement.querySelector('#amount')
@@ -582,7 +582,7 @@ const initTransactionForm = async (config, editId = null) => {
 		console.warn(
 			`Form with id "${
 				config.formId || 'transactions-form'
-			}" not found during initTransactionForm.`
+			}" not found during initTransactionForm.`,
 		)
 	}
 
@@ -596,14 +596,14 @@ const handleTransactionSuccess = async (
 	outgoingPreviousAccountName = null,
 	outgoingPreviousAmount = null,
 	incomingPreviousAccountName = null,
-	incomingPreviousAmount = null
+	incomingPreviousAmount = null,
 ) => {
 	const processTableRow = async (transactionData, targetTableId, wasEdit) => {
 		const method = wasEdit ? 'updateTableRow' : 'addTableRow'
 
 		const processedRow = await TableManager[method](
 			transactionData,
-			targetTableId
+			targetTableId,
 		)
 		if (processedRow) {
 			processedRow.setAttribute('data-id', transactionData.id)
@@ -611,7 +611,7 @@ const handleTransactionSuccess = async (
 		} else {
 			console.warn(
 				`TableManager.${method} did not return a row for data:`,
-				transactionData
+				transactionData,
 			)
 		}
 		return processedRow
@@ -625,7 +625,7 @@ const handleTransactionSuccess = async (
 					result.id,
 					null,
 					outgoingPreviousAccountName,
-					outgoingPreviousAmount
+					outgoingPreviousAmount,
 				)
 			} else {
 				updateBankAccountSummaryAfterAdd(false)
@@ -640,7 +640,7 @@ const handleTransactionSuccess = async (
 					outgoingPreviousAccountName,
 					outgoingPreviousAmount,
 					incomingPreviousAccountName,
-					incomingPreviousAmount
+					incomingPreviousAmount,
 				)
 			} else {
 				updateBankAccountSummaryAfterAdd(true)
@@ -657,7 +657,7 @@ const handleTransactionSuccess = async (
 					result.id,
 					null,
 					outgoingPreviousAccountName,
-					outgoingPreviousAmount
+					outgoingPreviousAmount,
 				)
 			} else {
 				updateBankAccountSummaryAfterAdd(false)
@@ -665,210 +665,25 @@ const handleTransactionSuccess = async (
 		} else {
 			console.error('Unknown transaction success result structure:', result)
 			showError(
-				'Не удалось обработать ответ сервера после сохранения транзакции.'
+				'Не удалось обработать ответ сервера после сохранения транзакции.',
 			)
 			return
 		}
 
 		TableManager.calculateTableSummary(tableId, ['amount'])
+		colorizeTableAmounts(tableId)
 	} catch (error) {
 		console.error('Error handling transaction success:', error)
 		showError('Произошла ошибка при обновлении таблицы после сохранения.')
 	}
 }
 
-const fetchOrderDebt = async (orderId, currentPaymentAmount = 0) => {
-	if (!orderId) return null
-
-	const loader = createLoader()
-	document.body.appendChild(loader)
-	let debtValue = null
-	try {
-		const response = await fetch(`/commerce/orders/${orderId}/debt/`)
-		if (!response.ok) {
-			throw new Error(`Server responded with status: ${response.status}`)
-		}
-		const data = await response.json()
-
-		debtValue = parseFloat(data.debt) + Number(currentPaymentAmount)
-	} catch (error) {
-		console.error('Error fetching order debt:', error)
-		showError('Не удалось загрузить долг по заказу.')
-	} finally {
-		loader.remove()
-	}
-	return debtValue
-}
-
-const displayOrderDebt = (inputId, debtValue) => {
-	const debtAmountInput = document.getElementById(inputId)
-	if (debtAmountInput) {
-		debtAmountInput.value =
-			debtValue !== null && !isNaN(debtValue)
-				? formatCurrency(debtValue)
-				: DEFAULT_CURRENCY_VALUE
-	}
-}
-
-const updateClientOrdersList = async (
-	clientId,
-	selectElement,
-	isFirstLoad = false,
-	targetOrderId = null
+const editTransactionForAll = async (
+	transactionId,
+	row,
+	tableId,
+	closed = false,
 ) => {
-	if (!selectElement) {
-		console.error('updateClientOrdersList: selectElement not provided.')
-		return
-	}
-	const selectParent = selectElement.closest('.select')
-	if (!selectParent) {
-		console.error(
-			'updateClientOrdersList: Could not find .select parent for',
-			selectElement
-		)
-		return
-	}
-
-	const selectInput = selectParent.querySelector('.select__input')
-	const selectText = selectParent.querySelector('.select__text')
-
-	if (selectInput) selectInput.value = ''
-	if (selectText) selectText.textContent = 'Загрузка заказов...'
-
-	const loader = createLoader()
-	document.body.appendChild(loader)
-	try {
-		const url = `/commerce/orders/ids/?client=${clientId}${
-			targetOrderId ? `&order=${targetOrderId}` : ''
-		}`
-		const response = await fetch(url, {
-			headers: { 'X-Requested-With': 'XMLHttpRequest' },
-		})
-		if (!response.ok) {
-			throw new Error(`Ошибка загрузки заказов: ${response.status}`)
-		}
-		const data = await response.json()
-
-		if (isFirstLoad) {
-			await SelectHandler.setupSelects({ data: data, select: selectParent })
-		} else {
-			SelectHandler.updateSelectOptions(selectParent, data)
-		}
-
-		if (targetOrderId) {
-			await new Promise(resolve => setTimeout(resolve, 50))
-
-			let foundAndSelected = false
-
-			const options = selectParent.querySelectorAll('.select__option')
-			for (const option of options) {
-				if (option.dataset.value === String(targetOrderId)) {
-					option.click()
-					foundAndSelected = true
-					break
-				}
-			}
-
-			if (
-				!foundAndSelected &&
-				selectInput &&
-				selectInput.value !== String(targetOrderId)
-			) {
-				const targetOrderItem = data.find(
-					item => String(item.id) === String(targetOrderId)
-				)
-				if (targetOrderItem) {
-					selectInput.value = targetOrderItem.id
-					if (selectText)
-						selectText.textContent =
-							targetOrderItem.name || `Заказ #${targetOrderItem.id}`
-					foundAndSelected = true
-				}
-			}
-
-			if (!foundAndSelected) {
-				console.warn(
-					`Target order ID ${targetOrderId} not found in fetched list for client ${clientId}.`
-				)
-				if (selectText)
-					selectText.textContent =
-						data.length > 0 ? 'Выберите заказ' : 'Нет заказов'
-			}
-		} else {
-			if (selectText)
-				selectText.textContent =
-					data.length > 0 ? 'Выберите заказ' : 'Нет заказов'
-		}
-	} catch (error) {
-		console.error('Ошибка получения данных для select (заказы):', error)
-		showError('Не удалось загрузить список заказов.')
-		if (selectText) selectText.textContent = 'Ошибка загрузки'
-	} finally {
-		loader.remove()
-
-		displayOrderDebt('debt_amount', null)
-	}
-}
-
-const setIds = (ids, tableId) => {
-	const tableRows = document.querySelectorAll(
-		`#${tableId} tbody tr:not(.table__row--summary)`
-	)
-	if (!tableRows || tableRows.length === 0 || !ids || ids.length === 0) {
-		return
-	}
-	if (tableRows.length !== ids.length) {
-		console.error('Количество строк не совпадает с количеством ID')
-	} else {
-		tableRows.forEach((row, index) => {
-			row.setAttribute('data-id', ids[index])
-		})
-	}
-}
-
-const deleteTransaction = (transactionId, row) => {
-	showQuestion(
-		'Вы действительно хотите удалить запись?',
-		'Удаление',
-		async () => {
-			const loader = createLoader()
-			document.body.appendChild(loader)
-			let relatedRow = null
-			try {
-				const data = await TableManager.sendDeleteRequest(
-					transactionId,
-					'/ledger/transactions/delete/',
-					'transactions-table'
-				)
-				if (data?.status === 'success') {
-					const relatedTransactionId = data.related_transaction_id
-					if (relatedTransactionId) {
-						relatedRow = TableManager.getRowById(
-							relatedTransactionId,
-							'transactions-table'
-						)
-					}
-
-					updateBankAccountSummaryAfterDelete(row, relatedRow)
-
-					showSuccess('Запись успешно удалена')
-				} else {
-					console.error(
-						'Deletion failed or did not return success:',
-						data?.message
-					)
-				}
-			} catch (error) {
-				console.error('Error during deleteTransaction process:', error)
-				showError('Произошла ошибка при удалении.')
-			} finally {
-				loader.remove()
-			}
-		}
-	)
-}
-
-const editTransaction = async (transactionId, row, tableId, closed = false) => {
 	const table = document.getElementById(tableId)
 	if (!table) {
 		console.error(`Таблица с id "${tableId}" не найдена`)
@@ -882,20 +697,20 @@ const editTransaction = async (transactionId, row, tableId, closed = false) => {
 	if (typeHeaderIndex === -1) {
 		console.error('Не найден столбец с типом транзакции (data-name="type")')
 		showError(
-			'Ошибка: Не удалось определить тип транзакции для редактирования.'
+			'Ошибка: Не удалось определить тип транзакции для редактирования.',
 		)
 		return
 	}
 
 	const cells = row.querySelectorAll('td')
-	const outgoingPreviousAccountName = cells[1]?.textContent?.trim()
-	const outgoingPreviousAmount = parseNumeric(cells[2]?.textContent)
+	const outgoingPreviousAccountName = cells[3]?.textContent?.trim()
+	const outgoingPreviousAmount = parseNumeric(cells[4]?.textContent)
 
 	const typeCell = cells[typeHeaderIndex]
 	if (!typeCell) {
 		console.error('Не найдена ячейка с типом транзакции в строке.')
 		showError(
-			'Ошибка: Не удалось определить тип транзакции для редактирования.'
+			'Ошибка: Не удалось определить тип транзакции для редактирования.',
 		)
 		return
 	}
@@ -906,27 +721,28 @@ const editTransaction = async (transactionId, row, tableId, closed = false) => {
 	let incomingPreviousAmount = null
 
 	if (typeValue === 'Перевод между счетами') {
-		const transactionsTable = document.getElementById('transactions-table')
+		const transactionsTable = document.getElementById(tableId)
 		const rows = Array.from(
-			transactionsTable.querySelectorAll('tbody tr:not(.table__row--summary)')
+			transactionsTable.querySelectorAll('tbody tr:not(.table__row--summary)'),
 		)
 		const incomingRow = rows.find(
 			r =>
 				r !== row &&
 				r.querySelector('td[data-name="type"]')?.textContent?.trim() ===
-					'Перевод между счетами'
+					'Перевод между счетами',
 		)
 		if (incomingRow) {
 			const incomingCells = incomingRow.querySelectorAll('td')
-			incomingPreviousAccountName = incomingCells[1]?.textContent?.trim()
-			incomingPreviousAmount = parseNumeric(incomingCells[2]?.textContent)
+			incomingPreviousAccountName = incomingCells[3]?.textContent?.trim()
+			incomingPreviousAmount = parseNumeric(incomingCells[4]?.textContent)
 		}
 	}
 	const closed_url = closed ? 'closed/' : ''
 	let config = {
 		submitUrl: `/ledger/transactions/${closed_url}edit/`,
+		queryParams: { table: 'all' },
 		getUrl: `${BASE_URL}transactions/`,
-		tableId: 'transactions-table',
+		tableId: tableId,
 		formId: 'transactions-form',
 		modalConfig: {
 			url: '',
@@ -937,12 +753,12 @@ const editTransaction = async (transactionId, row, tableId, closed = false) => {
 		onSuccess: async result =>
 			handleTransactionSuccess(
 				result,
-				'transactions-table',
+				tableId,
 				true,
 				outgoingPreviousAccountName,
 				outgoingPreviousAmount,
 				incomingPreviousAccountName,
-				incomingPreviousAmount
+				incomingPreviousAmount,
 			),
 		dataUrls: [],
 	}
@@ -1022,15 +838,21 @@ const editTransaction = async (transactionId, row, tableId, closed = false) => {
 		await initTransactionForm(config, transactionId)
 
 		const formElement = document.getElementById(
-			config.formId || 'transactions-form'
+			config.formId || 'transactions-form',
 		)
 		if (!formElement) {
 			console.error(
-				`Form element "${
-					config.formId || 'transactions-form'
-				}" not found after init.`
+				`Form element "${config.formId || 'transactions-form'}" not found after init.`,
 			)
 			return
+		}
+
+		const reportDateInput = formElement.querySelector('#report_date')
+		if (reportDateInput) {
+			const reportDateGroup = reportDateInput.closest('.modal-form__group')
+			if (reportDateGroup) {
+				reportDateGroup.style.display = 'block'
+			}
 		}
 
 		if (typeValue === 'Оплата заказа') {
@@ -1053,10 +875,10 @@ const editTransaction = async (transactionId, row, tableId, closed = false) => {
 
 			if (!initialClientIdInput?.value || !initialOrderIdInput?.value) {
 				console.error(
-					'LS Payment Edit: Missing initial client or order ID in the form.'
+					'LS Payment Edit: Missing initial client or order ID in the form.',
 				)
 				showError(
-					'Ошибка: Не удалось получить исходные данные клиента или заказа для редактирования.'
+					'Ошибка: Не удалось получить исходные данные клиента или заказа для редактирования.',
 				)
 				return
 			}
@@ -1065,11 +887,11 @@ const editTransaction = async (transactionId, row, tableId, closed = false) => {
 			const currentPayment = amountInput ? parseNumeric(amountInput.value) : 0
 
 			const tableContainer = formElement.querySelector(
-				'#clients-table--container'
+				'#clients-table--container',
 			)
 			if (!tableContainer) {
 				console.error(
-					"LS Payment Edit: Container '#clients-table--container' not found in the modal."
+					"LS Payment Edit: Container '#clients-table--container' not found in the modal.",
 				)
 				return
 			}
@@ -1082,7 +904,7 @@ const editTransaction = async (transactionId, row, tableId, closed = false) => {
 					`/commerce/clients/balances/?client=${initialClientId}`,
 					{
 						headers: { 'X-Requested-With': 'XMLHttpRequest' },
-					}
+					},
 				)
 				const data = await response.json()
 
@@ -1092,7 +914,7 @@ const editTransaction = async (transactionId, row, tableId, closed = false) => {
 					const newTableElement = TableManager.replaceEntireTable(
 						data.html,
 						'clients-table--container',
-						'clients-table'
+						'clients-table',
 					)
 
 					if (newTableElement) {
@@ -1108,8 +930,8 @@ const editTransaction = async (transactionId, row, tableId, closed = false) => {
 
 							const rows = Array.from(
 								newTableElement.querySelectorAll(
-									'tbody tr:not(.table__row--summary)'
-								)
+									'tbody tr:not(.table__row--summary)',
+								),
 							)
 
 							let initialRowFound = false
@@ -1128,13 +950,13 @@ const editTransaction = async (transactionId, row, tableId, closed = false) => {
 
 							if (!initialRowFound && rows.length > 0 && clientIds.length > 0) {
 								console.warn(
-									`Initial client ${initialClientId} not found in balances table, selecting first.`
+									`Initial client ${initialClientId} not found in balances table, selecting first.`,
 								)
 							}
 
 							newTableElement.addEventListener('click', event => {
 								const row = event.target.closest(
-									'tbody tr:not(.table__row--summary)'
+									'tbody tr:not(.table__row--summary)',
 								)
 								if (!row) return
 
@@ -1150,7 +972,7 @@ const editTransaction = async (transactionId, row, tableId, closed = false) => {
 											selectedClientId,
 											orderSelectElement,
 											false,
-											null
+											null,
 										)
 									}
 								}
@@ -1162,7 +984,7 @@ const editTransaction = async (transactionId, row, tableId, closed = false) => {
 									initialClientId,
 									orderSelectElement,
 									true,
-									initialOrderId
+									initialOrderId,
 								)
 
 								await new Promise(resolve => setTimeout(resolve, 150))
@@ -1187,23 +1009,23 @@ const editTransaction = async (transactionId, row, tableId, closed = false) => {
 								})
 							} else {
 								console.error(
-									"LS Payment Edit: Order select element '#order' not found."
+									"LS Payment Edit: Order select element '#order' not found.",
 								)
 							}
 						} else {
 							console.error(
-								"LS Payment Edit: Client hidden input '#client' not found."
+								"LS Payment Edit: Client hidden input '#client' not found.",
 							)
 						}
 					} else {
 						console.error(
-							'LS Payment Edit: Failed to replace client balances table.'
+							'LS Payment Edit: Failed to replace client balances table.',
 						)
 					}
 				} else {
 					console.error(
 						'LS Payment Edit: Invalid data received for client balances.',
-						data
+						data,
 					)
 					showError('Не удалось загрузить балансы клиентов.')
 				}
@@ -1219,6 +1041,550 @@ const editTransaction = async (transactionId, row, tableId, closed = false) => {
 
 		showError('Не удалось загрузить форму редактирования.')
 	}
+}
+
+const editTransaction = async (transactionId, row, tableId, closed = false) => {
+	const table = document.getElementById(tableId)
+	if (!table) {
+		console.error(`Таблица с id "${tableId}" не найдена`)
+		showError(`Ошибка: Таблица "${tableId}" не найдена.`)
+		return
+	}
+
+	const headers = Array.from(table.querySelectorAll('thead th'))
+	const typeHeaderIndex = headers.findIndex(th => th.dataset.name === 'type')
+
+	if (typeHeaderIndex === -1) {
+		console.error('Не найден столбец с типом транзакции (data-name="type")')
+		showError(
+			'Ошибка: Не удалось определить тип транзакции для редактирования.',
+		)
+		return
+	}
+
+	const cells = row.querySelectorAll('td')
+	const outgoingPreviousAccountName = cells[1]?.textContent?.trim()
+	const outgoingPreviousAmount = parseNumeric(cells[2]?.textContent)
+
+	const typeCell = cells[typeHeaderIndex]
+	if (!typeCell) {
+		console.error('Не найдена ячейка с типом транзакции в строке.')
+		showError(
+			'Ошибка: Не удалось определить тип транзакции для редактирования.',
+		)
+		return
+	}
+
+	const typeValue = typeCell.dataset.value || typeCell.textContent.trim()
+
+	let incomingPreviousAccountName = null
+	let incomingPreviousAmount = null
+
+	if (typeValue === 'Перевод между счетами') {
+		const transactionsTable = document.getElementById('transactions-table')
+		const rows = Array.from(
+			transactionsTable.querySelectorAll('tbody tr:not(.table__row--summary)'),
+		)
+		const incomingRow = rows.find(
+			r =>
+				r !== row &&
+				r.querySelector('td[data-name="type"]')?.textContent?.trim() ===
+					'Перевод между счетами',
+		)
+		if (incomingRow) {
+			const incomingCells = incomingRow.querySelectorAll('td')
+			incomingPreviousAccountName = incomingCells[1]?.textContent?.trim()
+			incomingPreviousAmount = parseNumeric(incomingCells[2]?.textContent)
+		}
+	}
+	const closed_url = closed ? 'closed/' : ''
+	let config = {
+		submitUrl: `/ledger/transactions/${closed_url}edit/`,
+		getUrl: `${BASE_URL}transactions/`,
+		tableId: 'transactions-table',
+		formId: 'transactions-form',
+		modalConfig: {
+			url: '',
+			title: '',
+			context: {},
+		},
+
+		onSuccess: async result =>
+			handleTransactionSuccess(
+				result,
+				'transactions-table',
+				true,
+				outgoingPreviousAccountName,
+				outgoingPreviousAmount,
+				incomingPreviousAccountName,
+				incomingPreviousAmount,
+			),
+		dataUrls: [],
+	}
+
+	switch (typeValue) {
+		case 'Приход':
+			config.dataUrls = [
+				{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
+				{
+					id: 'category',
+					url: `/ledger/${TRANSACTION_CATEGORIES}/list/?type=income`,
+				},
+			]
+			config.modalConfig.url = '/components/ledger/add_transaction/'
+			config.modalConfig.title = 'Редактирование прихода'
+			config.modalConfig.context = { type: 'income' }
+
+			break
+		case 'Расход':
+			config.dataUrls = [
+				{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
+				{
+					id: 'category',
+					url: `/ledger/${TRANSACTION_CATEGORIES}/list/?type=expense`,
+				},
+			]
+			config.modalConfig.url = '/components/ledger/add_transaction/'
+			config.modalConfig.title = 'Редактирование расхода'
+			config.modalConfig.context = { type: 'expense' }
+
+			break
+		case 'Оплата заказа':
+			config.dataUrls = [
+				{
+					id: 'order',
+					url: `/commerce/orders/ids/?transaction=${transactionId}`,
+				},
+				{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
+			]
+			config.modalConfig.url = '/components/ledger/add_order_payment/'
+			config.modalConfig.title = 'Редактирование оплаты заказа'
+
+			break
+		case 'Перевод между счетами':
+			config.dataUrls = [
+				{ id: 'source_bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
+				{
+					id: 'destination_bank_account',
+					url: `/ledger/${BANK_ACCOUNTS}/list/`,
+				},
+			]
+			config.modalConfig.url = '/components/ledger/add_transfer/'
+			config.modalConfig.title = 'Редактирование перевода'
+
+			break
+		case 'Внос на ЛС клиента':
+			config.dataUrls = [
+				{ id: 'client', url: '/commerce/clients/list/' },
+				{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
+			]
+			config.modalConfig.url = '/components/ledger/deposit_client_balance/'
+			config.modalConfig.title = 'Редактирование зачисления на ЛС клиента'
+
+			break
+		case 'Оплата с ЛС клиента':
+			config.modalConfig.url = '/components/ledger/ls_payment/'
+			config.modalConfig.title = 'Редактирование оплаты заказа с ЛС клиента'
+
+			break
+		default:
+			console.error('Неизвестный тип транзакции для редактирования:', typeValue)
+			showError(`Невозможно редактировать транзакцию типа "${typeValue}"`)
+			return
+	}
+
+	try {
+		await initTransactionForm(config, transactionId)
+
+		const formElement = document.getElementById(
+			config.formId || 'transactions-form',
+		)
+		if (!formElement) {
+			console.error(
+				`Form element "${
+					config.formId || 'transactions-form'
+				}" not found after init.`,
+			)
+			return
+		}
+
+		if (typeValue === 'Оплата заказа') {
+			const orderInput = formElement.querySelector('#order')
+			const amountInput = formElement.querySelector('#amount')
+			const debtAmountInput = formElement.querySelector('#debt_amount')
+
+			if (orderInput?.value && amountInput && debtAmountInput) {
+				const currentPayment = parseNumeric(amountInput.value)
+				const debt = await fetchOrderDebt(orderInput.value, currentPayment)
+				displayOrderDebt('debt_amount', debt)
+			}
+		} else if (typeValue === 'Оплата с ЛС клиента') {
+			const debtAmountInput = formElement.querySelector('#debt_amount')
+			if (debtAmountInput) debtAmountInput.value = DEFAULT_CURRENCY_VALUE
+
+			const initialClientIdInput = formElement.querySelector('#client')
+			const initialOrderIdInput = formElement.querySelector('#order')
+			const amountInput = formElement.querySelector('#amount')
+
+			if (!initialClientIdInput?.value || !initialOrderIdInput?.value) {
+				console.error(
+					'LS Payment Edit: Missing initial client or order ID in the form.',
+				)
+				showError(
+					'Ошибка: Не удалось получить исходные данные клиента или заказа для редактирования.',
+				)
+				return
+			}
+			const initialClientId = initialClientIdInput.value
+			const initialOrderId = initialOrderIdInput.value
+			const currentPayment = amountInput ? parseNumeric(amountInput.value) : 0
+
+			const tableContainer = formElement.querySelector(
+				'#clients-table--container',
+			)
+			if (!tableContainer) {
+				console.error(
+					"LS Payment Edit: Container '#clients-table--container' not found in the modal.",
+				)
+				return
+			}
+
+			const loader = createLoader()
+			tableContainer.appendChild(loader)
+
+			try {
+				const response = await fetch(
+					`/commerce/clients/balances/?client=${initialClientId}`,
+					{
+						headers: { 'X-Requested-With': 'XMLHttpRequest' },
+					},
+				)
+				const data = await response.json()
+
+				if (data.html && data.ids) {
+					const clientIds = data.ids
+
+					const newTableElement = TableManager.replaceEntireTable(
+						data.html,
+						'clients-table--container',
+						'clients-table',
+					)
+
+					if (newTableElement) {
+						const inputClient = formElement.querySelector('input[id="client"]')
+
+						if (inputClient) {
+							const selectRow = rowElement => {
+								newTableElement
+									.querySelectorAll('tbody tr.table__row--selected')
+									.forEach(r => r.classList.remove('table__row--selected'))
+								rowElement?.classList.add('table__row--selected')
+							}
+
+							const rows = Array.from(
+								newTableElement.querySelectorAll(
+									'tbody tr:not(.table__row--summary)',
+								),
+							)
+
+							let initialRowFound = false
+							for (let i = 0; i < rows.length; i++) {
+								const clientIdForRow = clientIds[i]?.id
+								if (
+									clientIdForRow &&
+									String(clientIdForRow) === String(initialClientId)
+								) {
+									selectRow(rows[i])
+									inputClient.value = initialClientId
+									initialRowFound = true
+									break
+								}
+							}
+
+							if (!initialRowFound && rows.length > 0 && clientIds.length > 0) {
+								console.warn(
+									`Initial client ${initialClientId} not found in balances table, selecting first.`,
+								)
+							}
+
+							newTableElement.addEventListener('click', event => {
+								const row = event.target.closest(
+									'tbody tr:not(.table__row--summary)',
+								)
+								if (!row) return
+
+								const index = rows.indexOf(row)
+								if (index !== -1 && index < clientIds.length) {
+									const selectedClientId = clientIds[index].id
+									inputClient.value = selectedClientId
+									selectRow(row)
+
+									const orderSelectElement = formElement.querySelector('#order')
+									if (orderSelectElement) {
+										updateClientOrdersList(
+											selectedClientId,
+											orderSelectElement,
+											false,
+											null,
+										)
+									}
+								}
+							})
+
+							const orderSelectElement = formElement.querySelector('#order')
+							if (orderSelectElement) {
+								await updateClientOrdersList(
+									initialClientId,
+									orderSelectElement,
+									true,
+									initialOrderId,
+								)
+
+								await new Promise(resolve => setTimeout(resolve, 150))
+								const finalOrderId =
+									formElement.querySelector('#order')?.value || initialOrderId
+								const debt = await fetchOrderDebt(finalOrderId, currentPayment)
+								displayOrderDebt('debt_amount', debt)
+
+								const orderSelectParent = orderSelectElement.closest('.select')
+								const dropdownElement =
+									orderSelectParent?.querySelector('.select__dropdown')
+								dropdownElement?.addEventListener('click', async event => {
+									if (event.target.classList.contains('select__option')) {
+										const selectedOrderId = event.target.dataset.value
+										if (selectedOrderId) {
+											const debt = await fetchOrderDebt(selectedOrderId, 0)
+											displayOrderDebt('debt_amount', debt)
+										} else {
+											displayOrderDebt('debt_amount', null)
+										}
+									}
+								})
+							} else {
+								console.error(
+									"LS Payment Edit: Order select element '#order' not found.",
+								)
+							}
+						} else {
+							console.error(
+								"LS Payment Edit: Client hidden input '#client' not found.",
+							)
+						}
+					} else {
+						console.error(
+							'LS Payment Edit: Failed to replace client balances table.',
+						)
+					}
+				} else {
+					console.error(
+						'LS Payment Edit: Invalid data received for client balances.',
+						data,
+					)
+					showError('Не удалось загрузить балансы клиентов.')
+				}
+			} catch (error) {
+				console.error('Ошибка при настройке формы Оплаты с ЛС (edit):', error)
+				showError('Произошла ошибка при настройке формы редактирования.')
+			} finally {
+				loader.remove()
+			}
+		}
+	} catch (error) {
+		console.error('Ошибка при инициализации формы редактирования:', error)
+
+		showError('Не удалось загрузить форму редактирования.')
+	}
+}
+
+const fetchOrderDebt = async (orderId, currentPaymentAmount = 0) => {
+	if (!orderId) return null
+
+	const loader = createLoader()
+	document.body.appendChild(loader)
+	let debtValue = null
+	try {
+		const response = await fetch(`/commerce/orders/${orderId}/debt/`)
+		if (!response.ok) {
+			throw new Error(`Server responded with status: ${response.status}`)
+		}
+		const data = await response.json()
+
+		debtValue = parseFloat(data.debt) + Number(currentPaymentAmount)
+	} catch (error) {
+		console.error('Error fetching order debt:', error)
+		showError('Не удалось загрузить долг по заказу.')
+	} finally {
+		loader.remove()
+	}
+	return debtValue
+}
+
+const displayOrderDebt = (inputId, debtValue) => {
+	const debtAmountInput = document.getElementById(inputId)
+	if (debtAmountInput) {
+		debtAmountInput.value =
+			debtValue !== null && !isNaN(debtValue)
+				? formatCurrency(debtValue)
+				: DEFAULT_CURRENCY_VALUE
+	}
+}
+
+const updateClientOrdersList = async (
+	clientId,
+	selectElement,
+	isFirstLoad = false,
+	targetOrderId = null,
+) => {
+	if (!selectElement) {
+		console.error('updateClientOrdersList: selectElement not provided.')
+		return
+	}
+	const selectParent = selectElement.closest('.select')
+	if (!selectParent) {
+		console.error(
+			'updateClientOrdersList: Could not find .select parent for',
+			selectElement,
+		)
+		return
+	}
+
+	const selectInput = selectParent.querySelector('.select__input')
+	const selectText = selectParent.querySelector('.select__text')
+
+	if (selectInput) selectInput.value = ''
+	if (selectText) selectText.textContent = 'Загрузка заказов...'
+
+	const loader = createLoader()
+	document.body.appendChild(loader)
+	try {
+		const url = `/commerce/orders/ids/?client=${clientId}${
+			targetOrderId ? `&order=${targetOrderId}` : ''
+		}`
+		const response = await fetch(url, {
+			headers: { 'X-Requested-With': 'XMLHttpRequest' },
+		})
+		if (!response.ok) {
+			throw new Error(`Ошибка загрузки заказов: ${response.status}`)
+		}
+		const data = await response.json()
+
+		if (isFirstLoad) {
+			await SelectHandler.setupSelects({ data: data, select: selectParent })
+		} else {
+			SelectHandler.updateSelectOptions(selectParent, data)
+		}
+
+		if (targetOrderId) {
+			await new Promise(resolve => setTimeout(resolve, 50))
+
+			let foundAndSelected = false
+
+			const options = selectParent.querySelectorAll('.select__option')
+			for (const option of options) {
+				if (option.dataset.value === String(targetOrderId)) {
+					option.click()
+					foundAndSelected = true
+					break
+				}
+			}
+
+			if (
+				!foundAndSelected &&
+				selectInput &&
+				selectInput.value !== String(targetOrderId)
+			) {
+				const targetOrderItem = data.find(
+					item => String(item.id) === String(targetOrderId),
+				)
+				if (targetOrderItem) {
+					selectInput.value = targetOrderItem.id
+					if (selectText)
+						selectText.textContent =
+							targetOrderItem.name || `Заказ #${targetOrderItem.id}`
+					foundAndSelected = true
+				}
+			}
+
+			if (!foundAndSelected) {
+				console.warn(
+					`Target order ID ${targetOrderId} not found in fetched list for client ${clientId}.`,
+				)
+				if (selectText)
+					selectText.textContent =
+						data.length > 0 ? 'Выберите заказ' : 'Нет заказов'
+			}
+		} else {
+			if (selectText)
+				selectText.textContent =
+					data.length > 0 ? 'Выберите заказ' : 'Нет заказов'
+		}
+	} catch (error) {
+		console.error('Ошибка получения данных для select (заказы):', error)
+		showError('Не удалось загрузить список заказов.')
+		if (selectText) selectText.textContent = 'Ошибка загрузки'
+	} finally {
+		loader.remove()
+
+		displayOrderDebt('debt_amount', null)
+	}
+}
+
+const setIds = (ids, tableId) => {
+	const tableRows = document.querySelectorAll(
+		`#${tableId} tbody tr:not(.table__row--summary)`,
+	)
+	if (!tableRows || tableRows.length === 0 || !ids || ids.length === 0) {
+		return
+	}
+	if (tableRows.length !== ids.length) {
+		console.error('Количество строк не совпадает с количеством ID')
+	} else {
+		tableRows.forEach((row, index) => {
+			row.setAttribute('data-id', ids[index])
+		})
+	}
+}
+
+const deleteTransaction = (transactionId, row) => {
+	showQuestion(
+		'Вы действительно хотите удалить запись?',
+		'Удаление',
+		async () => {
+			const loader = createLoader()
+			document.body.appendChild(loader)
+			let relatedRow = null
+			try {
+				const data = await TableManager.sendDeleteRequest(
+					transactionId,
+					'/ledger/transactions/delete/',
+					'transactions-table',
+				)
+				if (data?.status === 'success') {
+					const relatedTransactionId = data.related_transaction_id
+					if (relatedTransactionId) {
+						relatedRow = TableManager.getRowById(
+							relatedTransactionId,
+							'transactions-table',
+						)
+					}
+
+					updateBankAccountSummaryAfterDelete(row, relatedRow)
+
+					showSuccess('Запись успешно удалена')
+				} else {
+					console.error(
+						'Deletion failed or did not return success:',
+						data?.message,
+					)
+				}
+			} catch (error) {
+				console.error('Error during deleteTransaction process:', error)
+				showError('Произошла ошибка при удалении.')
+			} finally {
+				loader.remove()
+			}
+		},
+	)
 }
 
 const initGenericLedgerPage = pageConfig => {
@@ -1254,7 +1620,7 @@ const initPaymentsPage = async () => {
 	const orderId = getQueryParam('order_id')
 	if (orderId) {
 		const orderInput = document.querySelector(
-			'input[name="order"].create-form__input'
+			'input[name="order"].create-form__input',
 		)
 		if (orderInput) {
 			orderInput.value = orderId
@@ -1282,6 +1648,8 @@ const initPaymentsPage = async () => {
 	} catch (e) {
 		console.error('Error processing restricted user data:', e)
 	}
+
+	colorizeTableAmounts('payments-table')
 }
 
 const initTransactionsPage = () => {
@@ -1301,7 +1669,7 @@ const initTransactionsPage = () => {
 			{ name: 'created' },
 			{ name: 'report_date' },
 		],
-		['amount']
+		['amount'],
 	)
 
 	const today = new Date()
@@ -1311,12 +1679,12 @@ const initTransactionsPage = () => {
 	const startDatePicker = initDatePicker(
 		'#start-date',
 		'.date-filter__icon[data-target="start-date"]',
-		formatDate(sevenDaysAgo)
+		formatDate(sevenDaysAgo),
 	)
 	const endDatePicker = initDatePicker(
 		'#end-date',
 		'.date-filter__icon[data-target="end-date"]',
-		formatDate(today)
+		formatDate(today),
 	)
 
 	const loadButton = document.getElementById('load-data')
@@ -1351,7 +1719,7 @@ const initTransactionsPage = () => {
 		try {
 			const response = await fetch(
 				`${BASE_URL}transactions/list/?start_date=${formattedStartDate}&end_date=${formattedEndDate}&page=${page}`,
-				{ headers: { 'X-Requested-With': 'XMLHttpRequest' } }
+				{ headers: { 'X-Requested-With': 'XMLHttpRequest' } },
 			)
 			const data = await response.json()
 
@@ -1359,6 +1727,7 @@ const initTransactionsPage = () => {
 				TableManager.updateTable(data.html, 'transactions-table')
 
 				TableManager.calculateTableSummary('transactions-table', ['amount'])
+				colorizeTableAmounts('transactions-table')
 
 				const { current_page, total_pages, transaction_ids = [] } = data.context
 
@@ -1381,7 +1750,7 @@ const initTransactionsPage = () => {
 
 				const transactionsTable = document.getElementById('transactions-table')
 				const rows = transactionsTable?.querySelectorAll(
-					'tbody tr:not(.table__row--summary)'
+					'tbody tr:not(.table__row--summary)',
 				)
 
 				if (rows && transaction_ids.length === rows.length) {
@@ -1390,7 +1759,7 @@ const initTransactionsPage = () => {
 					})
 				} else if (rows && transaction_ids.length > 0) {
 					console.warn(
-						'Mismatch between number of rows and transaction IDs received.'
+						'Mismatch between number of rows and transaction IDs received.',
 					)
 				}
 			} else {
@@ -1491,7 +1860,7 @@ const initTransactionsPage = () => {
 				try {
 					const response = await fetch(
 						'/users/check-permission/?permission=edit_closed_transactions',
-						{ headers: { 'X-Requested-With': 'XMLHttpRequest' } }
+						{ headers: { 'X-Requested-With': 'XMLHttpRequest' } },
 					)
 					if (response.ok) {
 						hasPermission = true
@@ -1510,7 +1879,7 @@ const initTransactionsPage = () => {
 						selectedRowId,
 						selectedRow,
 						'transactions-table',
-						true
+						true,
 					)
 				}
 			} else {
@@ -1522,20 +1891,48 @@ const initTransactionsPage = () => {
 	})
 }
 
+function colorizeTableAmounts(tableId) {
+	const table = document.getElementById(tableId)
+	if (!table) return
+
+	const ths = table.querySelectorAll('thead th')
+	let amountIndex = -1
+	ths.forEach((th, idx) => {
+		if (th.dataset.name === 'amount') amountIndex = idx
+	})
+	if (amountIndex === -1) return
+
+	const rows = table.querySelectorAll('tbody tr:not(.table__row--summary)')
+	rows.forEach(row => {
+		const cells = row.querySelectorAll('td')
+		const amountCell = cells[amountIndex]
+		if (!amountCell) return
+		const value = parseNumeric(amountCell.textContent)
+		amountCell.classList.remove('text-red', 'text-green')
+		if (value < 0) {
+			amountCell.classList.add('text-red')
+		} else if (value > 0) {
+			amountCell.classList.add('text-green')
+		}
+		amountCell.textContent = formatCurrency(value)
+	})
+}
+
 const initCurrentShiftPage = () => {
 	collapseContainer('current-shift-left', 'Баланс')
 	enableResize('current-shift-left')
+	colorizeTableAmounts('transactions-table')
 	TableManager.init()
 
 	TableManager.calculateTableSummary(
 		'transactions-bank-accounts-table',
 		['balance', 'shift_amount', 'total_amount'],
-		{ grouped: true, total: true }
+		{ grouped: true, total: true },
 	)
 
 	try {
 		const transactionIdsData = document.getElementById(
-			'transaction-ids-data'
+			'transaction-ids-data',
 		)?.textContent
 		if (transactionIdsData) {
 			const transactionIds = JSON.parse(transactionIdsData)
@@ -1556,7 +1953,7 @@ const initCurrentShiftPage = () => {
 			if (selectedRowId) {
 				const selectedRow = TableManager.getRowById(
 					selectedRowId,
-					'transactions-table'
+					'transactions-table',
 				)
 				if (selectedRow) {
 					editTransaction(selectedRowId, selectedRow, 'transactions-table')
@@ -1575,7 +1972,7 @@ const initCurrentShiftPage = () => {
 			if (selectedRowId) {
 				const selectedRow = TableManager.getRowById(
 					selectedRowId,
-					'transactions-table'
+					'transactions-table',
 				)
 				if (selectedRow) {
 					deleteTransaction(selectedRowId, selectedRow)
@@ -1599,7 +1996,7 @@ const initCurrentShiftPage = () => {
 			{ name: 'type', url: '/ledger/transaction-types/' },
 			{ name: 'comment' },
 		],
-		['amount']
+		['amount'],
 	)
 	TableManager.calculateTableSummary('transactions-table', ['amount'])
 
@@ -1650,11 +2047,11 @@ const initCurrentShiftPage = () => {
 					if (debtAmountInput) debtAmountInput.value = DEFAULT_CURRENCY_VALUE
 
 					const tableContainer = formElement.querySelector(
-						'#clients-table--container'
+						'#clients-table--container',
 					)
 					if (!tableContainer) {
 						console.error(
-							"LS Payment Add: Container '#clients-table--container' not found in modal."
+							"LS Payment Add: Container '#clients-table--container' not found in modal.",
 						)
 						return
 					}
@@ -1674,7 +2071,7 @@ const initCurrentShiftPage = () => {
 							const clientsTable = TableManager.replaceEntireTable(
 								data.html,
 								'clients-table--container',
-								'clients-table'
+								'clients-table',
 							)
 
 							if (clientsTable && clientIds.length > 0) {
@@ -1692,8 +2089,8 @@ const initCurrentShiftPage = () => {
 
 									const rows = Array.from(
 										clientsTable.querySelectorAll(
-											'tbody tr:not(.table__row--summary)'
-										)
+											'tbody tr:not(.table__row--summary)',
+										),
 									)
 
 									inputClient.value = clientIds[0].id
@@ -1704,14 +2101,14 @@ const initCurrentShiftPage = () => {
 										clientIds[0].id,
 										orderSelectElement,
 										true,
-										null
+										null,
 									)
 
 									displayOrderDebt('debt_amount', null)
 
 									clientsTable.addEventListener('click', event => {
 										const row = event.target.closest(
-											'tbody tr:not(.table__row--summary)'
+											'tbody tr:not(.table__row--summary)',
 										)
 										if (!row) return
 
@@ -1725,7 +2122,7 @@ const initCurrentShiftPage = () => {
 												selectedClientId,
 												orderSelectElement,
 												false,
-												null
+												null,
 											)
 										}
 									})
@@ -1744,12 +2141,12 @@ const initCurrentShiftPage = () => {
 									})
 								} else {
 									console.error(
-										'LS Payment Add: Client input or Order select not found in form.'
+										'LS Payment Add: Client input or Order select not found in form.',
 									)
 								}
 							} else if (!clientsTable) {
 								console.error(
-									'LS Payment Add: Failed to replace clients table.'
+									'LS Payment Add: Failed to replace clients table.',
 								)
 							} else {
 								tableContainer.innerHTML = '<p>Нет клиентов с балансом.</p>'
@@ -1757,14 +2154,14 @@ const initCurrentShiftPage = () => {
 						} else {
 							console.error(
 								'LS Payment Add: Invalid data received for client balances.',
-								data
+								data,
 							)
 							showError('Не удалось загрузить балансы клиентов.')
 						}
 					} catch (error) {
 						console.error(
 							'Ошибка при загрузке балансов клиентов (LS Payment Add):',
-							error
+							error,
 						)
 						showError('Произошла ошибка при загрузке данных клиентов.')
 						tableContainer.innerHTML = '<p>Ошибка загрузки данных.</p>'
@@ -1775,7 +2172,7 @@ const initCurrentShiftPage = () => {
 			} catch (error) {
 				console.error(
 					`Failed to initialize transaction form for ${buttonId}:`,
-					error
+					error,
 				)
 			}
 		})
@@ -1869,7 +2266,7 @@ const initCurrentShiftPage = () => {
 		try {
 			const permResponse = await fetch(
 				'/users/check-permission/?permission=close_current_shift',
-				{ headers: { 'X-Requested-With': 'XMLHttpRequest' } }
+				{ headers: { 'X-Requested-With': 'XMLHttpRequest' } },
 			)
 			if (permResponse.ok) {
 				hasPermission = true
@@ -1913,13 +2310,13 @@ const initCurrentShiftPage = () => {
 						TableManager.replaceEntireTable(
 							data.html,
 							'transactions-bank-accounts-container',
-							'transactions-bank-accounts-table'
+							'transactions-bank-accounts-table',
 						)
 
 						TableManager.calculateTableSummary(
 							'transactions-bank-accounts-table',
 							['balance', 'shift_amount', 'total_amount'],
-							{ grouped: true, total: true }
+							{ grouped: true, total: true },
 						)
 
 						const transactionsTable =
@@ -1935,21 +2332,60 @@ const initCurrentShiftPage = () => {
 						showSuccess('Смена успешно закрыта.')
 					} else {
 						showError(
-							'Не удалось обновить данные после закрытия смены. Ответ сервера не содержит ожидаемых данных.'
+							'Не удалось обновить данные после закрытия смены. Ответ сервера не содержит ожидаемых данных.',
 						)
 					}
 				} catch (error) {
 					console.error(
 						'Ошибка при выполнении запроса на закрытие смены:',
-						error
+						error,
 					)
 					showError(`Произошла сетевая или другая ошибка: ${error.message}`)
 				} finally {
 					closeLoader.remove()
 				}
-			}
+			},
 		)
 	})
+}
+
+const deleteClosedTransaction = (transactionId, row, tableId) => {
+	showQuestion(
+		'Вы действительно хотите удалить запись?',
+		'Удаление',
+		async () => {
+			const loader = createLoader()
+			document.body.appendChild(loader)
+			let relatedRow = null
+			try {
+				const data = await TableManager.sendDeleteRequest(
+					transactionId,
+					'/ledger/transactions/closed/delete/',
+					tableId,
+				)
+				if (data?.status === 'success') {
+					const relatedTransactionId = data.related_transaction_id
+					if (relatedTransactionId) {
+						relatedRow = TableManager.getRowById(relatedTransactionId, tableId)
+					}
+					if (row) row.remove()
+					if (relatedRow) relatedRow.remove()
+					TableManager.calculateTableSummary(tableId, ['amount'])
+					showSuccess('Запись успешно удалена')
+				} else {
+					console.error(
+						'Deletion failed or did not return success:',
+						data?.message,
+					)
+				}
+			} catch (error) {
+				console.error('Error during deleteClosedTransaction process:', error)
+				showError('Произошла ошибка при удалении.')
+			} finally {
+				loader.remove()
+			}
+		},
+	)
 }
 
 function colorizeAllTransactionTableAmounts() {
@@ -1975,6 +2411,7 @@ function colorizeAllTransactionTableAmounts() {
 		} else if (value > 0) {
 			amountCell.classList.add('text-green')
 		}
+		amountCell.textContent = formatCurrency(value)
 	})
 }
 
@@ -2007,7 +2444,7 @@ document.addEventListener('DOMContentLoaded', () => {
 			TableManager.calculateTableSummary(
 				'bank_accounts_balances-table',
 				['balance'],
-				{ grouped: true, total: true }
+				{ grouped: true, total: true },
 			)
 		} else if (urlName === 'all') {
 			if (document.getElementById('all_transaction-table')) {
@@ -2020,8 +2457,10 @@ document.addEventListener('DOMContentLoaded', () => {
 				const currentPageInput = document.getElementById('current-page')
 				const totalPagesSpan = document.getElementById('total-pages')
 				const refreshButton = document.getElementById('refresh')
+				const editTransactionButton = document.getElementById('edit-button')
+				const deleteTransactionButton = document.getElementById('delete-button')
 				const tableContainer = document.getElementById(
-					'all_transaction-container'
+					'all_transaction-container',
 				)
 
 				const fetchAndUpdateAllTransactionsTable = async page => {
@@ -2030,7 +2469,7 @@ document.addEventListener('DOMContentLoaded', () => {
 					try {
 						const response = await fetch(
 							`/ledger/transactions/table/?page=${page}`,
-							{ headers: { 'X-Requested-With': 'XMLHttpRequest' } }
+							{ headers: { 'X-Requested-With': 'XMLHttpRequest' } },
 						)
 						const data = await response.json()
 						if (response.ok && data.html && data.context) {
@@ -2042,6 +2481,9 @@ document.addEventListener('DOMContentLoaded', () => {
 								}
 							}
 							colorizeAllTransactionTableAmounts()
+							TableManager.calculateTableSummary('all_transaction-table', [
+								'amount',
+							])
 							const {
 								current_page,
 								total_pages,
@@ -2066,7 +2508,7 @@ document.addEventListener('DOMContentLoaded', () => {
 							if (firstPageButton) firstPageButton.disabled = isFirstPage
 
 							const tableRows = document.querySelectorAll(
-								'#all_transaction-table tbody tr:not(.table__row--summary)'
+								'#all_transaction-table tbody tr:not(.table__row--summary)',
 							)
 							if (tableRows && transaction_ids.length === tableRows.length) {
 								tableRows.forEach((row, index) => {
@@ -2079,6 +2521,9 @@ document.addEventListener('DOMContentLoaded', () => {
 								const tbody = table.querySelector('tbody')
 								if (tbody) tbody.innerHTML = ''
 							}
+							TableManager.calculateTableSummary('all_transaction-table', [
+								'amount',
+							])
 							if (currentPageInput) {
 								currentPageInput.value = 1
 								currentPageInput.max = 1
@@ -2101,10 +2546,78 @@ document.addEventListener('DOMContentLoaded', () => {
 							const tbody = table.querySelector('tbody')
 							if (tbody) tbody.innerHTML = ''
 						}
+						TableManager.calculateTableSummary('all_transaction-table', [
+							'amount',
+						])
 					} finally {
 						loader.remove()
 					}
 				}
+
+				editTransactionButton?.addEventListener('click', async () => {
+					const selectedRow = TableManager.getSelectedRow(
+						'all_transaction-table',
+					)
+
+					if (selectedRow) {
+						const selectedRowId = selectedRow.getAttribute('data-id')
+						if (selectedRowId) {
+							let hasPermission = false
+							const loader = createLoader()
+							document.body.appendChild(loader)
+							try {
+								const response = await fetch(
+									'/users/check-permission/?permission=edit_closed_transactions',
+									{ headers: { 'X-Requested-With': 'XMLHttpRequest' } },
+								)
+								if (response.ok) {
+									hasPermission = true
+								} else {
+									showError('У вас нет прав на редактирование транзакций')
+								}
+							} catch (error) {
+								console.error('Permission check failed:', error)
+								showError('Ошибка проверки прав доступа.')
+							} finally {
+								loader.remove()
+							}
+
+							if (hasPermission) {
+								editTransactionForAll(
+									selectedRowId,
+									selectedRow,
+									'all_transaction-table',
+									true,
+								)
+							}
+						} else {
+							showError('Не удалось получить ID выбранной строки.')
+						}
+					} else {
+						showError('Выберите строку для редактирования')
+					}
+				})
+
+				deleteTransactionButton?.addEventListener('click', async () => {
+					const selectedRow = TableManager.getSelectedRow(
+						'all_transaction-table',
+					)
+
+					if (selectedRow) {
+						const selectedRowId = selectedRow.getAttribute('data-id')
+						if (selectedRowId) {
+							deleteClosedTransaction(
+								selectedRowId,
+								selectedRow,
+								'all_transaction-table',
+							)
+						} else {
+							showError('Не удалось получить ID выбранной строки.')
+						}
+					} else {
+						showError('Выберите строку для удаления')
+					}
+				})
 
 				refreshButton?.addEventListener('click', () => {
 					const currentPage = parseInt(currentPageInput?.value, 10) || 1
@@ -2120,7 +2633,7 @@ document.addEventListener('DOMContentLoaded', () => {
 					const totalPages =
 						parseInt(
 							totalPagesSpan?.textContent || currentPageInput?.max,
-							10
+							10,
 						) || 1
 					fetchAndUpdateAllTransactionsTable(totalPages)
 				})
@@ -2131,14 +2644,14 @@ document.addEventListener('DOMContentLoaded', () => {
 				})
 
 				firstPageButton?.addEventListener('click', () =>
-					fetchAndUpdateAllTransactionsTable(1)
+					fetchAndUpdateAllTransactionsTable(1),
 				)
 
 				currentPageInput?.addEventListener('input', () => {
 					const totalPages =
 						parseInt(
 							totalPagesSpan?.textContent || currentPageInput?.max,
-							10
+							10,
 						) || 1
 					let currentPage = parseInt(currentPageInput.value, 10)
 
@@ -2153,7 +2666,7 @@ document.addEventListener('DOMContentLoaded', () => {
 					const totalPages =
 						parseInt(
 							totalPagesSpan?.textContent || currentPageInput?.max,
-							10
+							10,
 						) || 1
 					let targetPage = parseInt(currentPageInput.value, 10)
 
@@ -2166,23 +2679,372 @@ document.addEventListener('DOMContentLoaded', () => {
 					fetchAndUpdateAllTransactionsTable(targetPage)
 				})
 
-				// Инициализация первой страницы при загрузке
 				fetchAndUpdateAllTransactionsTable(1)
+
+				const setupTransactionButtonForAll = (buttonId, typeConfig) => {
+					const button = document.getElementById(buttonId)
+					if (!button) {
+						console.warn(`Button with ID "${buttonId}" not found.`)
+						return
+					}
+
+					button.addEventListener('click', async () => {
+						const defaultConfig = {
+							tableId: 'all_transaction-table',
+							formId: 'transactions-form',
+
+							onSuccess: result =>
+								handleTransactionSuccess(
+									result,
+									'all_transaction-table',
+									false,
+								),
+						}
+
+						const finalConfig = { ...defaultConfig, ...typeConfig }
+
+						try {
+							await initTransactionForm(finalConfig, null)
+
+							const formElement = document.getElementById(finalConfig.formId)
+							if (!formElement) return
+
+							if (buttonId === 'order-payment-button-modal') {
+								const orderInput = formElement.querySelector('#order')
+								const debtAmountInput =
+									formElement.querySelector('#debt_amount')
+
+								if (debtAmountInput)
+									debtAmountInput.value = DEFAULT_CURRENCY_VALUE
+
+								const orderSelectParent = orderInput?.closest('.select')
+								const dropdownElement =
+									orderSelectParent?.querySelector('.select__dropdown')
+
+								dropdownElement?.addEventListener('click', async event => {
+									if (event.target.classList.contains('select__option')) {
+										const selectedOrderId = event.target.dataset.value
+
+										const debt = await fetchOrderDebt(selectedOrderId, 0)
+										displayOrderDebt('debt_amount', debt)
+									}
+								})
+							} else if (buttonId === 'ls-payment-button-modal') {
+								const debtAmountInput =
+									formElement.querySelector('#debt_amount')
+								if (debtAmountInput)
+									debtAmountInput.value = DEFAULT_CURRENCY_VALUE
+
+								const tableContainer = formElement.querySelector(
+									'#clients-table--container',
+								)
+								if (!tableContainer) {
+									console.error(
+										"LS Payment Add: Container '#clients-table--container' not found in modal.",
+									)
+									return
+								}
+
+								const loader = createLoader()
+								tableContainer.appendChild(loader)
+
+								try {
+									const response = await fetch('/commerce/clients/balances/', {
+										headers: { 'X-Requested-With': 'XMLHttpRequest' },
+									})
+									const data = await response.json()
+
+									if (data.html && data.ids) {
+										const clientIds = data.ids
+
+										const clientsTable = TableManager.replaceEntireTable(
+											data.html,
+											'clients-table--container',
+											'clients-table',
+										)
+
+										if (clientsTable && clientIds.length > 0) {
+											const inputClient =
+												formElement.querySelector('input[id="client"]')
+											const orderSelectElement =
+												formElement.querySelector('#order')
+
+											if (inputClient && orderSelectElement) {
+												const selectRow = rowElement => {
+													clientsTable
+														.querySelectorAll('tbody tr.table__row--selected')
+														.forEach(r =>
+															r.classList.remove('table__row--selected'),
+														)
+													rowElement?.classList.add('table__row--selected')
+												}
+
+												const rows = Array.from(
+													clientsTable.querySelectorAll(
+														'tbody tr:not(.table__row--summary)',
+													),
+												)
+
+												inputClient.value = clientIds[0].id
+												const firstRow = rows[0]
+												selectRow(firstRow)
+
+												await updateClientOrdersList(
+													clientIds[0].id,
+													orderSelectElement,
+													true,
+													null,
+												)
+
+												displayOrderDebt('debt_amount', null)
+
+												clientsTable.addEventListener('click', event => {
+													const row = event.target.closest(
+														'tbody tr:not(.table__row--summary)',
+													)
+													if (!row) return
+
+													const index = rows.indexOf(row)
+													if (index !== -1 && index < clientIds.length) {
+														const selectedClientId = clientIds[index].id
+														inputClient.value = selectedClientId
+														selectRow(row)
+
+														updateClientOrdersList(
+															selectedClientId,
+															orderSelectElement,
+															false,
+															null,
+														)
+													}
+												})
+
+												const orderSelectParent =
+													orderSelectElement.closest('.select')
+												const dropdownElement =
+													orderSelectParent?.querySelector('.select__dropdown')
+												dropdownElement?.addEventListener(
+													'click',
+													async event => {
+														if (
+															event.target.classList.contains('select__option')
+														) {
+															const selectedOrderId = event.target.dataset.value
+
+															const debt = await fetchOrderDebt(
+																selectedOrderId,
+																0,
+															)
+															displayOrderDebt('debt_amount', debt)
+														}
+													},
+												)
+											} else {
+												console.error(
+													'LS Payment Add: Client input or Order select not found in form.',
+												)
+											}
+										} else if (!clientsTable) {
+											console.error(
+												'LS Payment Add: Failed to replace clients table.',
+											)
+										} else {
+											tableContainer.innerHTML =
+												'<p>Нет клиентов с балансом.</p>'
+										}
+									} else {
+										console.error(
+											'LS Payment Add: Invalid data received for client balances.',
+											data,
+										)
+										showError('Не удалось загрузить балансы клиентов.')
+									}
+								} catch (error) {
+									console.error(
+										'Ошибка при загрузке балансов клиентов (LS Payment Add):',
+										error,
+									)
+									showError('Произошла ошибка при загрузке данных клиентов.')
+									tableContainer.innerHTML = '<p>Ошибка загрузки данных.</p>'
+								} finally {
+									loader.remove()
+								}
+							}
+						} catch (error) {
+							console.error(
+								`Failed to initialize transaction form for ${buttonId}:`,
+								error,
+							)
+						}
+					})
+				}
+
+				const addButton = document.getElementById('add-button')
+				if (addButton) {
+					addButton.addEventListener('click', () => {
+						const modal = document.createElement('div')
+						modal.className = 'modal'
+						modal.innerHTML = `
+                        <div class="modal__overlay"></div>
+                        <div class="modal__content">
+                            <div class="modal__header">
+                                <h3>Добавить транзакцию</h3>
+                                <button class="modal__close">&times;</button>
+                            </div>
+                            <div class="modal__body">
+                                <div id="transaction-type-buttons">
+                                    <button class="button" id="income-button-modal">Приход</button>
+                                    <button class="button" id="expense-button-modal">Расход</button>
+                                    <button class="button" id="transfer-button-modal">Перевод</button>
+                                    <button class="button" id="order-payment-button-modal">Оплата заказа</button>
+                                    <button class="button" id="deposit-button-modal">Внос на ЛС</button>
+                                    <button class="button" id="ls-payment-button-modal">Оплата с ЛС</button>
+                                </div>
+                            </div>
+                        </div>
+                    `
+						document.body.appendChild(modal)
+
+						setupTransactionButtonForAll('income-button-modal', {
+							dataUrls: [
+								{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
+								{
+									id: 'category',
+									url: `/ledger/${TRANSACTION_CATEGORIES}/list/?type=income`,
+								},
+							],
+							submitUrl: '/ledger/transactions/add/',
+							modalConfig: {
+								url: '/components/ledger/add_transaction/',
+								title: 'Приход',
+								context: { type: 'income' },
+							},
+						})
+
+						setupTransactionButtonForAll('expense-button-modal', {
+							dataUrls: [
+								{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
+								{
+									id: 'category',
+									url: `/ledger/${TRANSACTION_CATEGORIES}/list/?type=expense`,
+								},
+							],
+							submitUrl: '/ledger/transactions/add/',
+							modalConfig: {
+								url: '/components/ledger/add_transaction/',
+								title: 'Расход',
+								context: { type: 'expense' },
+							},
+						})
+
+						setupTransactionButtonForAll('transfer-button-modal', {
+							dataUrls: [
+								{
+									id: 'source_bank_account',
+									url: `/ledger/${BANK_ACCOUNTS}/list/`,
+								},
+								{
+									id: 'destination_bank_account',
+									url: `/ledger/${BANK_ACCOUNTS}/list/`,
+								},
+							],
+							submitUrl: '/ledger/transfers/add/',
+							modalConfig: {
+								url: '/components/ledger/add_transfer/',
+								title: 'Перевод',
+							},
+						})
+
+						setupTransactionButtonForAll('order-payment-button-modal', {
+							dataUrls: [
+								{
+									id: 'order',
+									url: '/commerce/orders/ids/',
+									includeValuesInSearch: true,
+								},
+								{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
+							],
+							submitUrl: '/ledger/order-payments/add/',
+							modalConfig: {
+								url: '/components/ledger/add_order_payment/',
+								title: 'Оплата заказа',
+							},
+						})
+
+						setupTransactionButtonForAll('deposit-button-modal', {
+							dataUrls: [
+								{ id: 'client', url: '/commerce/clients/list/' },
+								{ id: 'bank_account', url: `/ledger/${BANK_ACCOUNTS}/list/` },
+							],
+							submitUrl: '/ledger/client-balance/deposit/',
+							modalConfig: {
+								url: '/components/ledger/deposit_client_balance/',
+								title: 'Зачисление на ЛС клиента',
+							},
+						})
+
+						setupTransactionButtonForAll('ls-payment-button-modal', {
+							submitUrl: '/ledger/client-balance/payment/',
+							modalConfig: {
+								url: '/components/ledger/ls_payment/',
+								title: 'Оплата заказа с ЛС клиента',
+							},
+						})
+
+						modal
+							.querySelector('.modal__close')
+							.addEventListener('click', () => modal.remove())
+						modal
+							.querySelector('.modal__overlay')
+							.addEventListener('click', () => modal.remove())
+					})
+				}
 			}
 		} else {
 			console.error(
-				`No specific initialization logic defined for URL segment: ${urlName}`
+				`No specific initialization logic defined for URL segment: ${urlName}`,
 			)
 		}
 	} else {
 		console.error(
 			'Could not determine page context from URL pathname:',
-			pathname
+			pathname,
 		)
+	}
+
+	const contentDiv = document.querySelector('.content')
+	if (contentDiv) {
+		const counter = document.createElement('div')
+		counter.id = 'hidden-rows-counter'
+		counter.style.position = 'absolute'
+		counter.style.bottom = '1px'
+		counter.style.right = '10px'
+		counter.style.background = 'rgba(255, 255, 255, 0.8)'
+		counter.style.padding = '5px 10px'
+		counter.style.borderRadius = '3px'
+		counter.style.fontSize = '12px'
+		counter.style.zIndex = '1000'
+		counter.style.border = '1px solid #ccc'
+		counter.textContent = 'Скрыто: 0'
+		counter.style.display = 'none'
+		contentDiv.appendChild(counter)
 	}
 
 	const hideButton = document.getElementById('hide-button')
 	const showAllButton = document.getElementById('show-all-button')
+
+	function updateHiddenRowsCounter() {
+		const hiddenCount = document.querySelectorAll('.hidden-row').length
+		const counter = document.getElementById('hidden-rows-counter')
+		if (counter) {
+			if (hiddenCount === 0) {
+				counter.style.display = 'none'
+			} else {
+				counter.style.display = 'block'
+				counter.textContent = `Скрыто: ${hiddenCount}`
+			}
+		}
+	}
 
 	if (hideButton) {
 		hideButton.addEventListener('click', () => {
@@ -2190,6 +3052,7 @@ document.addEventListener('DOMContentLoaded', () => {
 			if (selectedRow) {
 				selectedRow.classList.add('hidden-row')
 				selectedRow.style.display = 'none'
+				updateHiddenRowsCounter()
 			}
 		})
 	}
@@ -2200,6 +3063,7 @@ document.addEventListener('DOMContentLoaded', () => {
 				row.classList.remove('hidden-row')
 				row.style.display = ''
 			})
+			updateHiddenRowsCounter()
 		})
 	}
 })

@@ -43,19 +43,17 @@
                 <img src="{% static 'images/close.svg' %}" alt="Clear" class="clear-button">
             </div>
         </div>
-        {% if type == 'expense' %}
-            <div class="modal-form__group modal-form__group--width-30">
-                <label class="modal-form__label" for="report_date">Месяц реализации</label>
-                <input class="modal-form__input"
-                       type="month"
-                       id="report_date"
-                       name="report_date"
-                       autocapitalize="off"
-                       autocorrect="off"
-                       autocomplete="off"
-                       placeholder="Месяц реализации">
-            </div>
-        {% endif %}
+        <div class="modal-form__group modal-form__group--width-30">
+            <label class="modal-form__label" for="report_date">Месяц реализации</label>
+            <input class="modal-form__input"
+                    type="month"
+                    id="report_date"
+                    name="report_date"
+                    autocapitalize="off"
+                    autocorrect="off"
+                    autocomplete="off"
+                    placeholder="Месяц реализации">
+        </div>
         <div class="modal-form__buttons">
             <button class="button modal-form__button" type="submit">Сохранить</button>
             <button class="button modal-form__button button--cancel" type="button">Отменить</button>

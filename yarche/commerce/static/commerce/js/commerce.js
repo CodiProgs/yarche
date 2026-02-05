@@ -57,7 +57,7 @@ const configs = {
 					return
 				}
 				const anyRow = table.querySelector(
-					'tbody tr:not(.table__row--empty):not(.table__row--summary)'
+					'tbody tr:not(.table__row--empty):not(.table__row--summary)',
 				)
 				if (anyRow) loadFirstClientFromTable()
 				else clearClientForm()
@@ -176,16 +176,16 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 						if (urls.length) {
 							const table =
 								documentsContainer.querySelector(
-									`table#order-documents-${orderId}`
+									`table#order-documents-${orderId}`,
 								) || documentsContainer.querySelector('table')
 							if (table) {
 								const ths = Array.from(table.querySelectorAll('thead th'))
 								const fileColIndex = ths.findIndex(
-									th => th && th.dataset && th.dataset.name === 'file_display'
+									th => th && th.dataset && th.dataset.name === 'file_display',
 								)
 								if (fileColIndex !== -1) {
 									const rows = table.querySelectorAll(
-										'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+										'tbody tr:not(.table__row--summary):not(.table__row--empty)',
 									)
 									rows.forEach((row, idx) => {
 										const cell = row.children[fileColIndex]
@@ -202,7 +202,7 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 					} catch (err) {
 						console.warn(
 							'Не удалось применить ссылки к колонке file_display:',
-							err
+							err,
 						)
 					}
 					if (data && data.ids) {
@@ -211,7 +211,7 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 				} else {
 					documentsContainer.innerHTML = data.html || ''
 					showError(
-						data.error || data.message || 'Ошибка загрузки документов заказа'
+						data.error || data.message || 'Ошибка загрузки документов заказа',
 					)
 				}
 			} else {
@@ -223,7 +223,7 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 					`/commerce/order/${orderId}/files/cards/`,
 					{
 						headers: { 'X-Requested-With': 'XMLHttpRequest' },
-					}
+					},
 				)
 				const data = await filesResp.json()
 				if (filesResp.ok && data.status === 'success') {
@@ -231,7 +231,7 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 				} else {
 					documentsContainer.innerHTML = data.html || ''
 					showError(
-						data.error || data.message || 'Ошибка загрузки файлов заказа'
+						data.error || data.message || 'Ошибка загрузки файлов заказа',
 					)
 				}
 			} else {
@@ -360,13 +360,13 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 
 								if (!uploadResp.ok || payload.status !== 'success') {
 									showError(
-										payload.message || payload.error || 'Ошибка загрузки файла'
+										payload.message || payload.error || 'Ошибка загрузки файла',
 									)
 								} else {
 									const tableId = `order-documents-${orderId}`
 									const newRow = await TableManager.addTableRow(
 										payload,
-										tableId
+										tableId,
 									)
 									if (
 										newRow &&
@@ -376,7 +376,7 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 									) {
 										newRow.setAttribute(
 											'data-id',
-											String(payload.id || payload.pk)
+											String(payload.id || payload.pk),
 										)
 									}
 
@@ -388,7 +388,9 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 											const ths = Array.from(table.querySelectorAll('thead th'))
 											const fileColIndex = ths.findIndex(
 												th =>
-													th && th.dataset && th.dataset.name === 'file_display'
+													th &&
+													th.dataset &&
+													th.dataset.name === 'file_display',
 											)
 											if (fileColIndex !== -1) {
 												const row = table.querySelector('tbody tr:last-child')
@@ -406,7 +408,7 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 									} catch (e) {
 										console.warn(
 											'Не удалось применить ссылку к новой строке:',
-											e
+											e,
 										)
 									}
 
@@ -415,7 +417,7 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 											`/commerce/order/${orderId}/files/cards/`,
 											{
 												headers: { 'X-Requested-With': 'XMLHttpRequest' },
-											}
+											},
 										)
 										const data = await filesResp.json()
 										if (filesResp.ok && data.status === 'success') {
@@ -488,10 +490,15 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 							const fileWithNewName = new File([f], finalName, {
 								type: f.type,
 							})
+
+							const commentInput = form.querySelector('#comment')
+							const comment = commentInput.value
+
 							fd.append('file', fileWithNewName)
 							fd.append('order', orderId)
 							fd.append('file_type', fileTypeVal)
 							fd.append('filename', finalName)
+							fd.append('comment', comment)
 
 							const uploadResp = await fetch(`${BASE_URL}documents/upload/`, {
 								method: 'POST',
@@ -507,7 +514,7 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 
 							if (!uploadResp.ok || payload.status !== 'success') {
 								showError(
-									payload.message || payload.error || 'Ошибка загрузки файла'
+									payload.message || payload.error || 'Ошибка загрузки файла',
 								)
 							} else {
 								const tableId = `order-documents-${orderId}`
@@ -520,7 +527,7 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 								) {
 									newRow.setAttribute(
 										'data-id',
-										String(payload.id || payload.pk)
+										String(payload.id || payload.pk),
 									)
 								}
 								showSuccess('Файл успешно загружен')
@@ -531,7 +538,7 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 										const ths = Array.from(table.querySelectorAll('thead th'))
 										const fileColIndex = ths.findIndex(
 											th =>
-												th && th.dataset && th.dataset.name === 'file_display'
+												th && th.dataset && th.dataset.name === 'file_display',
 										)
 										if (fileColIndex !== -1) {
 											const row = table.querySelector('tbody tr:last-child')
@@ -555,7 +562,7 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 										`/commerce/order/${orderId}/files/cards/`,
 										{
 											headers: { 'X-Requested-With': 'XMLHttpRequest' },
-										}
+										},
 									)
 									const data = await filesResp.json()
 									if (filesResp.ok && data.status === 'success') {
@@ -584,7 +591,7 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 	} catch (e) {
 		console.warn(
 			'Ошибка инициализации загрузчика документов в модальном окне:',
-			e
+			e,
 		)
 	}
 
@@ -613,7 +620,7 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 				if (viewType === 'table') {
 					const docsResp2 = await fetch(
 						`${BASE_URL}documents/table/${orderId}/`,
-						{ headers: { 'X-Requested-With': 'XMLHttpRequest' } }
+						{ headers: { 'X-Requested-With': 'XMLHttpRequest' } },
 					)
 					const data = await docsResp2.json()
 					if (docsResp2.ok) {
@@ -624,17 +631,18 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 							if (urls.length) {
 								const table =
 									documentsContainer.querySelector(
-										`table#order-documents-${orderId}`
+										`table#order-documents-${orderId}`,
 									) || documentsContainer.querySelector('table')
 								if (table) {
 									const ths = Array.from(table.querySelectorAll('thead th'))
 									const fileColIndex = ths.findIndex(
-										th => th && th.dataset && th.dataset.name === 'file_display'
+										th =>
+											th && th.dataset && th.dataset.name === 'file_display',
 									)
 
 									if (fileColIndex !== -1) {
 										const rows = table.querySelectorAll(
-											'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+											'tbody tr:not(.table__row--summary):not(.table__row--empty)',
 										)
 										rows.forEach((row, idx) => {
 											const cell = row.children[fileColIndex]
@@ -651,7 +659,7 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 						} catch (err) {
 							console.warn(
 								'Не удалось применить ссылки к колонке file_display:',
-								err
+								err,
 							)
 						}
 
@@ -669,13 +677,13 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 						} catch (e) {
 							console.warn(
 								'Не удалось инициализировать таблицу документов после обновления:',
-								e
+								e,
 							)
 						}
 					} else {
 						documentsContainer.innerHTML = data.html || ''
 						showError(
-							data.error || data.message || 'Ошибка загрузки документов заказа'
+							data.error || data.message || 'Ошибка загрузки документов заказа',
 						)
 					}
 				} else {
@@ -683,7 +691,7 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 						`/commerce/order/${orderId}/files/cards/`,
 						{
 							headers: { 'X-Requested-With': 'XMLHttpRequest' },
-						}
+						},
 					)
 					const data = await filesResp.json()
 					if (filesResp.ok && data.status === 'success') {
@@ -691,7 +699,7 @@ async function reloadOrderFiles(orderId, viewType, documentsContainer) {
 					} else {
 						documentsContainer.innerHTML = data.html || ''
 						showError(
-							data.error || data.message || 'Ошибка загрузки файлов заказа'
+							data.error || data.message || 'Ошибка загрузки файлов заказа',
 						)
 					}
 				}
@@ -794,19 +802,12 @@ function setupOrderFilesButton2(button, getOrderId) {
 		if (typeof getOrderId === 'function') {
 			orderId = getOrderId()
 		} else {
-			const selectedCell = document.querySelector('td.table__cell--selected')
-			if (selectedCell) {
-				const v = selectedCell.textContent.trim()
-				orderId = Number.isNaN(Number(v)) ? null : parseInt(v, 10)
-			}
-			if (!orderId) {
-				const selectedRow = document.querySelector('tr.table__row--selected')
-				if (selectedRow) {
-					const firstCell = selectedRow.querySelector('td')
-					if (firstCell) {
-						const v = firstCell.textContent.trim()
-						orderId = Number.isNaN(Number(v)) ? null : parseInt(v, 10)
-					}
+			const selectedRow = document.querySelector('tr.table__row--selected')
+			if (selectedRow) {
+				const firstCell = selectedRow.querySelector('td:first-child')
+				if (firstCell) {
+					const v = firstCell.textContent.trim()
+					orderId = Number.isNaN(Number(v)) ? null : parseInt(v, 10)
 				}
 			}
 		}
@@ -817,7 +818,6 @@ function setupOrderFilesButton2(button, getOrderId) {
 		const viewType = localStorage.getItem('orderFilesView') || 'cards'
 		documentsContainer.dataset.orderId = orderId
 		documentsContainer.dataset.viewType = viewType
-
 		await reloadOrderFiles(orderId, viewType, documentsContainer)
 	})
 }
@@ -951,7 +951,7 @@ const setupCurrencyInput = (inputId, decimalPlaces = 2) => {
 
 const setIds = (ids, tableId) => {
 	const tableRows = document.querySelectorAll(
-		`#${tableId} tbody tr:not(.table__row--summary)`
+		`#${tableId} tbody tr:not(.table__row--summary)`,
 	)
 	if (!tableRows || tableRows.length === 0 || !ids || ids.length === 0) {
 		return
@@ -984,10 +984,10 @@ const addMenuHandler = () => {
 	const refreshButton = document.getElementById('refresh-button')
 
 	const renameOrderDocumentButton = document.getElementById(
-		'rename-order-document-button'
+		'rename-order-document-button',
 	)
 	const deleteOrderDocumentButton = document.getElementById(
-		'delete-order-document-button'
+		'delete-order-document-button',
 	)
 
 	if (menu) {
@@ -1041,7 +1041,7 @@ const addMenuHandler = () => {
 	if (menu) {
 		document.addEventListener('contextmenu', function (e) {
 			const row = e.target.closest(
-				'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+				'tbody tr:not(.table__row--summary):not(.table__row--empty)',
 			)
 
 			const pathname = window.location.pathname
@@ -1074,7 +1074,11 @@ const addMenuHandler = () => {
 						addButton.textContent = 'Новый расчет'
 					}
 
-					if (table.id && table.id.startsWith('order-viewers-')) {
+					if (
+						table.id &&
+						(table.id.startsWith('order-viewers-') ||
+							table.id.startsWith('order-documents-'))
+					) {
 						addButton.style.display = 'none'
 					}
 				}
@@ -1086,7 +1090,10 @@ const addMenuHandler = () => {
 						editButton.style.display = 'block'
 					}
 
-					if (table.id.startsWith('order-viewers-')) {
+					if (
+						table.id.startsWith('order-viewers-') ||
+						table.id.startsWith('order-documents-')
+					) {
 						editButton.style.display = 'none'
 					}
 				}
@@ -1100,6 +1107,10 @@ const addMenuHandler = () => {
 
 					if (table.id.startsWith('order-viewers-')) {
 						deleteButton.textContent = 'Убрать из списка'
+					}
+
+					if (table.id.startsWith('order-documents-')) {
+						deleteButton.style.display = 'none'
 					}
 				}
 
@@ -1119,11 +1130,11 @@ const addMenuHandler = () => {
 						settleDebtButton.style.display = 'none'
 					} else if (table.id === 'investors-table') {
 						const selectedCell = document.querySelector(
-							'td.table__cell--selected'
+							'td.table__cell--selected',
 						)
 						if (selectedCell) {
 							const cellIndex = Array.from(
-								selectedCell.parentNode.children
+								selectedCell.parentNode.children,
 							).indexOf(selectedCell)
 							const th = table.querySelectorAll('thead th')[cellIndex]
 							const colName = th ? th.dataset.name : null
@@ -1220,22 +1231,22 @@ const addMenuHandler = () => {
 				}
 
 				const viewOrderFilesBtn = document.getElementById(
-					'view_order_files-button'
+					'view_order_files-button',
 				)
 				const updateStatusBtn = document.getElementById('update_status-button')
 				const assignExecutorBtn = document.getElementById(
-					'assign_executor-button'
+					'assign_executor-button',
 				)
 				const viewCorrespondenceBtn = document.getElementById(
-					'view_correspondence-button'
+					'view_correspondence-button',
 				)
 				const newMessageBtn = document.getElementById('new_message-button')
 				const editMessageBtn = document.getElementById('edit_message-button')
 				const deleteMessageBtn = document.getElementById(
-					'delete_message-button'
+					'delete_message-button',
 				)
 				const refreshMessagesBtn = document.getElementById(
-					'refresh_messages-button'
+					'refresh_messages-button',
 				)
 
 				if (
@@ -1292,7 +1303,11 @@ const addMenuHandler = () => {
 				if (addViewerButton && urlName === 'works') {
 					addViewerButton.style.display = 'block'
 
-					if (table.id && table.id.startsWith('order-viewers-')) {
+					if (
+						table.id &&
+						(table.id.startsWith('order-viewers-') ||
+							table.id.startsWith('order-documents-'))
+					) {
 						addViewerButton.style.display = 'none'
 					}
 				} else if (addViewerButton) {
@@ -1377,14 +1392,14 @@ const addMenuHandler = () => {
 				}
 
 				const viewOrderFilesBtn = document.getElementById(
-					'view_order_files-button'
+					'view_order_files-button',
 				)
 				const updateStatusBtn = document.getElementById('update_status-button')
 				const assignExecutorBtn = document.getElementById(
-					'assign_executor-button'
+					'assign_executor-button',
 				)
 				const viewCorrespondenceBtn = document.getElementById(
-					'view_correspondence-button'
+					'view_correspondence-button',
 				)
 
 				if (viewOrderFilesBtn) viewOrderFilesBtn.style.display = 'block'
@@ -1395,10 +1410,10 @@ const addMenuHandler = () => {
 				const newMessageBtn = document.getElementById('new_message-button')
 				const editMessageBtn = document.getElementById('edit_message-button')
 				const deleteMessageBtn = document.getElementById(
-					'delete_message-button'
+					'delete_message-button',
 				)
 				const refreshMessagesBtn = document.getElementById(
-					'refresh_messages-button'
+					'refresh_messages-button',
 				)
 				if (newMessageBtn) newMessageBtn.style.display = 'none'
 				if (editMessageBtn) editMessageBtn.style.display = 'none'
@@ -1418,7 +1433,7 @@ const addMenuHandler = () => {
 				if (
 					h4 &&
 					['Оборудование', 'Кредит', 'Краткосрочные обязательства'].includes(
-						h4.textContent.trim()
+						h4.textContent.trim(),
 					)
 				) {
 					if (settleDebtButton) {
@@ -1435,10 +1450,10 @@ const addMenuHandler = () => {
 				const newMessageBtn = document.getElementById('new_message-button')
 				const editMessageBtn = document.getElementById('edit_message-button')
 				const deleteMessageBtn = document.getElementById(
-					'delete_message-button'
+					'delete_message-button',
 				)
 				const refreshMessagesBtn = document.getElementById(
-					'refresh_messages-button'
+					'refresh_messages-button',
 				)
 				if (newMessageBtn) newMessageBtn.style.display = 'block'
 				if (editMessageBtn) editMessageBtn.style.display = 'block'
@@ -1461,14 +1476,14 @@ const addMenuHandler = () => {
 				if (refreshButton) refreshButton.style.display = 'none'
 
 				const viewOrderFilesBtn = document.getElementById(
-					'view_order_files-button'
+					'view_order_files-button',
 				)
 				const updateStatusBtn = document.getElementById('update_status-button')
 				const assignExecutorBtn = document.getElementById(
-					'assign_executor-button'
+					'assign_executor-button',
 				)
 				const viewCorrespondenceBtn = document.getElementById(
-					'view_correspondence-button'
+					'view_correspondence-button',
 				)
 
 				if (viewOrderFilesBtn) viewOrderFilesBtn.style.display = 'none'
@@ -1514,7 +1529,7 @@ const addMenuHandler = () => {
 					touchTimer = null
 				}, LONG_PRESS_DELAY)
 			},
-			{ passive: true }
+			{ passive: true },
 		)
 
 		document.addEventListener(
@@ -1525,7 +1540,7 @@ const addMenuHandler = () => {
 					touchTimer = null
 				}
 			},
-			{ passive: true }
+			{ passive: true },
 		)
 
 		document.addEventListener(
@@ -1536,7 +1551,7 @@ const addMenuHandler = () => {
 					touchTimer = null
 				}
 			},
-			{ passive: true }
+			{ passive: true },
 		)
 
 		document.addEventListener('click', () => {
@@ -1561,7 +1576,7 @@ function addSearchInput(
 	placeholder,
 	selector,
 	marginLeft = '0px',
-	type = 'clients'
+	type = 'clients',
 ) {
 	if (!listEl) return
 	const wrapper = document.createElement('div')
@@ -1598,7 +1613,7 @@ async function deleteDepartmentWork(workId, card) {
 				loader.remove()
 				if (!resp.ok || data.status !== 'success') {
 					showError(
-						data.message || data.error || 'Ошибка при удалении работы отдела'
+						data.message || data.error || 'Ошибка при удалении работы отдела',
 					)
 					return
 				}
@@ -1608,7 +1623,7 @@ async function deleteDepartmentWork(workId, card) {
 				loader.remove()
 				showError(err.message || 'Ошибка при удалении работы отдела')
 			}
-		}
+		},
 	)
 }
 
@@ -1622,7 +1637,7 @@ const initWorksPage = () => {
 
 	clientsList.addEventListener('click', function (e) {
 		const clientRow = e.target.closest(
-			'.debtors-office-list__row[data-target^="branch-"]'
+			'.debtors-office-list__row[data-target^="branch-"]',
 		)
 		if (clientRow) {
 			const branchId = clientRow.getAttribute('data-target')
@@ -1635,13 +1650,13 @@ const initWorksPage = () => {
 						'Поиск объекта...',
 						'h4',
 						'16px',
-						'objects'
+						'objects',
 					)
 				}
 			}
 		}
 		const objectRow = e.target.closest(
-			'.debtors-office-list__row[data-target^="object-"]'
+			'.debtors-office-list__row[data-target^="object-"]',
 		)
 		if (objectRow) {
 			const objectIdAttr = objectRow.getAttribute('data-target')
@@ -1654,7 +1669,7 @@ const initWorksPage = () => {
 						'Поиск продукции...',
 						'.debtors-office-list__title',
 						'32px',
-						'products'
+						'products',
 					)
 				}
 			}
@@ -1695,7 +1710,7 @@ const initWorksPage = () => {
 				if (!productId || !clientId || !objectId) return
 
 				const resp = await fetch(
-					`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`
+					`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`,
 				)
 				const data = await resp.json()
 				loader.remove()
@@ -1730,7 +1745,7 @@ const initWorksPage = () => {
 					const tableId = data.table_id
 					const observer = new MutationObserver(() => {
 						const idInput = document.querySelector(
-							`#${tableId} thead input[name="id"]`
+							`#${tableId} thead input[name="id"]`,
 						)
 						if (idInput) {
 							idInput.value = orderIdFromQuery
@@ -1781,7 +1796,7 @@ const initWorksPage = () => {
 		if (!clientIdFromQuery || !objectIdFromQuery || !productIdFromQuery) return
 
 		const clientRow = document.querySelector(
-			`.debtors-office-list__row[data-target="branch-${clientIdFromQuery}"]`
+			`.debtors-office-list__row[data-target="branch-${clientIdFromQuery}"]`,
 		)
 		if (clientRow) {
 			clientRow.click()
@@ -1789,7 +1804,7 @@ const initWorksPage = () => {
 		}
 
 		const objectRow = document.querySelector(
-			`.debtors-office-list__row[data-target="object-${clientIdFromQuery}-${objectIdFromQuery}"]`
+			`.debtors-office-list__row[data-target="object-${clientIdFromQuery}-${objectIdFromQuery}"]`,
 		)
 		if (objectRow) {
 			objectRow.click()
@@ -1797,7 +1812,7 @@ const initWorksPage = () => {
 		}
 
 		const productRow = document.querySelector(
-			`.debtors-office-list__row[data-target="product-${clientIdFromQuery}-${objectIdFromQuery}-${productIdFromQuery}"]`
+			`.debtors-office-list__row[data-target="product-${clientIdFromQuery}-${objectIdFromQuery}-${productIdFromQuery}"]`,
 		)
 		if (productRow) {
 			productRow.click()
@@ -1832,7 +1847,7 @@ const initWorksPage = () => {
 							result.client_id
 						) {
 							const branchDetails = document.getElementById(
-								`branch-${result.client_id}`
+								`branch-${result.client_id}`,
 							)
 							if (branchDetails) {
 								let ul = branchDetails.querySelector('ul')
@@ -1855,7 +1870,7 @@ const initWorksPage = () => {
 								const newItem = ul.lastElementChild
 								if (newItem) {
 									const newRow = newItem.querySelector(
-										'.debtors-office-list__row'
+										'.debtors-office-list__row',
 									)
 									if (newRow) {
 										newRow.addEventListener('click', async function (e) {
@@ -1865,7 +1880,7 @@ const initWorksPage = () => {
 											if (!details) return
 
 											const btn = newRow.querySelector(
-												'.debtors-office-list__toggle'
+												'.debtors-office-list__toggle',
 											)
 											if (btn) btn.classList.toggle('open')
 											details.classList.toggle('open')
@@ -1884,7 +1899,7 @@ const initWorksPage = () => {
 												if (productId && clientId && objectId) {
 													try {
 														const resp = await fetch(
-															`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`
+															`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`,
 														)
 														const data = await resp.json()
 														loader.remove()
@@ -1905,7 +1920,7 @@ const initWorksPage = () => {
 									}
 
 									const productRows = newItem.querySelectorAll(
-										'.debtors-office-list__row[data-target^="product-"]'
+										'.debtors-office-list__row[data-target^="product-"]',
 									)
 									productRows.forEach(row => {
 										row.addEventListener('click', async function (e) {
@@ -1915,7 +1930,7 @@ const initWorksPage = () => {
 											if (!details) return
 
 											const btn = row.querySelector(
-												'.debtors-office-list__toggle'
+												'.debtors-office-list__toggle',
 											)
 											if (btn) btn.classList.toggle('open')
 											details.classList.toggle('open')
@@ -1934,7 +1949,7 @@ const initWorksPage = () => {
 												if (productId && clientId && objectId) {
 													try {
 														const resp = await fetch(
-															`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`
+															`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`,
 														)
 														const data = await resp.json()
 														loader.remove()
@@ -1975,7 +1990,7 @@ const initWorksPage = () => {
 				}
 			} else if (buttonText === 'Новый расчет') {
 				const row = document.querySelector(
-					'.debtors-office-list__row[data-target^="product-"]'
+					'.debtors-office-list__row[data-target^="product-"]',
 				)
 				if (!row) {
 					showError('Не выбран продукт для создания расчета.')
@@ -2007,7 +2022,7 @@ const initWorksPage = () => {
 					onSuccess: async result => {
 						if (result.status === 'success' && result.id) {
 							const debtorsOfficeDetails = document.getElementById(
-								`product-${clientId}-${objectId}-${productId}`
+								`product-${clientId}-${objectId}-${productId}`,
 							)
 							if (!debtorsOfficeDetails) return
 
@@ -2021,7 +2036,7 @@ const initWorksPage = () => {
 								const newRow = await TableManager.addTableRow(
 									result,
 									tableId,
-									true
+									true,
 								)
 
 								if (newRow) {
@@ -2108,11 +2123,11 @@ const initWorksPage = () => {
 					const selectWrapper = clientInput.closest('.select')
 					if (selectWrapper) {
 						const displaySpan = selectWrapper.querySelector(
-							'.select__display span'
+							'.select__display span',
 						)
 						if (displaySpan) {
 							const clientRow = document.querySelector(
-								`[data-target="branch-${clientId}"]`
+								`[data-target="branch-${clientId}"]`,
 							)
 							if (clientRow) {
 								displaySpan.textContent =
@@ -2128,7 +2143,7 @@ const initWorksPage = () => {
 					const selectWrapper = productInput.closest('.select')
 					if (selectWrapper) {
 						const displaySpan = selectWrapper.querySelector(
-							'.select__display span'
+							'.select__display span',
 						)
 						if (displaySpan) {
 							displaySpan.textContent =
@@ -2144,11 +2159,11 @@ const initWorksPage = () => {
 					const selectWrapper = clientObjectInput.closest('.select')
 					if (selectWrapper) {
 						const displaySpan = selectWrapper.querySelector(
-							'.select__display span'
+							'.select__display span',
 						)
 						if (displaySpan) {
 							const objectRow = document.querySelector(
-								`[data-target="object-${clientId}-${objectId}"]`
+								`[data-target="object-${clientId}-${objectId}"]`,
 							)
 							if (objectRow) {
 								displaySpan.textContent =
@@ -2170,11 +2185,11 @@ const initWorksPage = () => {
 						const unitPrice = unitPriceAN
 							? unitPriceAN.getNumber()
 							: parseFloat(
-									unit_priceInput.value.replace(/\s/g, '').replace(',', '.')
-							  ) || 0
+									unit_priceInput.value.replace(/\s/g, '').replace(',', '.'),
+								) || 0
 						const quantity =
 							parseFloat(
-								quantityInput.value.replace(/\s/g, '').replace(',', '.')
+								quantityInput.value.replace(/\s/g, '').replace(',', '.'),
 							) || 0
 
 						if (unitPrice > 0 && quantity > 0) {
@@ -2205,9 +2220,10 @@ const initWorksPage = () => {
 						`/commerce/products/${productId}/departments/`,
 						{
 							headers: { 'X-Requested-With': 'XMLHttpRequest' },
-						}
+						},
 					)
 					const data = await resp.json()
+
 					if (!resp.ok || !Array.isArray(data)) return
 
 					const modalBody = document.querySelector('.modal__body')
@@ -2221,24 +2237,30 @@ const initWorksPage = () => {
 						carousel = document.createElement('div')
 						carousel.className = 'departments-carousel'
 						form.insertAdjacentElement('afterend', carousel)
-					} else {
-						carousel.innerHTML = ''
 					}
 
-					data.forEach(dep => {
-						const card = document.createElement('div')
-						card.className = 'department-card'
-						card.dataset.id = dep.id
-						card.innerHTML = `
-                            <img src="/static/images/departments/${
-															dep.slug + '.png' || 'default.png'
-														}" alt="${dep.name}" class="department-card__img">
-                            <div class="department-card__title">${
-															dep.name
-														}</div>
-                        `
-						carousel.appendChild(card)
-					})
+					if (data.length === 0) {
+						const noDepartmentsMessage = document.createElement('div')
+						noDepartmentsMessage.style.textAlign = 'center'
+						noDepartmentsMessage.style.padding = '20px'
+						noDepartmentsMessage.style.fontSize = '16px'
+						noDepartmentsMessage.style.color = '#666'
+						noDepartmentsMessage.textContent =
+							'Стандартные отделы для продукта не заданы.'
+
+						carousel.appendChild(noDepartmentsMessage)
+					} else {
+						data.forEach(dep => {
+							const card = document.createElement('div')
+							card.className = 'department-card'
+							card.dataset.id = dep.id
+							card.innerHTML = `
+            <img src="/static/images/departments/${dep.slug || 'default'}.png" alt="${dep.name}" class="department-card__img">
+            <div class="department-card__title">${dep.name}</div>
+        `
+							carousel.appendChild(card)
+						})
+					}
 				} catch (e) {
 					console.warn('Ошибка загрузки отделов:', e)
 				}
@@ -2273,7 +2295,7 @@ const initWorksPage = () => {
 						) {
 							const existingObjectItem = document
 								.querySelector(
-									`[data-target="object-${result.client_id}-${result.id}"]`
+									`[data-target="object-${result.client_id}-${result.id}"]`,
 								)
 								?.closest('li')
 
@@ -2282,13 +2304,13 @@ const initWorksPage = () => {
 
 								const newItem = document
 									.querySelector(
-										`[data-target="object-${result.client_id}-${result.id}"]`
+										`[data-target="object-${result.client_id}-${result.id}"]`,
 									)
 									?.closest('li')
 
 								if (newItem) {
 									const newRow = newItem.querySelector(
-										'.debtors-office-list__row'
+										'.debtors-office-list__row',
 									)
 									if (newRow) {
 										newRow.addEventListener('click', async function (e) {
@@ -2298,7 +2320,7 @@ const initWorksPage = () => {
 											if (!details) return
 
 											const btn = newRow.querySelector(
-												'.debtors-office-list__toggle'
+												'.debtors-office-list__toggle',
 											)
 											if (btn) btn.classList.toggle('open')
 											details.classList.toggle('open')
@@ -2306,7 +2328,7 @@ const initWorksPage = () => {
 									}
 
 									const productRows = newItem.querySelectorAll(
-										'.debtors-office-list__row[data-target^="product-"]'
+										'.debtors-office-list__row[data-target^="product-"]',
 									)
 									productRows.forEach(row => {
 										row.addEventListener('click', async function (e) {
@@ -2316,7 +2338,7 @@ const initWorksPage = () => {
 											if (!details) return
 
 											const btn = row.querySelector(
-												'.debtors-office-list__toggle'
+												'.debtors-office-list__toggle',
 											)
 											if (btn) btn.classList.toggle('open')
 											details.classList.toggle('open')
@@ -2335,7 +2357,7 @@ const initWorksPage = () => {
 												if (productId && clientId && objectId) {
 													try {
 														const resp = await fetch(
-															`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`
+															`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`,
 														)
 														const data = await resp.json()
 														loader.remove()
@@ -2466,7 +2488,7 @@ const initWorksPage = () => {
 							dw.status_name === 'Готово'
 								? `<span style="position:absolute;top:10px;right:10px;display:inline-block;width:14px;height:14px;background:#4caf50;border-radius:50%;border:2px solid #fff;" title="Готово${
 										dw.completed_at ? ' — ' + dw.completed_at : ''
-								  }"></span>`
+									}"></span>`
 								: ''
 
 						card.innerHTML = `
@@ -2488,11 +2510,12 @@ const initWorksPage = () => {
 						addBtn.onclick = async () => {
 							if (!orderId) {
 								showError(
-									'Не удалось определить заказ для добавления работы отделу'
+									'Не удалось определить заказ для добавления работы отделу',
 								)
 								return
 							}
 
+							// TODO: Нужно показывать не список отделов а в виде карточек
 							const config = {
 								submitUrl: '/departments/work/create/',
 								formId: 'add-work-form',
@@ -2514,7 +2537,7 @@ const initWorksPage = () => {
 										showSuccess('Работа отдела успешно добавлена')
 										result.created.forEach(createdWork => {
 											const dep = departments.find(
-												d => d.name === createdWork.department_name
+												d => d.name === createdWork.department_name,
 											)
 											if (!dep) return
 
@@ -2533,7 +2556,7 @@ const initWorksPage = () => {
 												}
 
 											const addCard = carousel.querySelector(
-												'.department-card--add'
+												'.department-card--add',
 											)
 											carousel.insertBefore(card, addCard)
 										})
@@ -2569,11 +2592,11 @@ const initWorksPage = () => {
 						const unitPrice = unitPriceAN
 							? unitPriceAN.getNumber()
 							: parseFloat(
-									unit_priceInput.value.replace(/\s/g, '').replace(',', '.')
-							  ) || 0
+									unit_priceInput.value.replace(/\s/g, '').replace(',', '.'),
+								) || 0
 						const quantity =
 							parseFloat(
-								quantityInput.value.replace(/\s/g, '').replace(',', '.')
+								quantityInput.value.replace(/\s/g, '').replace(',', '.'),
 							) || 0
 
 						if (unitPrice > 0 && quantity > 0) {
@@ -2627,7 +2650,7 @@ const initWorksPage = () => {
 										'X-CSRFToken': getCSRFToken(),
 									},
 									credentials: 'same-origin',
-								}
+								},
 							)
 
 							const data = await resp.json()
@@ -2635,7 +2658,7 @@ const initWorksPage = () => {
 
 							if (!resp.ok || data.status !== 'success') {
 								showError(
-									data.message || data.error || 'Ошибка при удалении объекта'
+									data.message || data.error || 'Ошибка при удалении объекта',
 								)
 								return
 							}
@@ -2648,12 +2671,12 @@ const initWorksPage = () => {
 								objectItem.remove()
 
 								const branchDetails = document.getElementById(
-									`branch-${clientId}`
+									`branch-${clientId}`,
 								)
 								if (branchDetails) {
 									const ul = branchDetails.querySelector('ul')
 									const remainingObjects = ul?.querySelectorAll(
-										'li.debtors-office-list__item'
+										'li.debtors-office-list__item',
 									)
 
 									if (!remainingObjects || remainingObjects.length === 0) {
@@ -2675,7 +2698,7 @@ const initWorksPage = () => {
 							loader.remove()
 							showError(err.message || 'Ошибка при удалении объекта')
 						}
-					}
+					},
 				)
 			} else if (deleteButton.textContent.trim() === 'Удалить расчет') {
 				const selectedRow = document.querySelector('.table__row--selected')
@@ -2707,7 +2730,7 @@ const initWorksPage = () => {
 
 							if (!resp.ok || data.status !== 'success') {
 								showError(
-									data.message || data.error || 'Ошибка при удалении расчета'
+									data.message || data.error || 'Ошибка при удалении расчета',
 								)
 								return
 							}
@@ -2718,7 +2741,7 @@ const initWorksPage = () => {
 							loader.remove()
 							showError(err.message || 'Ошибка при удалении расчета')
 						}
-					}
+					},
 				)
 			} else if (deleteButton.textContent.trim() === 'Убрать из списка') {
 				const selectedRow = document.querySelector('.table__row--selected')
@@ -2726,7 +2749,7 @@ const initWorksPage = () => {
 				const tableId = table?.id || ''
 				if (!selectedRow || !tableId.startsWith('order-viewers-')) {
 					showError(
-						'Выберите пользователя для удаления из списка наблюдателей.'
+						'Выберите пользователя для удаления из списка наблюдателей.',
 					)
 					return
 				}
@@ -2755,7 +2778,7 @@ const initWorksPage = () => {
 									},
 									body: `user_id=${encodeURIComponent(userId)}`,
 									credentials: 'same-origin',
-								}
+								},
 							)
 							const data = await resp.json()
 							loader.remove()
@@ -2763,7 +2786,7 @@ const initWorksPage = () => {
 								showError(
 									data.message ||
 										data.error ||
-										'Ошибка при удалении пользователя из списка'
+										'Ошибка при удалении пользователя из списка',
 								)
 								return
 							}
@@ -2772,10 +2795,10 @@ const initWorksPage = () => {
 						} catch (err) {
 							loader.remove()
 							showError(
-								err.message || 'Ошибка при удалении пользователя из списка'
+								err.message || 'Ошибка при удалении пользователя из списка',
 							)
 						}
-					}
+					},
 				)
 			}
 		})
@@ -2821,7 +2844,7 @@ const initWorksPage = () => {
 					`/commerce/orders/${orderId}/viewers/`,
 					{
 						headers: { 'X-Requested-With': 'XMLHttpRequest' },
-					}
+					},
 				)
 				const viewersData = await viewersResp.json()
 				container.innerHTML = viewersData.html || '<div>Нет наблюдателей</div>'
@@ -2837,7 +2860,7 @@ const initWorksPage = () => {
 					if (viewersSelectInput) {
 						if (viewersSelectInput.multiple) {
 							viewers = Array.from(viewersSelectInput.selectedOptions).map(
-								opt => opt.value
+								opt => opt.value,
 							)
 						} else {
 							if (viewersSelectInput.value) viewers = [viewersSelectInput.value]
@@ -2863,13 +2886,13 @@ const initWorksPage = () => {
 									.map(id => `viewers[]=${encodeURIComponent(id)}`)
 									.join('&'),
 								credentials: 'same-origin',
-							}
+							},
 						)
 						const data = await resp.json()
 						loader.remove()
 						if (!resp.ok || data.status !== 'success') {
 							showError(
-								data.message || data.error || 'Ошибка добавления наблюдателей'
+								data.message || data.error || 'Ошибка добавления наблюдателей',
 							)
 							return
 						}
@@ -3038,7 +3061,7 @@ async function loadFirstClientFromTable() {
 	if (!table) return
 
 	const firstRow = table.querySelector(
-		'tbody tr:not(.table__row--empty):not(.table__row--summary)'
+		'tbody tr:not(.table__row--empty):not(.table__row--summary)',
 	)
 	if (!firstRow) return
 
@@ -3343,14 +3366,14 @@ function attachClientFormHandlers() {
 				e.preventDefault()
 				active = Math.min(active + 1, items.length - 1)
 				items.forEach(
-					(it, i) => (it.style.background = i === active ? '#eef' : '')
+					(it, i) => (it.style.background = i === active ? '#eef' : ''),
 				)
 				items[active].scrollIntoView({ block: 'nearest' })
 			} else if (e.key === 'ArrowUp') {
 				e.preventDefault()
 				active = Math.max(active - 1, 0)
 				items.forEach(
-					(it, i) => (it.style.background = i === active ? '#eef' : '')
+					(it, i) => (it.style.background = i === active ? '#eef' : ''),
 				)
 				items[active].scrollIntoView({ block: 'nearest' })
 			} else if (e.key === 'Enter') {
@@ -3365,7 +3388,7 @@ function attachClientFormHandlers() {
 		document.addEventListener('click', ev => {
 			if (innInput) {
 				const container = innInput.parentNode.querySelector(
-					'.dadata-suggestions'
+					'.dadata-suggestions',
 				)
 				if (
 					container &&
@@ -3445,7 +3468,7 @@ function initClientsPagination() {
 				`${BASE_URL}clients/list/paginate/?page=${pageNum}`,
 				{
 					headers: { 'X-Requested-With': 'XMLHttpRequest' },
-				}
+				},
 			)
 			const data = await response.json()
 
@@ -3473,7 +3496,7 @@ function initClientsPagination() {
 				const tableElem = document.getElementById(clientsTableId)
 				if (tableElem) {
 					const rows = tableElem.querySelectorAll(
-						'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+						'tbody tr:not(.table__row--summary):not(.table__row--empty)',
 					)
 					hasRows = rows && rows.length > 0
 					if (rows && client_ids && client_ids.length === rows.length) {
@@ -3485,7 +3508,7 @@ function initClientsPagination() {
 
 				if (hasRows) {
 					const prev = document.querySelector(
-						'#clients-table tbody tr.table__row--selected'
+						'#clients-table tbody tr.table__row--selected',
 					)
 					if (prev) prev.classList.remove('table__row--selected')
 					setTimeout(loadFirstClientFromTable, 50)
@@ -3510,7 +3533,7 @@ function initClientsPagination() {
 				})
 				if (!response.ok) {
 					showError(
-						data?.error || data?.message || 'Ошибка загрузки списка клиентов.'
+						data?.error || data?.message || 'Ошибка загрузки списка клиентов.',
 					)
 				}
 			}
@@ -3626,7 +3649,7 @@ function initArchivePage() {
 						`${BASE_URL}documents/table/${orderId}/`,
 						{
 							headers: { 'X-Requested-With': 'XMLHttpRequest' },
-						}
+						},
 					)
 					const data = await docsResp.json()
 					if (docsResp.ok) {
@@ -3637,16 +3660,17 @@ function initArchivePage() {
 							if (urls.length) {
 								const table =
 									documentsContainer.querySelector(
-										`table#order-documents-${orderId}`
+										`table#order-documents-${orderId}`,
 									) || documentsContainer.querySelector('table')
 								if (table) {
 									const ths = Array.from(table.querySelectorAll('thead th'))
 									const fileColIndex = ths.findIndex(
-										th => th && th.dataset && th.dataset.name === 'file_display'
+										th =>
+											th && th.dataset && th.dataset.name === 'file_display',
 									)
 									if (fileColIndex !== -1) {
 										const rows = table.querySelectorAll(
-											'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+											'tbody tr:not(.table__row--summary):not(.table__row--empty)',
 										)
 										rows.forEach((row, idx) => {
 											const cell = row.children[fileColIndex]
@@ -3663,13 +3687,13 @@ function initArchivePage() {
 						} catch (err) {
 							console.warn(
 								'Не удалось применить ссылки к колонке file_display:',
-								err
+								err,
 							)
 						}
 					} else {
 						documentsContainer.innerHTML = data.html || ''
 						showError(
-							data.error || data.message || 'Ошибка загрузки документов заказа'
+							data.error || data.message || 'Ошибка загрузки документов заказа',
 						)
 					}
 				} else {
@@ -3758,7 +3782,7 @@ function initArchivePage() {
 											},
 											credentials: 'same-origin',
 											body: fd,
-										}
+										},
 									)
 
 									const payload = await uploadResp.json()
@@ -3767,13 +3791,13 @@ function initArchivePage() {
 										showError(
 											payload.message ||
 												payload.error ||
-												'Ошибка загрузки файла'
+												'Ошибка загрузки файла',
 										)
 									} else {
 										const tableId = `order-documents-${orderId}`
 										const newRow = await TableManager.addTableRow(
 											payload,
-											tableId
+											tableId,
 										)
 										if (
 											newRow &&
@@ -3783,7 +3807,7 @@ function initArchivePage() {
 										) {
 											newRow.setAttribute(
 												'data-id',
-												String(payload.id || payload.pk)
+												String(payload.id || payload.pk),
 											)
 										}
 										showSuccess('Файл успешно загружен')
@@ -3792,13 +3816,13 @@ function initArchivePage() {
 											const table = document.getElementById(tableId)
 											if (table && payload.url) {
 												const ths = Array.from(
-													table.querySelectorAll('thead th')
+													table.querySelectorAll('thead th'),
 												)
 												const fileColIndex = ths.findIndex(
 													th =>
 														th &&
 														th.dataset &&
-														th.dataset.name === 'file_display'
+														th.dataset.name === 'file_display',
 												)
 												if (fileColIndex !== -1) {
 													const row = table.querySelector('tbody tr:last-child')
@@ -3816,7 +3840,7 @@ function initArchivePage() {
 										} catch (e) {
 											console.warn(
 												'Не удалось применить ссылку к новой строке:',
-												e
+												e,
 											)
 										}
 									}
@@ -3841,7 +3865,7 @@ function initArchivePage() {
 			} catch (e) {
 				console.warn(
 					'Ошибка инициализации загрузчика документов в модальном окне:',
-					e
+					e,
 				)
 			}
 
@@ -3869,7 +3893,7 @@ function initArchivePage() {
 					try {
 						const docsResp2 = await fetch(
 							`${BASE_URL}documents/table/${orderId}/`,
-							{ headers: { 'X-Requested-With': 'XMLHttpRequest' } }
+							{ headers: { 'X-Requested-With': 'XMLHttpRequest' } },
 						)
 						const data = await docsResp2.json()
 						if (docsResp2.ok) {
@@ -3880,18 +3904,18 @@ function initArchivePage() {
 								if (urls.length) {
 									const table =
 										documentsContainer.querySelector(
-											`table#order-documents-${orderId}`
+											`table#order-documents-${orderId}`,
 										) || documentsContainer.querySelector('table')
 									if (table) {
 										const ths = Array.from(table.querySelectorAll('thead th'))
 										const fileColIndex = ths.findIndex(
 											th =>
-												th && th.dataset && th.dataset.name === 'file_display'
+												th && th.dataset && th.dataset.name === 'file_display',
 										)
 
 										if (fileColIndex !== -1) {
 											const rows = table.querySelectorAll(
-												'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+												'tbody tr:not(.table__row--summary):not(.table__row--empty)',
 											)
 											rows.forEach((row, idx) => {
 												const cell = row.children[fileColIndex]
@@ -3908,7 +3932,7 @@ function initArchivePage() {
 							} catch (err) {
 								console.warn(
 									'Не удалось применить ссылки к колонке file_display:',
-									err
+									err,
 								)
 							}
 
@@ -3927,7 +3951,7 @@ function initArchivePage() {
 							} catch (e) {
 								console.warn(
 									'Не удалось инициализировать таблицу документов после обновления:',
-									e
+									e,
 								)
 							}
 						} else {
@@ -3935,7 +3959,7 @@ function initArchivePage() {
 							showError(
 								data.error ||
 									data.message ||
-									'Ошибка загрузки документов заказа'
+									'Ошибка загрузки документов заказа',
 							)
 						}
 					} catch (err) {
@@ -3950,7 +3974,7 @@ function initArchivePage() {
 
 	document.addEventListener('dblclick', function (e) {
 		const row = e.target.closest(
-			'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+			'tbody tr:not(.table__row--summary):not(.table__row--empty)',
 		)
 		const table = e.target.closest('table')
 		if (!row || !table) return
@@ -3977,7 +4001,7 @@ function initArchivePage() {
 				viewBtn.click()
 			} catch (err) {
 				viewBtn.dispatchEvent(
-					new MouseEvent('click', { bubbles: true, cancelable: true })
+					new MouseEvent('click', { bubbles: true, cancelable: true }),
 				)
 			}
 		}
@@ -4014,7 +4038,7 @@ const initDepartmentPage = departmentSlug => {
 	if (orderIdFromQuery) {
 		const observer = new MutationObserver(() => {
 			const idInput = document.querySelector(
-				'#department_orders-table thead input[name="id"]'
+				'#department_orders-table thead input[name="id"]',
 			)
 			if (idInput) {
 				idInput.value = orderIdFromQuery
@@ -4157,7 +4181,7 @@ const initDepartmentPage = departmentSlug => {
 
 	document.addEventListener('dblclick', function (e) {
 		const row = e.target.closest(
-			'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+			'tbody tr:not(.table__row--summary):not(.table__row--empty)',
 		)
 		const table = e.target.closest('table')
 
@@ -4179,7 +4203,7 @@ const initDepartmentPage = departmentSlug => {
 			if (rowId) {
 				viewBtn =
 					document.querySelector(
-						`.view_order_files-button[data-row-id="${rowId}"]`
+						`.view_order_files-button[data-row-id="${rowId}"]`,
 					) || null
 			}
 		}
@@ -4189,14 +4213,14 @@ const initDepartmentPage = departmentSlug => {
 				viewBtn.click()
 			} catch (err) {
 				viewBtn.dispatchEvent(
-					new MouseEvent('click', { bubbles: true, cancelable: true })
+					new MouseEvent('click', { bubbles: true, cancelable: true }),
 				)
 			}
 		}
 	})
 
 	const viewCorrespondenceBtn = document.getElementById(
-		'view_correspondence-button'
+		'view_correspondence-button',
 	)
 
 	if (viewCorrespondenceBtn) {
@@ -4225,7 +4249,7 @@ const initDepartmentPage = departmentSlug => {
 					`/departments/${departmentSlug}/orders/${orderId}/work/`,
 					{
 						headers: { 'X-Requested-With': 'XMLHttpRequest' },
-					}
+					},
 				)
 
 				if (!orderWorkResp.ok) {
@@ -4267,7 +4291,7 @@ const initDepartmentPage = departmentSlug => {
 					let isEmpty = false
 					if (messagesHtml) {
 						const tbodyMatch = messagesHtml.match(
-							/<tbody[^>]*>([\s\S]*?)<\/tbody>/i
+							/<tbody[^>]*>([\s\S]*?)<\/tbody>/i,
 						)
 						if (tbodyMatch) {
 							const tbodyContent = tbodyMatch[1].trim()
@@ -4281,7 +4305,7 @@ const initDepartmentPage = departmentSlug => {
                             Нет сообщений
                         </td>
                     </tr>
-                </tbody>`
+                </tbody>`,
 								)
 							}
 						}
@@ -4327,12 +4351,12 @@ const initDepartmentPage = departmentSlug => {
 						if (table && messagesData.messages_meta) {
 							const ths = Array.from(table.querySelectorAll('thead th'))
 							const authorColIndex = ths.findIndex(
-								th => th && th.dataset && th.dataset.name === 'author'
+								th => th && th.dataset && th.dataset.name === 'author',
 							)
 
 							if (authorColIndex !== -1) {
 								const rows = table.querySelectorAll(
-									'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+									'tbody tr:not(.table__row--summary):not(.table__row--empty)',
 								)
 
 								messagesData.messages_meta.forEach((meta, idx) => {
@@ -4369,7 +4393,7 @@ const initDepartmentPage = departmentSlug => {
 					} catch (e) {
 						console.warn(
 							'Не удалось добавить индикаторы непрочитанных сообщений:',
-							e
+							e,
 						)
 					}
 
@@ -4396,7 +4420,7 @@ const initDepartmentPage = departmentSlug => {
 							messagesData.messages_id_list,
 							type === 'order'
 								? `order-messages-${orderId}`
-								: `order-work-messages-${orderWorkId}`
+								: `order-work-messages-${orderWorkId}`,
 						)
 					}
 				}
@@ -4404,7 +4428,7 @@ const initDepartmentPage = departmentSlug => {
 				const modal = new Modal()
 				await modal.open(
 					'<div class="modal__body"></div>',
-					`Переписка по заказу №${orderId}`
+					`Переписка по заказу №${orderId}`,
 				)
 				loader.remove()
 
@@ -4466,11 +4490,11 @@ const initDepartmentPage = departmentSlug => {
 						? {
 								id: 'recipient',
 								url: `/users/orders/${orderId}/users/`,
-						  }
+							}
 						: {
 								id: 'recipient',
 								url: `/departments/users/${departmentSlug}/?order_work_id=${orderWorkId}`,
-						  },
+							},
 				],
 				onSuccess: async result => {
 					if (
@@ -4493,10 +4517,10 @@ const initDepartmentPage = departmentSlug => {
 
 								try {
 									const ths = Array.from(
-										messagesTable.querySelectorAll('thead th')
+										messagesTable.querySelectorAll('thead th'),
 									)
 									const authorColIndex = ths.findIndex(
-										th => th && th.dataset && th.dataset.name === 'author'
+										th => th && th.dataset && th.dataset.name === 'author',
 									)
 
 									if (
@@ -4537,14 +4561,14 @@ const initDepartmentPage = departmentSlug => {
 								} catch (e) {
 									console.warn(
 										'Не удалось добавить индикатор к новому сообщению:',
-										e
+										e,
 									)
 								}
 
 								TableManager.attachRowCellHandlers(newRow)
 								TableManager.formatCurrencyValuesForRow(
 									messagesTable.id,
-									newRow
+									newRow,
 								)
 								TableManager.applyColumnWidthsForRow(messagesTable.id, newRow)
 
@@ -4650,7 +4674,7 @@ const initDepartmentPage = departmentSlug => {
 
 						const tbody = existingRow.parentNode
 						const existingRowIndex = Array.from(tbody.children).indexOf(
-							existingRow
+							existingRow,
 						)
 
 						existingRow.outerHTML = result.html
@@ -4664,10 +4688,10 @@ const initDepartmentPage = departmentSlug => {
 
 							try {
 								const ths = Array.from(
-									messagesTable.querySelectorAll('thead th')
+									messagesTable.querySelectorAll('thead th'),
 								)
 								const authorColIndex = ths.findIndex(
-									th => th && th.dataset && th.dataset.name === 'author'
+									th => th && th.dataset && th.dataset.name === 'author',
 								)
 
 								if (
@@ -4706,7 +4730,7 @@ const initDepartmentPage = departmentSlug => {
 							} catch (e) {
 								console.warn(
 									'Не удалось обновить индикатор непрочитанности:',
-									e
+									e,
 								)
 							}
 
@@ -4717,7 +4741,7 @@ const initDepartmentPage = departmentSlug => {
 							showSuccess('Сообщение успешно обновлено')
 						} else {
 							console.warn(
-								'Не удалось найти или заменить строку после обновления'
+								'Не удалось найти или заменить строку после обновления',
 							)
 						}
 					}
@@ -4780,7 +4804,7 @@ const initDepartmentPage = departmentSlug => {
 									'X-CSRFToken': getCSRFToken(),
 								},
 								credentials: 'same-origin',
-							}
+							},
 						)
 
 						const data = await resp.json()
@@ -4788,7 +4812,7 @@ const initDepartmentPage = departmentSlug => {
 
 						if (!resp.ok || data.status !== 'success') {
 							showError(
-								data.message || data.error || 'Ошибка при удалении сообщения'
+								data.message || data.error || 'Ошибка при удалении сообщения',
 							)
 							return
 						}
@@ -4796,7 +4820,7 @@ const initDepartmentPage = departmentSlug => {
 						selectedRow.remove()
 
 						const remainingRows = messagesTable.querySelectorAll(
-							'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+							'tbody tr:not(.table__row--summary):not(.table__row--empty)',
 						)
 
 						if (remainingRows.length === 0) {
@@ -4817,7 +4841,7 @@ const initDepartmentPage = departmentSlug => {
 						loader.remove()
 						showError(err.message || 'Ошибка при удалении сообщения')
 					}
-				}
+				},
 			)
 		})
 	}
@@ -4867,7 +4891,7 @@ const initDepartmentPage = departmentSlug => {
 					showError(
 						messagesData.error ||
 							messagesData.message ||
-							'Ошибка загрузки сообщений'
+							'Ошибка загрузки сообщений',
 					)
 					return
 				}
@@ -4894,7 +4918,7 @@ const initDepartmentPage = departmentSlug => {
 						showError(
 							messagesData.error ||
 								messagesData.message ||
-								'Ошибка загрузки сообщений'
+								'Ошибка загрузки сообщений',
 						)
 						return
 					}
@@ -4914,12 +4938,12 @@ const initDepartmentPage = departmentSlug => {
 						if (table && messagesData.messages_meta) {
 							const ths = Array.from(table.querySelectorAll('thead th'))
 							const authorColIndex = ths.findIndex(
-								th => th && th.dataset && th.dataset.name === 'author'
+								th => th && th.dataset && th.dataset.name === 'author',
 							)
 
 							if (authorColIndex !== -1) {
 								const rows = table.querySelectorAll(
-									'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+									'tbody tr:not(.table__row--summary):not(.table__row--empty)',
 								)
 
 								messagesData.messages_meta.forEach((meta, idx) => {
@@ -4956,7 +4980,7 @@ const initDepartmentPage = departmentSlug => {
 					} catch (e) {
 						console.warn(
 							'Не удалось добавить индикаторы непрочитанных сообщений:',
-							e
+							e,
 						)
 					}
 
@@ -4986,7 +5010,7 @@ const initDepartmentPage = departmentSlug => {
 							messagesData.messages_id_list,
 							tableIdMatch && tableIdMatch[1]
 								? `order-work-messages-${tableIdMatch[1]}`
-								: `order-messages-${tableIdOrderMatch[1]}`
+								: `order-messages-${tableIdOrderMatch[1]}`,
 						)
 					}
 
@@ -5001,7 +5025,7 @@ const initDepartmentPage = departmentSlug => {
 						messagesData.messages_id_list,
 						tableIdMatch && tableIdMatch[1]
 							? `order-work-messages-${tableIdMatch[1]}`
-							: `order-messages-${tableIdOrderMatch[1]}`
+							: `order-messages-${tableIdOrderMatch[1]}`,
 					)
 				}
 
@@ -5067,21 +5091,21 @@ document.addEventListener('DOMContentLoaded', () => {
 			])
 
 			const viewOrderFilesBtn = document.getElementById(
-				'view_order_files-button'
+				'view_order_files-button',
 			)
 			if (viewOrderFilesBtn) {
 				setupOrderFilesButton2(viewOrderFilesBtn)
 			}
 
 			const viewOrderPaymentsBtn = document.getElementById(
-				'view_order_payments-button'
+				'view_order_payments-button',
 			)
 
 			if (viewOrderPaymentsBtn) {
 				viewOrderPaymentsBtn.addEventListener('click', () => {
 					let orderId = null
 					const selectedCell = document.querySelector(
-						'td.table__cell--selected'
+						'td.table__cell--selected',
 					)
 					if (selectedCell) {
 						const v = selectedCell.textContent.trim()
@@ -5089,7 +5113,7 @@ document.addEventListener('DOMContentLoaded', () => {
 					}
 					if (!orderId) {
 						const selectedRow = document.querySelector(
-							'tr.table__row--selected'
+							'tr.table__row--selected',
 						)
 						if (selectedRow) {
 							const firstCell = selectedRow.querySelector('td')
@@ -5111,13 +5135,13 @@ document.addEventListener('DOMContentLoaded', () => {
 			initDepartmentPage(departmentSlug)
 		} else {
 			console.error(
-				`No specific initialization logic defined for URL segment: ${urlName}`
+				`No specific initialization logic defined for URL segment: ${urlName}`,
 			)
 		}
 	} else {
 		console.error(
 			'Could not determine page context from URL pathname:',
-			pathname
+			pathname,
 		)
 	}
 
@@ -5144,7 +5168,7 @@ document.addEventListener('DOMContentLoaded', () => {
 	}
 
 	const renameOrderDocumentButton = document.getElementById(
-		'rename-order-document-button'
+		'rename-order-document-button',
 	)
 
 	if (renameOrderDocumentButton) {
@@ -5175,7 +5199,7 @@ document.addEventListener('DOMContentLoaded', () => {
 			try {
 				const ths = Array.from(table.querySelectorAll('thead th'))
 				fileColIndex = ths.findIndex(
-					th => th && th.dataset && th.dataset.name === 'file_display'
+					th => th && th.dataset && th.dataset.name === 'file_display',
 				)
 			} catch (e) {
 				fileColIndex = -1
@@ -5212,6 +5236,7 @@ document.addEventListener('DOMContentLoaded', () => {
 				return
 			}
 			const nameInput = form.querySelector('#name')
+			const commentInput = form.querySelector('#comment')
 			if (!nameInput) {
 				showError('Поле имени не найдено')
 				return
@@ -5219,9 +5244,20 @@ document.addEventListener('DOMContentLoaded', () => {
 			nameInput.value = nameOnly
 			nameInput.focus()
 
+			const commentColIndex = Array.from(
+				selectedRow.closest('table').querySelectorAll('thead th'),
+			).findIndex(th => th.dataset.name === 'comment')
+
+			commentInput.value =
+				commentColIndex !== -1
+					? selectedRow.children[commentColIndex]?.textContent.trim() || ''
+					: ''
+
 			form.onsubmit = async e => {
 				e.preventDefault()
 				let newNameRaw = nameInput.value.trim()
+				let newComment = commentInput.value.trim()
+
 				if (!newNameRaw) {
 					showError('Имя файла не может быть пустым')
 					return
@@ -5241,15 +5277,15 @@ document.addEventListener('DOMContentLoaded', () => {
 								'X-Requested-With': 'XMLHttpRequest',
 							},
 							credentials: 'same-origin',
-							body: `name=${encodeURIComponent(finalName)}`,
-						}
+							body: `name=${encodeURIComponent(finalName)}&comment=${encodeURIComponent(newComment)}`,
+						},
 					)
 					const payload = await renameResp.json()
 					if (!renameResp.ok || payload.status !== 'success') {
 						showError(
 							payload.message ||
 								payload.error ||
-								'Ошибка при переименовании файла'
+								'Ошибка при переименовании файла',
 						)
 						return
 					}
@@ -5262,6 +5298,11 @@ document.addEventListener('DOMContentLoaded', () => {
 						} else {
 							fileCell.textContent = newDisplay
 						}
+					}
+
+					const commentCell = selectedRow.children[commentColIndex]
+					if (commentCell) {
+						commentCell.textContent = payload.comment || newComment
 					}
 
 					showSuccess('Файл успешно переименован')
@@ -5280,7 +5321,7 @@ document.addEventListener('DOMContentLoaded', () => {
 	}
 
 	const deleteOrderDocumentButton = document.getElementById(
-		'delete-order-document-button'
+		'delete-order-document-button',
 	)
 
 	if (deleteOrderDocumentButton) {
@@ -5327,7 +5368,7 @@ document.addEventListener('DOMContentLoaded', () => {
 						l.remove()
 						if (!resp.ok || payload.status !== 'success') {
 							showError(
-								payload.message || payload.error || 'Ошибка при удалении файла'
+								payload.message || payload.error || 'Ошибка при удалении файла',
 							)
 							return
 						}
@@ -5337,7 +5378,7 @@ document.addEventListener('DOMContentLoaded', () => {
 						try {
 							const tbody = table.querySelector('tbody')
 							const remaining = tbody.querySelectorAll(
-								'tr:not(.table__row--summary):not(.table__row--empty)'
+								'tr:not(.table__row--summary):not(.table__row--empty)',
 							)
 							if (remaining.length === 0) {
 								tbody.innerHTML = `<tr class="table__row--empty"><td colspan="100%" style="text-align:center;padding:20px">Нет файлов</td></tr>`
@@ -5346,7 +5387,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 						try {
 							const documentsContainer = document.getElementById(
-								'documents-container'
+								'documents-container',
 							)
 							if (documentsContainer) {
 								const tidMatch = table.id.match(/^order-documents-(\d+)/)
@@ -5365,7 +5406,7 @@ document.addEventListener('DOMContentLoaded', () => {
 						l.remove()
 						showError(err.message || 'Ошибка при удалении файла')
 					}
-				}
+				},
 			)
 		})
 	}
@@ -5472,7 +5513,7 @@ document.addEventListener(
 
 		link.addEventListener('mouseleave', removePreview)
 	},
-	true
+	true,
 )
 
 document.addEventListener(
@@ -5580,5 +5621,5 @@ document.addEventListener(
 			document.addEventListener('mousedown', previewCloseHandler, true)
 		}, 0)
 	},
-	true
+	true,
 )

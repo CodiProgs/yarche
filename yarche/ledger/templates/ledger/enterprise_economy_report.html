@@ -1,8 +1,8 @@
 {% extends "layout.html" %}
 {% load static %}
 {% block content %}
-    <div class="page-table-container" id="payments-container">
-        {% include "components/table.html" with id="payments-table" fields=fields data=data %}
+    <div class="page-table-container" id="enterprise-economy-container">
+        {% include "components/table.html" with id="enterprise-economy-table" fields=fields data=data %}
         <div id="context-menu"
             class="dropdown-menu"
             data-is-admin="{% if request.user.user_type and request.user.user_type.name == 'Администратор' %}true{% else %}false{% endif %}">
@@ -16,7 +16,6 @@
     </div>
 {% endblock content %}
 {% block extra_scripts %}
-    {{ restricted_user|json_script:"restricted-user" }}
     {{ block.super }}
     <script src="{% static 'ledger/js/ledger2.js' %}" type="module"></script>
 {% endblock extra_scripts %}

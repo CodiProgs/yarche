@@ -13,6 +13,7 @@ export class DynamicFormHandler {
 		this.config = {
 			submitUrl: '',
 			formId: '',
+			queryParams: {},
 			...config,
 		}
 		this.currentEditId = null
@@ -113,7 +114,7 @@ export class DynamicFormHandler {
 		try {
 			const response = await fetch(
 				`${this.config.getUrl}${this.currentEditId}/`,
-				{ headers: { 'X-Requested-With': 'XMLHttpRequest' } }
+				{ headers: { 'X-Requested-With': 'XMLHttpRequest' } },
 			)
 
 			if (!response.ok) throw new Error('Failed to load edit data')
@@ -139,7 +140,8 @@ export class DynamicFormHandler {
 
 			if (!element) continue
 
-			const processedValue = fieldName === 'amount' ? Math.abs(value) : value
+			const processedValue =
+				fieldName === 'amount' ? Math.round(Math.abs(parseFloat(value))) : value
 			this.setFieldValue(element, processedValue)
 
 			element.dispatchEvent(new Event('change', { bubbles: true }))
@@ -192,7 +194,7 @@ export class DynamicFormHandler {
 
 			values.forEach(val => {
 				const option = selectContainer.querySelector(
-					`.select__option[data-value="${val}"]`
+					`.select__option[data-value="${val}"]`,
 				)
 				if (option) {
 					const checkbox = option.querySelector('.select__checkbox')
@@ -208,13 +210,13 @@ export class DynamicFormHandler {
 					: selectInput.getAttribute('placeholder') || ''
 				textElement.classList.toggle(
 					'select__placeholder',
-					selectedNames.length === 0
+					selectedNames.length === 0,
 				)
 			}
 			selectContainer.classList.toggle('has-value', selectedNames.length > 0)
 		} else {
 			const option = selectContainer?.querySelector(
-				`.select__option[data-value="${value}"]`
+				`.select__option[data-value="${value}"]`,
 			)
 			if (option) {
 				const textElement = selectContainer.querySelector('.select__text')
@@ -257,9 +259,15 @@ export class DynamicFormHandler {
 			const formData = new FormData(form)
 			const csrfToken = this.getCSRFToken(form)
 
-			const url = this.currentEditId
-				? `${this.config.submitUrl}${this.currentEditId}/`
-				: this.config.submitUrl
+			let url = new URL(this.config.submitUrl, window.location.origin)
+			if (this.currentEditId) {
+				url.pathname += `${this.currentEditId}/`
+			}
+			if (this.config.queryParams) {
+				Object.keys(this.config.queryParams).forEach(key => {
+					url.searchParams.append(key, this.config.queryParams[key])
+				})
+			}
 
 			let requestOptions = {
 				method: 'POST',
@@ -270,7 +278,7 @@ export class DynamicFormHandler {
 
 			requestOptions.body = formData
 
-			const response = await fetch(url, requestOptions)
+			const response = await fetch(url.toString(), requestOptions)
 
 			await this.handleFormResponse(response)
 		} catch (error) {

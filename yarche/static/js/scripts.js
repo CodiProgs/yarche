@@ -40,3 +40,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
 	observerInputs.observe(document.body, { childList: true, subtree: true })
 })
+
+document.addEventListener('DOMContentLoaded', () => {
+	const processCheckboxes = () => {
+		const checkboxes = document.querySelectorAll('.checkbox')
+
+		checkboxes.forEach(checkbox => {
+			const checkboxInput = checkbox.querySelector('.checkbox__input')
+			const checkboxBox = checkbox.querySelector('.checkbox__box')
+
+			if (!checkboxInput || !checkboxBox) return
+
+			if (checkboxBox.dataset.initialized === 'true') return
+			checkboxBox.dataset.initialized = 'true'
+
+			checkboxBox.addEventListener('keydown', event => {
+				if (event.code === 'Space' && !checkboxInput.disabled) {
+					event.preventDefault()
+					checkboxInput.checked = !checkboxInput.checked
+					checkboxInput.dispatchEvent(new Event('change'))
+				}
+			})
+		})
+	}
+
+	processCheckboxes()
+
+	const observer = new MutationObserver(() => {
+		processCheckboxes()
+	})
+
+	observer.observe(document.body, { childList: true, subtree: true })
+})
