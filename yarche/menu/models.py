@@ -8,6 +8,7 @@ class MenuCategory(models.Model):
         ('commerce', 'Продажи'),
         ('departments', 'Отделы'),
         ('report', 'Отчет'),
+        ('settings', 'Настройки')
     ]
     
     name = models.CharField("Название категории", max_length=50, choices=CATEGORY_CHOICES, unique=True)

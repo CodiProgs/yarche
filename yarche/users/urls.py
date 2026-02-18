@@ -18,4 +18,5 @@ urlpatterns = [
     ),
 	
 	path('orders/<int:order_id>/users/', views.order_related_users, name='order_related_users'),
+	path('departments/<int:department_id>/workers/', views.department_workers, name='department_workers'),
 ]

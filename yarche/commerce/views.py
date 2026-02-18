@@ -17,7 +17,7 @@ from django.db.models.functions import Coalesce
 from django.template.loader import render_to_string
 from yarche.utils import get_model_fields
 from django.contrib.auth.decorators import login_required
-from .models import Product, Client, Order, OrderStatus, Contact, FileType, Document, ClientObject, OrderDepartmentWork, KanbanClientPlacement, KanbanColumn, OrderWorkStatus
+from .models import Product, Client, Order, OrderStatus, Contact, FileType, Document, ClientObject, OrderDepartmentWork, KanbanClientPlacement, KanbanColumn, OrderWorkStatus, EmergencyIncident, Department
 from ledger.models import Transaction, BankAccount
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.http import require_http_methods, require_POST
@@ -1946,7 +1946,7 @@ def document_rename(request, pk: int):
                         doc.url = default_storage.url(new_path)
                     except Exception:
                         pass
-                    doc.save(update_fields=["file", "name", "size", "url", "comment"])  # Обновляем поле comment
+                    doc.save(update_fields=["file", "name", "size", "url", "comment"]) 
                     return JsonResponse({"status": "success", "id": doc.id, "name": doc.name, "comment": doc.comment, "url": getattr(doc, "url", "")})
 
                 data = None
@@ -1983,7 +1983,7 @@ def document_rename(request, pk: int):
                     doc.url = getattr(doc.file, "url", None)
                 except Exception:
                     pass
-                doc.save(update_fields=["file", "name", "size", "url", "comment"])  # Обновляем поле comment
+                doc.save(update_fields=["file", "name", "size", "url", "comment"]) 
                 return JsonResponse({"status": "success", "id": doc.id, "name": doc.name, "comment": doc.comment, "url": getattr(doc, "url", "")})
 
             except Exception as e:
@@ -2035,3 +2035,157 @@ def document_delete(request, pk: int):
             return JsonResponse({"status": "success", "id": pk})
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+
+@login_required
+@require_POST
+def create_emergency(request):
+    try:
+        order_id = request.POST.get("order")
+        department_id = request.POST.get("department")
+        resolver_id = request.POST.get("resolver")
+        description = request.POST.get("description", "").strip()
+
+        if not order_id or not department_id or not resolver_id:
+            return JsonResponse({"status": "error", "message": "Не указаны обязательные параметры: order_id, department_id, resolver_id"}, status=400)
+
+        order = get_object_or_404(Order, id=order_id)
+        department = get_object_or_404(Department, id=department_id)
+        resolver = get_object_or_404(User, id=resolver_id)
+
+        work = get_object_or_404(OrderDepartmentWork, order=order, department=department)
+
+        emergency = EmergencyIncident.objects.create(
+            order_department_work=work,
+            resolver=resolver,
+            description=description,
+            started_at=timezone.now(),
+        )
+
+        return JsonResponse({"status": "success", "emergency_id": emergency.id})
+    except ValueError as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+
+
+@login_required
+@require_POST
+def resolve_emergency(request):
+    try:
+        emergency_id = request.POST.get("emergency_id")
+        if not emergency_id:
+            return JsonResponse({"status": "error", "message": "Не указан emergency_id"}, status=400)
+
+        emergency = get_object_or_404(EmergencyIncident, id=emergency_id)
+        emergency.resolve()
+
+        fields = [
+            {"name": "id", "verbose_name": "ID"},
+            {"name": "started_at", "verbose_name": "Начало", "is_date": True},
+            {"name": "description", "verbose_name": "Описание"},
+            {"name": "resolver", "verbose_name": "Работник", "is_relation": True},
+            {"name": "resolved_at", "verbose_name": "Закрытие", "is_date": True},
+            {"name": "is_active", "verbose_name": "Активна", "is_boolean": True},
+        ]
+
+        context = {"item": emergency, "fields": fields}
+        html = render_to_string("components/table_row.html", context)
+
+        return JsonResponse({"status": "success", "id": emergency.id, "html": html})
+    except ValueError as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["GET"])
+def emergency_list(request, order_department_work_id: int):
+    try:
+        order_department_work = get_object_or_404(OrderDepartmentWork, id=order_department_work_id)
+        emergencies = EmergencyIncident.objects.filter(order_department_work=order_department_work).order_by('-started_at')
+
+        fields = [
+            {"name": "id", "verbose_name": "ID"},
+            {"name": "started_at", "verbose_name": "Начало", "is_date": True},
+            {"name": "description", "verbose_name": "Описание"},
+            {"name": "resolver", "verbose_name": "Работник", "is_relation": True},
+            {"name": "resolved_at", "verbose_name": "Закрытие", "is_date": True},
+            {"name": "is_active", "verbose_name": "Активна", "is_boolean": True},
+        ]
+
+        html = render_to_string(
+            "components/table.html",
+            {
+                "fields": fields,
+                "data": emergencies,
+                "id": f"emergencies-{order_department_work_id}",
+            },
+        )
+
+        return JsonResponse({"html": html, "ids": [e.id for e in emergencies], "table_id": f"emergencies-{order_department_work_id}"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["POST", "PUT", "PATCH"])
+def emergency_update(request, pk: int):
+    try:
+        with transaction.atomic():
+            emergency = get_object_or_404(EmergencyIncident, id=pk)
+            data = (
+                json.loads(request.body) if request.method in ["PUT", "PATCH"] else request.POST.dict()
+            )
+
+            if "description" in data:
+                description = data["description"]
+                if isinstance(description, str):
+                    description = description.strip()
+                    if description == "":
+                        description = None
+                emergency.description = description
+
+            if "resolver_id" in data:
+                resolver_id = data["resolver_id"]
+                if resolver_id:
+                    try:
+                        resolver = get_object_or_404(User, id=int(resolver_id))
+                        emergency.resolver = resolver
+                    except (ValueError, TypeError):
+                        return JsonResponse({"status": "error", "message": "Неверный ID resolver"}, status=400)
+                else:
+                    emergency.resolver = None
+
+            emergency.save()
+
+            fields = [
+                {"name": "id", "verbose_name": "ID"},
+                {"name": "started_at", "verbose_name": "Начало", "is_date": True},
+                {"name": "description", "verbose_name": "Описание"},
+                {"name": "resolver", "verbose_name": "Работник", "is_relation": True},
+                {"name": "resolved_at", "verbose_name": "Закрытие", "is_date": True},
+                {"name": "is_active", "verbose_name": "Активна", "is_boolean": True},
+            ]
+
+            context = {"item": emergency, "fields": fields}
+            html = render_to_string("components/table_row.html", context)
+
+            return JsonResponse({"status": "success", "id": emergency.id, "html": html})
+    except json.JSONDecodeError:
+        return JsonResponse({"status": "error", "message": "Неверный формат JSON"}, status=400)
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["GET"])
+def emergency_detail(request, pk: int):
+    emergency = get_object_or_404(EmergencyIncident, id=pk)
+    data = model_to_dict(emergency)
+
+    if "started_at" in data and data["started_at"]:
+        data["started_at"] = localtime(data["started_at"]).strftime("%Y-%m-%d %H:%M")
+    if "resolved_at" in data and data["resolved_at"]:
+        data["resolved_at"] = localtime(data["resolved_at"]).strftime("%Y-%m-%d %H:%M")
+
+    return JsonResponse({"data": data})

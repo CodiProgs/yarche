@@ -1,0 +1,47 @@
+{% load static %}
+{% load components %}
+{% add_style 'css/modal-form.css' %}
+<form class="modal-form" id="emergency-form" method="post">
+    <div class="modal-form__content">
+        {% csrf_token %}
+        <input class="modal-form__input"
+            type="text"
+            id="department"
+            spellcheck="false"
+            autocapitalize="off"
+            autocorrect="off"
+            autocomplete="off"
+            hidden
+            name="department">
+        <input class="modal-form__input"
+            type="text"
+            id="order"
+            spellcheck="false"
+            autocapitalize="off"
+            autocorrect="off"
+            autocomplete="off"
+            hidden
+            name="order">
+		<div class="modal-form__group">
+			<label class="modal-form__label" for="resolver">Клиент</label>
+            {% include "components/select.html" with id="resolver" placeholder="Выберите исполнителя" %}
+        </div>
+        <div class="modal-form__group">
+            <div class="input-container">
+                <textarea class="modal-form__textarea"
+                          type="text"
+                          id="description"
+                          name="description"
+                       autocapitalize="off"
+                       autocorrect="off"
+                       autocomplete="off"
+                          placeholder="Комментарий"></textarea>
+                <img src="{% static 'images/close.svg' %}" alt="Clear" class="clear-button">
+            </div>
+        </div>
+        <div class="modal-form__buttons">
+            <button class="button modal-form__button" type="submit">Сохранить</button>
+            <button class="button modal-form__button button--cancel" type="button">Отменить</button>
+        </div>
+    </div>
+</form>

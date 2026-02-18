@@ -319,3 +319,58 @@ class OrderDepartmentWorkMessage(models.Model):
         verbose_name = "Сообщение по работе отдела"
         verbose_name_plural = "Сообщения по работам отделов"
         ordering = ['-created']
+
+
+class EmergencyIncident(models.Model):
+    order_department_work = models.ForeignKey(
+        OrderDepartmentWork,
+        on_delete=models.CASCADE,
+        verbose_name="Работа отдела по заказу",
+        related_name="emergencies",
+        help_text="Авария связана с этой работой отдела"
+    )
+    started_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Начало аварии",
+        help_text="Когда была зафиксирована авария"
+    )
+    description = models.TextField(
+        verbose_name="Описание аварии",
+        blank=True,
+        null=True,
+        help_text="Подробное описание аварии"
+    )
+    resolver = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        verbose_name="Работник по устранению",
+        related_name="resolved_emergencies",
+        blank=True,
+        null=True,
+        help_text="Пользователь, назначенный для устранения аварии"
+    )
+    resolved_at = models.DateTimeField(
+        verbose_name="Закрытие аварии",
+        blank=True,
+        null=True,
+        help_text="Когда авария была закрыта"
+    )
+
+    def __str__(self):
+        return f"Авария для {self.order_department_work} - {self.started_at.strftime('%d.%m.%Y %H:%M')}"
+
+    def is_active(self):
+        """Проверяет, активна ли авария"""
+        return self.resolved_at is None
+
+    def resolve(self):
+        """Метод для закрытия аварии"""
+        from django.utils import timezone
+        self.resolved_at = timezone.now()
+        self.save()
+
+    class Meta:
+        verbose_name = "Авария"
+        verbose_name_plural = "Аварии"
+        ordering = ['-started_at']
+        

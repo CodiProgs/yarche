@@ -21,6 +21,9 @@
                id="view_order_files-button"
                data-action="view_order_files">Файлы заказа</a>
             <a class="dropdown-item context-action"
+               id="emergency-button"
+               data-action="emergency">Авария</a>
+            <a class="dropdown-item context-action"
                id="new_message-button"
                data-action="new_message">Новое сообщение</a>
             <a class="dropdown-item context-action"
@@ -40,10 +43,23 @@
                 id="delete-order-document-button"
                 data-action="delete_order_document"
                 style="display: none;">Удалить</a>
+            <a class="dropdown-item context-action"
+               id="add-emergency-button"
+               data-action="add_emergency"
+               style="display: none;">Добавить аварию</a>
+            <a class="dropdown-item context-action"
+               id="edit-emergency-button"
+               data-action="edit_emergency"
+               style="display: none;">Редактировать</a>
+            <a class="dropdown-item context-action"
+               id="close-emergency-button"
+               data-action="close_emergency"
+               style="display: none;">Закрыть аварию</a>
         </div>
     </div>
 {% endblock content %}
 {% block extra_scripts %}
     {{ block.super }}
+    {{ ids|json_script:"order-ids" }}
     <script src="{% static 'commerce/js/commerce.js' %}" type="module"></script>
 {% endblock extra_scripts %}

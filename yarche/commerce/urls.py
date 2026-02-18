@@ -55,4 +55,10 @@ urlpatterns = [
 	path("kanban/create_column/", views.kanban_create_column, name="kanban_create_column"),
 
 	path("order/<int:order_id>/files/cards/", views.order_files_cards, name="order_file_cards"),
+
+	path("emergencies/create/", views.create_emergency, name="create_emergency"),
+    path("emergencies/resolve/", views.resolve_emergency, name="resolve_emergency"),
+	path("emergencies/list/<int:order_department_work_id>/", views.emergency_list, name="emergency_list"),
+	path("emergencies/update/<int:pk>/", views.emergency_update, name="emergency_update"),
+	path("emergencies/<int:pk>/", views.emergency_detail, name="emergency_detail"),
 ]

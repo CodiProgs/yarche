@@ -109,3 +109,27 @@ def notifications_mark_all_read(request):
     Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
     return JsonResponse({"status": "success"})
 
+
+@login_required
+def department_workers(request, department_id):
+    from django.shortcuts import get_object_or_404
+    from commerce.models import Department
+    department = get_object_or_404(Department, id=department_id)
+    
+    users = set()
+    if department.worker_user_type:
+        for user in User.objects.filter(user_type=department.worker_user_type):
+            if user != request.user:
+                users.add(user)
+    
+    users_data = [
+        {
+            "id": user.id,
+            "name": f"{user.last_name} {user.first_name}" if user.last_name else user.username,
+            "username": user.username,
+            "email": user.email,
+        }
+        for user in users
+    ]
+    
+    return JsonResponse(users_data, safe=False)

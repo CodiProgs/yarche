@@ -12,6 +12,9 @@ from django.db.models import Q
 from types import SimpleNamespace
 from users.models import Notification
 
+
+# ...existing code...
+
 @login_required
 def department_orders(request, department_slug):
     department = get_object_or_404(Department, slug=department_slug)
@@ -61,13 +64,17 @@ def department_orders(request, department_slug):
         if user_type.name.lower() == "администратор":
             is_chief = True
 
+    ids = [work.id for work in department_works]
+
     context = {
         "fields": fields,
         "data": data,
         "is_chief": is_chief,
+        "ids": ids, 
     }
     
     return render(request, "departments/department_orders.html", context)
+
 
 @login_required
 def department_users(request, department_slug):
@@ -1015,3 +1022,11 @@ def order_departments_list(request, order_id: int):
         return JsonResponse({"departments": departments, "order_id": order.id})
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+def department_work_detail_by_id(request, work_id):
+    work = get_object_or_404(OrderDepartmentWork, id=work_id)
+    return JsonResponse({
+        'order_id': work.order.id,
+        'department_id': work.department.id,
+    })

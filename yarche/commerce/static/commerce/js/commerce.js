@@ -989,6 +989,18 @@ const addMenuHandler = () => {
 	const deleteOrderDocumentButton = document.getElementById(
 		'delete-order-document-button',
 	)
+	const viewOrderPayments = document.getElementById(
+		'view_order_payments-button',
+	)
+	const assignExecutorButton = document.getElementById('assign_executor-button')
+	const updateStatusButton = document.getElementById('update_status-button')
+	const viewCorrespondenceButton = document.getElementById(
+		'view_correspondence-button',
+	)
+
+	const addEmergencyButton = document.getElementById('add-emergency-button')
+	const editEmergencyButton = document.getElementById('edit-emergency-button')
+	const closeEmergencyButton = document.getElementById('close-emergency-button')
 
 	if (menu) {
 		if (menu.parentNode !== document.body) {
@@ -1190,6 +1202,18 @@ const addMenuHandler = () => {
 						deleteContactButton.style.display = 'none'
 					}
 				}
+				if (viewOrderPayments) {
+					viewOrderPayments.style.display = 'block'
+				}
+				if (viewCorrespondenceButton) {
+					viewCorrespondenceButton.style.display = 'block'
+				}
+				if (updateStatusButton) {
+					updateStatusButton.style.display = 'block'
+				}
+				if (assignExecutorButton) {
+					assignExecutorButton.style.display = 'block'
+				}
 
 				if (table.id === 'cash_flow-table') {
 					const headers = table.querySelectorAll('thead th')
@@ -1233,6 +1257,7 @@ const addMenuHandler = () => {
 				const viewOrderFilesBtn = document.getElementById(
 					'view_order_files-button',
 				)
+				const emergencyButton = document.getElementById('emergency-button')
 				const updateStatusBtn = document.getElementById('update_status-button')
 				const assignExecutorBtn = document.getElementById(
 					'assign_executor-button',
@@ -1255,12 +1280,14 @@ const addMenuHandler = () => {
 					table.id.startsWith('order-messages-')
 				) {
 					if (viewOrderFilesBtn) viewOrderFilesBtn.style.display = 'none'
+					if (emergencyButton) emergencyButton.style.display = 'none'
 					if (updateStatusBtn) updateStatusBtn.style.display = 'none'
 					if (assignExecutorBtn) assignExecutorBtn.style.display = 'none'
 					if (viewCorrespondenceBtn)
 						viewCorrespondenceBtn.style.display = 'none'
 				} else {
 					if (viewOrderFilesBtn) viewOrderFilesBtn.style.display = 'block'
+					if (emergencyButton) emergencyButton.style.display = 'block'
 					if (updateStatusBtn) updateStatusBtn.style.display = 'block'
 					if (assignExecutorBtn) assignExecutorBtn.style.display = 'block'
 					if (viewCorrespondenceBtn)
@@ -1326,6 +1353,23 @@ const addMenuHandler = () => {
 						deleteOrderDocumentButton.style.display = 'none'
 				}
 
+				if (table.id && table.id.startsWith('emergencies-')) {
+					if (addEmergencyButton) addEmergencyButton.style.display = 'block'
+					if (editEmergencyButton) editEmergencyButton.style.display = 'block'
+					if (closeEmergencyButton) closeEmergencyButton.style.display = 'block'
+
+					if (assignExecutorButton) assignExecutorButton.style.display = 'none'
+					if (updateStatusButton) updateStatusButton.style.display = 'none'
+					if (viewCorrespondenceButton)
+						viewCorrespondenceButton.style.display = 'none'
+					if (viewOrderFilesBtn) viewOrderFilesBtn.style.display = 'none'
+					if (emergencyButton) emergencyButton.style.display = 'none'
+				} else {
+					if (addEmergencyButton) addEmergencyButton.style.display = 'none'
+					if (editEmergencyButton) editEmergencyButton.style.display = 'none'
+					if (closeEmergencyButton) closeEmergencyButton.style.display = 'none'
+				}
+
 				showMenu(e.pageX, e.pageY)
 				return
 			}
@@ -1351,6 +1395,9 @@ const addMenuHandler = () => {
 				if (deleteContactButton) deleteContactButton.style.display = 'none'
 
 				if (refreshButton) refreshButton.style.display = 'none'
+				if (addEmergencyButton) addEmergencyButton.style.display = 'none'
+				if (editEmergencyButton) editEmergencyButton.style.display = 'none'
+				if (closeEmergencyButton) closeEmergencyButton.style.display = 'none'
 
 				const pathname = window.location.pathname
 
@@ -1394,6 +1441,7 @@ const addMenuHandler = () => {
 				const viewOrderFilesBtn = document.getElementById(
 					'view_order_files-button',
 				)
+				const emergencyButton = document.getElementById('emergency-button')
 				const updateStatusBtn = document.getElementById('update_status-button')
 				const assignExecutorBtn = document.getElementById(
 					'assign_executor-button',
@@ -1401,11 +1449,36 @@ const addMenuHandler = () => {
 				const viewCorrespondenceBtn = document.getElementById(
 					'view_correspondence-button',
 				)
+				const viewOrderPayments = document.getElementById(
+					'view_order_payments-button',
+				)
+				const viewCorrespondenceButton = document.getElementById(
+					'view_correspondence-button',
+				)
+				const updateStatusButton = document.getElementById(
+					'update_status-button',
+				)
+				const assignExecutorButton = document.getElementById(
+					'assign_executor-button',
+				)
 
-				if (viewOrderFilesBtn) viewOrderFilesBtn.style.display = 'block'
-				if (updateStatusBtn) updateStatusBtn.style.display = 'block'
-				if (assignExecutorBtn) assignExecutorBtn.style.display = 'block'
-				if (viewCorrespondenceBtn) viewCorrespondenceBtn.style.display = 'block'
+				if (viewOrderFilesBtn) viewOrderFilesBtn.style.display = 'none'
+				if (emergencyButton) emergencyButton.style.display = 'none'
+				if (viewOrderPayments) {
+					viewOrderPayments.style.display = 'none'
+				}
+				if (viewCorrespondenceButton) {
+					viewCorrespondenceButton.style.display = 'none'
+				}
+				if (updateStatusButton) {
+					updateStatusButton.style.display = 'none'
+				}
+				if (assignExecutorButton) {
+					assignExecutorButton.style.display = 'none'
+				}
+				if (updateStatusBtn) updateStatusBtn.style.display = 'none'
+				if (assignExecutorBtn) assignExecutorBtn.style.display = 'none'
+				if (viewCorrespondenceBtn) viewCorrespondenceBtn.style.display = 'none'
 
 				const newMessageBtn = document.getElementById('new_message-button')
 				const editMessageBtn = document.getElementById('edit_message-button')
@@ -1478,6 +1551,7 @@ const addMenuHandler = () => {
 				const viewOrderFilesBtn = document.getElementById(
 					'view_order_files-button',
 				)
+				const emergencyButton = document.getElementById('emergency-button')
 				const updateStatusBtn = document.getElementById('update_status-button')
 				const assignExecutorBtn = document.getElementById(
 					'assign_executor-button',
@@ -1487,6 +1561,7 @@ const addMenuHandler = () => {
 				)
 
 				if (viewOrderFilesBtn) viewOrderFilesBtn.style.display = 'none'
+				if (emergencyButton) emergencyButton.style.display = 'none'
 				if (updateStatusBtn) updateStatusBtn.style.display = 'none'
 				if (assignExecutorBtn) assignExecutorBtn.style.display = 'none'
 				if (viewCorrespondenceBtn) viewCorrespondenceBtn.style.display = 'none'
@@ -4053,6 +4128,12 @@ const initDepartmentPage = departmentSlug => {
 		})
 	}
 
+	const orderIds = JSON.parse(
+		document.getElementById('order-ids').textContent || '[]',
+	)
+
+	setIds(orderIds, tableId)
+
 	const assignExecutorBtn = document.getElementById('assign_executor-button')
 	if (assignExecutorBtn) {
 		assignExecutorBtn.addEventListener('click', async () => {
@@ -5034,6 +5115,433 @@ const initDepartmentPage = departmentSlug => {
 				loader.remove()
 				showError(err.message || 'Ошибка при обновлении сообщений')
 			}
+		})
+	}
+
+	const emergencyButton = document.getElementById('emergency-button')
+	if (emergencyButton) {
+		emergencyButton.addEventListener('click', async () => {
+			const selectedRow = document.querySelector('.table__row--selected')
+			if (!selectedRow) {
+				showError('Выберите заказ для просмотра аварий')
+				return
+			}
+
+			const orderIdCell = selectedRow.querySelector('td:first-child')
+			const orderId = orderIdCell?.textContent.trim()
+
+			if (!orderId) {
+				showError('Не удалось определить ID заказа')
+				return
+			}
+
+			const orderDepartmentWorkId =
+				selectedRow.getAttribute('data-id') || orderId
+
+			const modal = new Modal()
+			await modal.open('<div id="emergencies-container"></div>', 'Аварии')
+
+			const container = document.getElementById('emergencies-container')
+			const loader = createLoader()
+			document.body.appendChild(loader)
+
+			try {
+				const resp = await fetch(
+					`/commerce/emergencies/list/${orderDepartmentWorkId}/`,
+					{
+						headers: { 'X-Requested-With': 'XMLHttpRequest' },
+					},
+				)
+				const data = await resp.json()
+				loader.remove()
+
+				if (resp.ok) {
+					container.innerHTML = data.html || ''
+
+					const tbody = container.querySelector('tbody')
+					if (tbody) {
+						const hasRows = tbody.querySelector(
+							'tr:not(.table__row--empty):not(.table__row--summary)',
+						)
+						if (!hasRows) {
+							tbody.innerHTML =
+								'<tr class="table__row"><td colspan="100%" style="text-align: center; padding: 20px; max-width: 90px;">Нет аварий</td></tr>'
+						}
+					}
+
+					const table = container.querySelector('table')
+					if (table) {
+						table.id = data.table_id || `emergencies-${orderDepartmentWorkId}`
+						TableManager.initTable(table.id)
+						table.querySelectorAll('tbody tr').forEach(row => {
+							TableManager.attachRowCellHandlers(row)
+							TableManager.formatCurrencyValuesForRow(table.id, row)
+							TableManager.applyColumnWidthsForRow(table.id, row)
+						})
+					}
+
+					if (data.ids) {
+						setIds(
+							data.ids,
+							data.table_id || `emergencies-${orderDepartmentWorkId}`,
+						)
+					}
+				} else {
+					container.innerHTML = '<div class="info">Ошибка загрузки аварий</div>'
+					showError(data.message || 'Ошибка загрузки аварий')
+				}
+			} catch (err) {
+				loader.remove()
+				showError(err.message || 'Ошибка загрузки аварий')
+			}
+		})
+	}
+
+	const addEmergencyButton = document.getElementById('add-emergency-button')
+	if (addEmergencyButton) {
+		addEmergencyButton.addEventListener('click', async () => {
+			const table = document.querySelector('table[id^="emergencies-"]')
+			if (!table) {
+				showError('Таблица аварий не найдена')
+				return
+			}
+			const orderDepartmentWorkId = table.id.replace('emergencies-', '')
+			if (!orderDepartmentWorkId) {
+				showError('Не удалось определить ID работы отдела')
+				return
+			}
+
+			const loader = createLoader()
+			document.body.appendChild(loader)
+			try {
+				const workResp = await fetch(
+					`/departments/work/${orderDepartmentWorkId}/`,
+					{
+						headers: { 'X-Requested-With': 'XMLHttpRequest' },
+					},
+				)
+				const workData = await workResp.json()
+				loader.remove()
+				if (!workResp.ok) {
+					showError('Не удалось получить данные работы отдела')
+					return
+				}
+
+				const modal = new Modal()
+				const resp = await fetch('/components/commerce/add_emergency', {
+					headers: { 'X-Requested-With': 'XMLHttpRequest' },
+				})
+				const html = await resp.text()
+				await modal.open(html, 'Добавить аварию')
+
+				const orderInput = document.getElementById('order')
+				const departmentInput = document.getElementById('department')
+				if (orderInput) orderInput.value = workData.order_id || ''
+				if (departmentInput)
+					departmentInput.value = workData.department_id || ''
+
+				const resolverSelect = document.getElementById('resolver')
+				if (resolverSelect) {
+					const selectWrapper = resolverSelect.closest('.select')
+					if (selectWrapper) {
+						SelectHandler.setupSelects({
+							select: selectWrapper,
+							url: `/users/departments/${workData.department_id}/workers/`,
+						})
+					}
+				}
+
+				const form = document.getElementById('emergency-form')
+				if (form) {
+					form.onsubmit = async e => {
+						e.preventDefault()
+						const formData = new FormData(form)
+						const submitResp = await fetch('/commerce/emergencies/create/', {
+							method: 'POST',
+							headers: {
+								'X-CSRFToken': getCSRFToken(),
+							},
+							body: formData,
+						})
+						const data = await submitResp.json()
+						if (submitResp.ok && data.status === 'success') {
+							showSuccess('Авария успешно добавлена')
+							modal.close()
+							const emergenciesContainer = document.getElementById(
+								'emergencies-container',
+							)
+							if (emergenciesContainer) {
+								const listResp = await fetch(
+									`/commerce/emergencies/list/${orderDepartmentWorkId}/`,
+									{
+										headers: { 'X-Requested-With': 'XMLHttpRequest' },
+									},
+								)
+								const listData = await listResp.json()
+								if (listResp.ok) {
+									emergenciesContainer.innerHTML = listData.html || ''
+									const updatedTable =
+										emergenciesContainer.querySelector('table')
+									if (updatedTable) {
+										updatedTable.id =
+											listData.table_id ||
+											`emergencies-${orderDepartmentWorkId}`
+										TableManager.initTable(updatedTable.id)
+										updatedTable.querySelectorAll('tbody tr').forEach(row => {
+											TableManager.attachRowCellHandlers(row)
+											TableManager.formatCurrencyValuesForRow(
+												updatedTable.id,
+												row,
+											)
+											TableManager.applyColumnWidthsForRow(updatedTable.id, row)
+										})
+										if (listData.ids) {
+											setIds(listData.ids, updatedTable.id)
+										}
+									}
+								}
+							}
+						} else {
+							showError(data.message || 'Ошибка добавления аварии')
+						}
+					}
+
+					const cancelBtn = form.querySelector('.button--cancel')
+					if (cancelBtn) {
+						cancelBtn.onclick = () => modal.close()
+					}
+				}
+			} catch (err) {
+				loader.remove()
+				showError(err.message || 'Ошибка загрузки формы добавления аварии')
+			}
+		})
+	}
+
+	const editEmergencyButton = document.getElementById('edit-emergency-button')
+	if (editEmergencyButton) {
+		editEmergencyButton.addEventListener('click', async () => {
+			const table = document.querySelector('table[id^="emergencies-"]')
+			if (!table) {
+				showError('Таблица аварий не найдена')
+				return
+			}
+
+			let selectedRow =
+				table.querySelector('tbody tr.table__row--selected') ||
+				table.querySelector('tbody tr td.table__cell--selected')?.closest('tr')
+			if (!selectedRow) {
+				showError('Выберите аварию для редактирования')
+				return
+			}
+
+			const emergencyId =
+				selectedRow.getAttribute('data-id') ||
+				selectedRow.querySelector('td')?.textContent?.trim()
+			if (!emergencyId) {
+				showError('Не удалось определить ID аварии')
+				return
+			}
+
+			const orderDepartmentWorkId = table.id.replace('emergencies-', '')
+
+			const loader = createLoader()
+			document.body.appendChild(loader)
+			try {
+				const detailResp = await fetch(
+					`/commerce/emergencies/${emergencyId}/`,
+					{
+						headers: { 'X-Requested-With': 'XMLHttpRequest' },
+					},
+				)
+				const detailData = await detailResp.json()
+				loader.remove()
+				if (!detailResp.ok) {
+					showError('Не удалось загрузить данные аварии')
+					return
+				}
+
+				const modal = new Modal()
+				const resp = await fetch('/components/commerce/add_emergency', {
+					headers: { 'X-Requested-With': 'XMLHttpRequest' },
+				})
+				const html = await resp.text()
+				await modal.open(html, 'Редактировать аварию')
+
+				const workLoader = createLoader()
+				document.body.appendChild(workLoader)
+				try {
+					const workResp = await fetch(
+						`/departments/work/${orderDepartmentWorkId}/`,
+						{
+							headers: { 'X-Requested-With': 'XMLHttpRequest' },
+						},
+					)
+					const workData = await workResp.json()
+					workLoader.remove()
+					if (!workResp.ok) {
+						showError('Не удалось получить данные работы отдела')
+						return
+					}
+
+					const resolverSelect = document.getElementById('resolver')
+					if (resolverSelect) {
+						const selectWrapper = resolverSelect.closest('.select')
+						if (selectWrapper) {
+							SelectHandler.setupSelects({
+								select: selectWrapper,
+								url: `/users/departments/${workData.department_id}/workers/`,
+							})
+							await SelectHandler.populateSelectOptions(
+								selectWrapper,
+								`/users/departments/${workData.department_id}/workers/`,
+							)
+						}
+					}
+
+					const orderInput = document.getElementById('order')
+					const departmentInput = document.getElementById('department')
+					if (orderInput) orderInput.value = workData.order_id || ''
+					if (departmentInput)
+						departmentInput.value = workData.department_id || ''
+
+					const descriptionInput = document.getElementById('description')
+					const resolverInput = document.getElementById('resolver')
+					if (descriptionInput && detailData.data.description) {
+						descriptionInput.value = detailData.data.description
+					}
+					if (resolverInput && detailData.data.resolver) {
+						resolverInput.value = detailData.data.resolver
+						const selectWrapper = resolverInput.closest('.select')
+						if (selectWrapper) {
+							SelectHandler.restoreSelectValue(
+								selectWrapper,
+								detailData.data.resolver,
+							)
+						}
+					}
+
+					const form = document.getElementById('emergency-form')
+					if (form) {
+						form.onsubmit = async e => {
+							e.preventDefault()
+							const formData = new FormData(form)
+							if (formData.has('resolver')) {
+								formData.set('resolver_id', formData.get('resolver'))
+								formData.delete('resolver')
+							}
+							const submitResp = await fetch(
+								`/commerce/emergencies/update/${emergencyId}/`,
+								{
+									method: 'POST',
+									headers: {
+										'X-CSRFToken': getCSRFToken(),
+									},
+									body: formData,
+								},
+							)
+							const data = await submitResp.json()
+							if (submitResp.ok && data.status === 'success') {
+								showSuccess('Авария успешно обновлена')
+								modal.close()
+								if (data.html) {
+									selectedRow.outerHTML = data.html
+									const newRow = table.querySelector(
+										`tbody tr[data-id="${emergencyId}"]`,
+									)
+									if (newRow) {
+										TableManager.attachRowCellHandlers(newRow)
+										TableManager.formatCurrencyValuesForRow(table.id, newRow)
+										TableManager.applyColumnWidthsForRow(table.id, newRow)
+									}
+								}
+							} else {
+								showError(data.message || 'Ошибка обновления аварии')
+							}
+						}
+
+						const cancelBtn = form.querySelector('.button--cancel')
+						if (cancelBtn) {
+							cancelBtn.onclick = () => modal.close()
+						}
+					}
+				} catch (workErr) {
+					workLoader.remove()
+					showError(workErr.message || 'Ошибка загрузки данных работы отдела')
+					return
+				}
+			} catch (err) {
+				loader.remove()
+				showError(err.message || 'Ошибка загрузки формы редактирования аварии')
+			}
+		})
+	}
+
+	// TODO:
+	const closeEmergencyButton = document.getElementById('close-emergency-button')
+	if (closeEmergencyButton) {
+		closeEmergencyButton.addEventListener('click', async () => {
+			const table = document.querySelector('table[id^="emergencies-"]')
+			if (!table) {
+				showError('Таблица аварий не найдена')
+				return
+			}
+
+			let selectedRow =
+				table.querySelector('tbody tr.table__row--selected') ||
+				table.querySelector('tbody tr td.table__cell--selected')?.closest('tr')
+			if (!selectedRow) {
+				showError('Выберите аварию для закрытия')
+				return
+			}
+
+			const emergencyId =
+				selectedRow.getAttribute('data-id') ||
+				selectedRow.querySelector('td')?.textContent?.trim()
+			if (!emergencyId) {
+				showError('Не удалось определить ID аварии')
+				return
+			}
+
+			showQuestion(
+				'Вы действительно хотите закрыть аварию?',
+				'Закрытие аварии',
+				async () => {
+					const loader = createLoader()
+					document.body.appendChild(loader)
+					try {
+						const resp = await fetch('/commerce/emergencies/resolve/', {
+							method: 'POST',
+							headers: {
+								'Content-Type': 'application/x-www-form-urlencoded',
+								'X-CSRFToken': getCSRFToken(),
+							},
+							body: `emergency_id=${encodeURIComponent(emergencyId)}`,
+						})
+						const data = await resp.json()
+						loader.remove()
+						if (!resp.ok || data.status !== 'success') {
+							showError(data.message || 'Ошибка закрытия аварии')
+							return
+						}
+						if (data.html) {
+							selectedRow.outerHTML = data.html
+							const newRow = table.querySelector(
+								`tbody tr[data-id="${emergencyId}"]`,
+							)
+							if (newRow) {
+								TableManager.attachRowCellHandlers(newRow)
+								TableManager.formatCurrencyValuesForRow(table.id, newRow)
+								TableManager.applyColumnWidthsForRow(table.id, newRow)
+							}
+						}
+						showSuccess('Авария успешно закрыта')
+					} catch (err) {
+						loader.remove()
+						showError(err.message || 'Ошибка закрытия аварии')
+					}
+				},
+			)
 		})
 	}
 }
