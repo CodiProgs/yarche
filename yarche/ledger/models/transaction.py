@@ -115,3 +115,13 @@ class Transaction(models.Model):
 
         if self.type == "expense" and self.amount >= 0:
             raise ValidationError({"amount": "Сумма должна быть отрицательной"})
+
+
+class MonthlyCapital(models.Model):
+    year = models.IntegerField()
+    month = models.IntegerField()
+    capital = models.DecimalField(max_digits=20, decimal_places=2)
+    calculated_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('year', 'month')

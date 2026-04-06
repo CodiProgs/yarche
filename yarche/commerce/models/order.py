@@ -3,6 +3,7 @@ from .client import Client
 from .product import Product
 from .document import Document
 from users.models import User, UserType
+from django.utils import timezone
 
 
 class OrderStatus(models.Model):
@@ -386,6 +387,7 @@ class EmergencyIncident(models.Model):
 class FixedAsset(models.Model):
     name = models.CharField(max_length=255, verbose_name="Название основного средства")
     amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Сумма")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
 
     def __str__(self):
         return self.name
@@ -397,6 +399,7 @@ class FixedAsset(models.Model):
 class InventoryItem(models.Model):
     name = models.CharField(max_length=255, verbose_name="Название товара")
     amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Сумма")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
 
     def __str__(self):
         return self.name
@@ -408,6 +411,7 @@ class InventoryItem(models.Model):
 class Credit(models.Model):
     name = models.CharField(max_length=255, verbose_name="Название кредита")
     amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Сумма")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
 
     def __str__(self):
         return self.name
@@ -419,6 +423,7 @@ class Credit(models.Model):
 class AccountsPayable(models.Model):
     name = models.CharField(max_length=255, verbose_name="Название задолженности")
     amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Сумма")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
 
     def __str__(self):
         return self.name
@@ -430,6 +435,7 @@ class AccountsPayable(models.Model):
 class ShortTermLiability(models.Model):
     name = models.CharField(max_length=255, verbose_name="Название обязательства")
     amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Сумма")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
 
     def __str__(self):
         return self.name
@@ -441,6 +447,7 @@ class ShortTermLiability(models.Model):
 class Bonus(models.Model):
     name = models.CharField(max_length=255, verbose_name="Название бонуса")
     amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Сумма")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
 
     def __str__(self):
         return self.name

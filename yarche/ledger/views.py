@@ -2164,3 +2164,89 @@ def enterprise_balance_expand(request):
         html = ''
 
     return JsonResponse({'html': html})
+
+from datetime import datetime
+from django.db.models import Sum, F
+from calendar import monthrange
+from .models import MonthlyCapital
+
+@login_required
+def capital_by_month(request):
+    year = int(request.GET.get("year", timezone.now().year))
+    capitals = []
+    months = []
+    for month in range(1, 13):
+        percent = get_monthly_capital_percent(year, month)
+        capitals.append(percent)
+        months.append(datetime(year, month, 1).strftime('%B'))
+    return JsonResponse({"months": months, "capitals": capitals})
+
+def get_monthly_capital_percent(year, month):
+    # Даты начала и конца месяца
+    last_day = monthrange(year, month)[1]
+    dt_start = timezone.make_aware(datetime(year, month, 1, 0, 0, 0))
+    dt_end = timezone.make_aware(datetime(year, month, last_day, 23, 59, 59))
+
+    # Предыдущий месяц
+    if month == 1:
+        prev_year = year - 1
+        prev_month = 12
+    else:
+        prev_year = year
+        prev_month = month - 1
+
+    # Получаем капитал на конец предыдущего месяца
+    prev_last_day = monthrange(prev_year, prev_month)[1]
+    prev_dt_end = timezone.make_aware(datetime(prev_year, prev_month, prev_last_day, 23, 59, 59))
+    prev_cap = get_total_capital_at(prev_dt_end)
+
+    # Капитал на конец текущего месяца
+    curr_cap = get_total_capital_at(dt_end)
+
+    # Средний капитал
+    avg_cap = (Decimal(prev_cap) + Decimal(curr_cap)) / Decimal(2) if (prev_cap or curr_cap) else Decimal(0)
+
+    # Прибыль за месяц (например, поле profit в Transaction)
+    incomes = (
+        Transaction.objects.filter(
+            created__range=(dt_start, dt_end),
+            type="income"
+        ).aggregate(total=Sum("amount"))["total"] or Decimal(0)
+    )
+    expenses = (
+        Transaction.objects.filter(
+            created__range=(dt_start, dt_end),
+            type="expense"
+        ).aggregate(total=Sum("amount"))["total"] or Decimal(0)
+    )
+    profit_total = Decimal(incomes) + Decimal(expenses)  # expenses обычно отрицательные
+
+    # Процент
+    if avg_cap > 0 and profit_total != 0:
+        capital_percent = float(profit_total) / float(avg_cap) * 100.0
+    else:
+        capital_percent = 0.0
+
+    return round(capital_percent, 1)
+
+def get_total_capital_at(dt):
+    now = timezone.now()
+    # Если dt в прошлом месяце — используем MonthlyCapital
+    if (dt.year < now.year) or (dt.year == now.year and dt.month < now.month):
+        mc = MonthlyCapital.objects.filter(year=dt.year, month=dt.month).first()
+        if mc:
+            return Decimal(mc.capital)
+    # Для текущего или будущего месяца — считаем по активам/пассивам
+    assets = (
+        (FixedAsset.objects.filter(created_at__lte=dt).aggregate(total=Sum("amount"))["total"] or 0)
+        + (InventoryItem.objects.filter(created_at__lte=dt).aggregate(total=Sum("amount"))["total"] or 0)
+        + (Order.objects.filter(created__lte=dt).aggregate(total=Sum(F("amount") - F("paid_amount")))["total"] or 0)
+        + (BankAccount.objects.aggregate(total=Sum("balance"))["total"] or 0)
+    )
+    liabilities = (
+        (Credit.objects.filter(created_at__lte=dt).aggregate(total=Sum("amount"))["total"] or 0)
+        + (AccountsPayable.objects.filter(created_at__lte=dt).aggregate(total=Sum("amount"))["total"] or 0)
+        + (ShortTermLiability.objects.filter(created_at__lte=dt).aggregate(total=Sum("amount"))["total"] or 0)
+        + (Bonus.objects.filter(created_at__lte=dt).aggregate(total=Sum("amount"))["total"] or 0)
+    )
+    return Decimal(assets) - Decimal(liabilities)

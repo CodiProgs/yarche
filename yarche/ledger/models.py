@@ -3,4 +3,5 @@ from models import (
     BankAccount,
     TransactionCategory,
     Transaction,
+	MonthlyCapital
 )

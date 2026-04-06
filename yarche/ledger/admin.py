@@ -4,6 +4,7 @@ from .models import (
     BankAccount,
     TransactionCategory,
     Transaction,
+	MonthlyCapital
 )
 
 
@@ -11,3 +12,4 @@ admin.site.register(BankAccountType)
 admin.site.register(BankAccount)
 admin.site.register(TransactionCategory)
 admin.site.register(Transaction)
+admin.site.register(MonthlyCapital)
