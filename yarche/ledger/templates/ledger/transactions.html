@@ -3,10 +3,8 @@
 {% block extra_styles %}
     {{ block.super }}
     <link rel="stylesheet" href="{% static 'ledger/css/transactions.css' %}">
-    <link href="https://cdn.jsdelivr.net/gh/djibe/material@4.6.2-1.0/css/material-plugins.min.css"
-          rel="stylesheet"
-          crossorigin>
     <link rel="stylesheet" href="{% static 'css/flatpickr.css' %}">
+    <link rel="stylesheet" href="{% static 'css/material-plugins.min.css' %}">
 {% endblock extra_styles %}
 {% block content %}
     <div class="page-table-container" id="transaction-container">

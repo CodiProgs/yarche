@@ -1,0 +1,32 @@
+{% for node in nodes %}
+    <div class="debtors-header debtors-header--main">
+        <h1 class="debtors-office-list__header debtors-office-list__header--main">{{ node.name }}</h1>
+        <span class="debtors-total" data-total-key="{{ node.key }}">{{ node.total }}</span>
+    </div>
+    {% if node.children and node.children|length > 0 %}
+        {% for child in node.children %}
+            <div class="debtors-header">
+                <b class="debtors-office-list__header">{{ child.name }}</b>
+                <span class="debtors-total" data-total-key="{{ child.key }}">{{ child.total }}</span>
+            </div>
+            {% if child.children and child.children|length > 0 %}
+                <ul class="debtors-office-list">
+                    {% for subchild in child.children %}
+                        <li class="debtors-office-list__item">
+                            <div class="debtors-office-list__row">
+                                {% if subchild.expandable %}
+                                    <span class="debtors-office-list__toggle" data-type="{{ subchild.type }}">+</span>
+                                {% endif %}
+                                <span class="debtors-office-list__title">{{ subchild.name }}</span>
+                                <span class="debtors-office-list__amount" data-total-key="{{ subchild.key }}">{{ subchild.total }}</span>
+                            </div>
+                            {% if subchild.expandable %}
+                                <div class="expand-content" style="display:none"></div>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+{% endfor %}

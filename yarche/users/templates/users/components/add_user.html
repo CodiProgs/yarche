@@ -1,0 +1,95 @@
+{% load static %}
+{% load components %}
+{% add_style 'css/modal-form.css' %}
+<form class="modal-form" id="users-form" method="post">
+    <div class="modal-form__content">
+        {% csrf_token %}
+        
+		<div class="modal-form__group">
+			<label class="modal-form__label" for="username">Имя пользователя</label>
+			<input class="modal-form__input"
+				type="text"
+				id="username"
+				name="username"
+				spellcheck="false"
+				autocapitalize="off"
+				autocorrect="off"
+				autocomplete="off"
+				placeholder="Введите имя пользователя" />
+		</div>
+		<div class="modal-form__group">
+			<label class="modal-form__label" for="password">Пароль</label>
+			<input class="modal-form__input"
+				type="text"
+				id="password"
+				name="password"
+				spellcheck="false"
+				autocapitalize="off"
+				autocorrect="off"
+				autocomplete="off"
+				placeholder="Введите пароль" />
+		</div>
+		<div class="modal-form__group">
+			<label class="modal-form__label" for="email">Почта</label>
+			<input class="modal-form__input"
+				type="email"
+				id="email"
+				name="email"
+				spellcheck="false"
+				autocapitalize="off"
+				autocorrect="off"
+				autocomplete="off"
+				placeholder="Введите почту" />
+		</div>
+		<div class="modal-form__group">
+			<label class="modal-form__label" for="first_name">Имя</label>
+			<input class="modal-form__input"
+				type="text"
+				id="first_name"
+				name="first_name"
+				spellcheck="false"
+				autocapitalize="off"
+				autocorrect="off"
+				autocomplete="off"
+				placeholder="Введите имя" />
+		</div>
+		<div class="modal-form__group">
+			<label class="modal-form__label" for="last_name">Фамилия</label>
+			<input class="modal-form__input"
+				type="text"
+				id="last_name"
+				name="last_name"
+				spellcheck="false"
+				autocapitalize="off"
+				autocorrect="off"
+				autocomplete="off"
+				placeholder="Введите фамилию" />
+		</div>
+		<div class="modal-form__group">
+			<label class="modal-form__label" for="patronymic">Отчество</label>
+			<input class="modal-form__input"
+				type="text"
+				id="patronymic"
+				name="patronymic"
+				spellcheck="false"
+				autocapitalize="off"
+				autocorrect="off"
+				autocomplete="off"
+				placeholder="Введите отчество" />
+		</div>
+
+        <div class="modal-form__group">
+			<label class="modal-form__label" for="user_type">Тип пользователя</label>
+            {% include "components/select.html" with id="user_type" placeholder="Выберите тип пользователя" %}
+        </div>
+
+		 <div class="modal-form__group modal-form__group--width-40" style="padding-bottom: 10px;" hidden>
+			{% include "components/checkbox.html" with value="false" id="is_active" label="Активен" %}
+		</div>
+        
+        <div class="modal-form__buttons">
+            <button class="button modal-form__button" type="submit">Сохранить</button>
+            <button class="button modal-form__button button--cancel" type="button">Отменить</button>
+        </div>
+    </div>
+</form>

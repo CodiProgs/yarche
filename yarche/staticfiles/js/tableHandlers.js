@@ -51,11 +51,11 @@ export function initTableHandlers(config) {
 							? { context: config.modalConfig.context }
 							: {}),
 					},
-			  }
+				}
 			: {
 					createFormFunction: formId =>
 						TableManager.createForm(formId, config.tableId),
-			  }),
+				}),
 		onSuccess: result => {
 			TableManager.addTableRow(result, config.tableId)
 
@@ -80,11 +80,11 @@ export function initTableHandlers(config) {
 							? { context: config.modalConfig.context }
 							: {}),
 					},
-			  }
+				}
 			: {
 					createFormFunction: formId =>
 						TableManager.createForm(formId, config.tableId),
-			  }),
+				}),
 		onSuccess: result => {
 			TableManager.updateTableRow(result, config.tableId)
 
@@ -154,12 +154,12 @@ export function initTableHandlers(config) {
 						await TableManager.sendDeleteRequest(
 							selectedRowId,
 							config.deleteUrl,
-							config.tableId
+							config.tableId,
 						).then(result => {
 							if (config.afterDeleteFunc) {
 								config.afterDeleteFunc(result)
 							}
-						})
+						}),
 				)
 			} else {
 				showError('Выберите строку для удаления!')

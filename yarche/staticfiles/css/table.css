@@ -513,7 +513,9 @@ td.hidden {
 	cursor: pointer;
 	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 	opacity: 0.9;
-	transition: opacity 0.2s, transform 0.2s;
+	transition:
+		opacity 0.2s,
+		transform 0.2s;
 	z-index: 10;
 }
 
@@ -669,4 +671,51 @@ td.hidden {
 	.pagination-controls {
 		justify-content: center;
 	}
+}
+
+#income-button,
+#income-modal {
+	color: #218838;
+}
+
+#expense-button,
+#expense-modal {
+	color: #ff0033;
+}
+
+#transfer-button,
+#transfer-modal {
+	color: #004085;
+}
+
+#order-payment-button,
+#order-pay-modal {
+	color: #9c27b0;
+}
+
+#deposit-button,
+#deposit-modal {
+	color: #3f51b5;
+}
+
+#ls-payment-button,
+#ls-pay-modal {
+	color: #3f51b5;
+}
+
+#close-shift-button {
+	color: #795548;
+}
+
+#transaction-type-buttons {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 10px;
+	padding: 20px 30px;
+}
+
+#transaction-type-buttons .button {
+	flex: 1;
+	height: 40px;
+	font-size: 14px;
 }

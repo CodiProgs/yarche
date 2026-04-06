@@ -1,0 +1,32 @@
+{% extends "layout.html" %}
+{% load static %}
+{% block content %}
+<div class="page-table-container" id="debtors-container">
+    <div id="context-menu" class="dropdown-menu">
+        <a class="dropdown-item context-action" id="add-button" data-action="add">Добавить</a>
+        <a class="dropdown-item context-action" id="edit-button" data-action="edit">Редактировать</a>
+        {% if request.user.is_authenticated and request.user.user_type.name == "Администратор" %}
+        <a class="dropdown-item context-action" id="delete-button" data-action="delete">Удалить</a>
+        {% endif %}
+        <div class="dropdown-divider"></div>
+        <a class="dropdown-item context-action" id="hide-button" data-action="hide">Скрыть</a>
+        <a class="dropdown-item context-action" id="hide-all-button" data-action="hide-all">Скрыть все</a>
+        <a class="dropdown-item context-action" id="show-all-button" data-action="show-all">Показать все</a>
+        <div class="dropdown-divider"></div>
+        <a class="dropdown-item context-action" id="print-button" data-action="print">Печать</a>
+    </div>
+    <div class="stats-container">
+        <h2 class="debtors-office-list__header debtors-office__header">Баланс</h2>
+        <div id="balance-container">
+            {% include "ledger/enterprise_balance_node.html" with nodes=data %}
+        </div>
+    </div>
+</div>
+{% endblock content %}
+{% block extra_scripts %}
+    {{ block.super }}
+    <script src="{% static 'commerce/js/commerce.js' %}" type="module"></script>
+    <script src="{% static 'js/autonumeric.js' %}" defer></script>
+    {% comment %} <script src="{% static 'main/js/chart.js' %}" type="module" defer></script> {% endcomment %}
+    {% comment %} <script src="{% static 'main/js/chartjs-plugin-datalabels.js' %}" type="module" defer></script> {% endcomment %}
+{% endblock extra_scripts %}

@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Умный Помощник</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #1a1a1a;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden; 
+            width: 100%;
+        }
+
+        body, .chat-container {
+            scrollbar-color: #565869 #202123;
+            scrollbar-width: thin;
+        }
+
+        body::-webkit-scrollbar, .chat-container::-webkit-scrollbar {
+            width: 8px;
+            background: #202123;
+        }
+        body::-webkit-scrollbar-thumb, .chat-container::-webkit-scrollbar-thumb {
+            background: #565869;
+            border-radius: 4px;
+        }
+        body::-webkit-scrollbar-track, .chat-container::-webkit-scrollbar-track {
+            background: #202123;
+        }
+
+        code {
+            font-size: 14px;
+            background: #2d2d2d;
+            padding: 2px 4px;
+            border-radius: 4px;
+        }
+
+        p {
+            margin: 0 0 10px 0;
+            line-height: 1.5;
+        }
+        p:last-child {
+            margin-bottom: 0;
+        }
+
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: #333;
+            border-bottom: 1px solid #444;
+            padding: 10px 20px;
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0;
+            white-space: nowrap;
+        }
+
+        .header-links {
+            display: flex;
+            gap: 15px;
+            flex-shrink: 0;
+        }
+
+        .header a {
+            font-size: 14px;
+            color: #bbb;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .header a:hover {
+            color: white;
+        }
+
+        .chat-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding-top: 60px;
+            padding-bottom: 80px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+        }
+
+        .chat-messages {
+            width: 100%;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            flex: 1;
+        }
+
+        .message-wrapper {
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 100%; 
+        }
+
+        .message-content {
+            display: flex;
+            align-items: flex-start;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            width: 100%;
+            overflow: hidden; 
+        }
+
+        .message-user .message-content {
+            background-color: #343541;
+            border-color: #343541;
+        }
+
+        .message-ai .message-content {
+            background-color: #444654;
+            border-color: #444654;
+        }
+
+        .message-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 12px;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+
+        .message-user .message-icon {
+            background-color: #007bff;
+        }
+
+        .message-ai .message-icon {
+            background-color: #28a745;
+        }
+
+        .message-text {
+            flex: 1;
+            min-width: 0;
+            word-wrap: break-word;
+            overflow-x: auto;
+        }
+
+        .ai-table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin-top: 10px;
+            border: 1px solid #555;
+            border-radius: 4px;
+            position: relative;
+        }
+        
+        .ai-table-responsive::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 30px;
+            background: linear-gradient(to left, rgba(68, 70, 84, 1), rgba(68, 70, 84, 0));
+            pointer-events: none;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .ai-table-responsive table {
+            width: 100%;
+            min-width: 600px;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .ai-table-responsive th, 
+        .ai-table-responsive td {
+            padding: 10px;
+            border: 1px solid #555;
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        .ai-table-responsive th {
+            background-color: #333;
+            color: #ddd;
+            position: sticky;
+            top: 0;
+        }
+
+        .ai-table-responsive tr:nth-child(even) {
+            background-color: #3a3c4a;
+        }
+
+        .input-area {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(to top, #1a1a1a 80%, transparent);
+            padding: 20px;
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+        }
+
+        .input-form {
+            display: flex;
+            align-items: flex-end;
+            background-color: #333;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            width: 100%;
+            max-width: 900px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+        }
+
+        .input-form textarea {
+            width: 100%;
+            background: transparent;
+            color: white;
+            border: none;
+            outline: none;
+            resize: none;
+            padding: 8px;
+            font-size: 15px;
+            max-height: 150px;
+            line-height: 1.5;
+            font-family: inherit;
+        }
+
+        .input-form button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-left: 10px;
+            font-weight: 600;
+            flex-shrink: 0;
+            transition: background 0.2s;
+        }
+
+        .input-form button:hover {
+            background-color: #218838;
+        }
+
+        .input-form button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .loading-indicator {
+            display: none;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .loading-dots span {
+            animation: pulse 1.4s infinite ease-in-out both;
+            background-color: #bbb;
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            margin: 0 2px;
+        }
+        .loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+        
+        @keyframes pulse {
+            0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 10px 15px;
+                height: auto;
+                min-height: 60px;
+                flex-wrap: wrap;
+                display: flex;
+                align-items: center;
+            }
+            
+            .header h1 {
+                font-size: 16px;
+            }
+
+            .header-links {
+                justify-content: flex-end;
+                gap: 15px;
+            }
+
+            .chat-container {
+                padding-top: 100px;
+                padding-bottom: 70px;
+            }
+
+            .chat-messages {
+                padding: 10px;
+            }
+
+            .message-content {
+                padding: 12px;
+                flex-direction: row;
+            }
+
+            .message-icon {
+                width: 28px;
+                height: 28px;
+                font-size: 11px;
+                margin-right: 10px;
+            }
+
+            .message-text {
+                font-size: 14px;
+            }
+
+            .input-area {
+                padding: 10px;
+            }
+
+            .input-form {
+                padding: 8px;
+            }
+
+            .input-form textarea {
+                font-size: 14px;
+                padding: 6px;
+            }
+
+            .input-form button {
+                padding: 8px 15px;
+                font-size: 13px;
+                margin-left: 8px;
+            }
+            
+            .ai-table-responsive table {
+                min-width: 500px;
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Умный помощник</h1>
+        <div class="header-links">
+            {% if request.user.user_type.name == "Администратор" %}
+            <a href="{% url 'chat_logs' %}">Логи</a>
+            {% endif %}
+            <a href="/">Главная</a>
+        </div>
+    </div>
+
+    <div class="chat-container" id="chat-box">
+        <div class="chat-messages">
+            {% if not chat_history %}
+            <div class="message-wrapper message-ai">
+                <div class="message-content">
+                    <div class="message-icon">AI</div>
+                    <div class="message-text">
+                        <p><strong>Привет! Я могу помочь с данными.</strong></p>
+                        <p>Попробуй спросить:</p>
+                        <ul style="padding-left: 20px; color: #ccc;">
+                            <li>"Покажи были ли оплаты по №5 заказу"</li>
+                            <li>"Найди клиента ООО Ромашка"</li>
+                            <li>"Покажи последние транзакции"</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% for msg in chat_history %}
+            <div class="message-wrapper message-user">
+                <div class="message-content">
+                    <div class="message-icon">Y</div>
+                    <div class="message-text">
+                        {{ msg.message }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="message-wrapper message-ai">
+                <div class="message-content">
+                    <div class="message-icon">AI</div>
+                    <div class="message-text">
+                        <p>{{ msg.response|safe }}</p>
+                        
+                        {% if msg.response_html %}
+                        <div class="ai-table-responsive">
+                            {{ msg.response_html|safe }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div id="loading-indicator" class="loading-indicator">
+            <div class="message-content" style="background: transparent; border: none; padding: 0;">
+                <div class="message-icon">AI</div>
+                <div class="loading-dots">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="input-area">
+        <form id="chat-form" class="input-form">
+            <textarea id="message-input" name="message" rows="1" placeholder="Напишите запрос..." oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
+            <button type="submit">➤</button>
+        </form>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        const chatForm = document.getElementById('chat-form');
+        const messageInput = document.getElementById('message-input');
+        const loadingIndicator = document.getElementById('loading-indicator');
+
+        // Прокрутка вниз при загрузке
+        function scrollToBottom() {
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+        scrollToBottom();
+
+        // Авто-увеличение высоты textarea
+        messageInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+            if(this.value === '') this.style.height = 'auto';
+        });
+
+        chatForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            // Добавляем сообщение пользователя визуально (если нужно дублировать логику сервера)
+            // В данном коде история рендерится на сервере, но для отзывчивости можно добавить сразу
+            // Но чтобы не дублировать, просто очищаем поле и ждем ответа
+            
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+
+            loadingIndicator.style.display = 'block';
+            scrollToBottom();
+            
+            const submitBtn = chatForm.querySelector('button');
+            submitBtn.disabled = true;
+
+            try {
+                const response = await fetch('{% url "api_chat_send" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+
+                const data = await response.json();
+                loadingIndicator.style.display = 'none';
+
+                if (data.status === 'ok') {
+                    location.reload(); 
+                } else {
+                    alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+                    submitBtn.disabled = false;
+                }
+            } catch (error) {
+                loadingIndicator.style.display = 'none';
+                alert('Ошибка соединения с сервером.');
+                console.error(error);
+                submitBtn.disabled = false;
+            }
+        });
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    </script>
+</body>
+</html>

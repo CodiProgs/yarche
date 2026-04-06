@@ -15,6 +15,8 @@ const CLIENTS = 'clients'
 const CONTACTS = 'contacts'
 const PRODUCTS = 'products'
 const CLIENTS_OBJECTS = 'client-objects'
+const USERS = 'users'
+
 const CURRENCY_SUFFIX = ' р.'
 
 const BASE_URL = '/commerce/'
@@ -57,7 +59,7 @@ const configs = {
 					return
 				}
 				const anyRow = table.querySelector(
-					'tbody tr:not(.table__row--empty):not(.table__row--summary)'
+					'tbody tr:not(.table__row--empty):not(.table__row--summary)',
 				)
 				if (anyRow) loadFirstClientFromTable()
 				else clearClientForm()
@@ -108,6 +110,942 @@ const configs = {
 		editUrl: `${BASE_URL}${PRODUCTS}/edit/`,
 		deleteUrl: `${BASE_URL}${PRODUCTS}/delete/`,
 	},
+	users: {
+		containerId: `${USERS}-list-container`,
+		tableId: `${USERS}-list-table`,
+		formId: `${USERS}-form`,
+		getUrl: `/${USERS}/`,
+		addUrl: `/${USERS}/create/`,
+		editUrl: `/${USERS}/update/`,
+		deleteUrl: `/${USERS}/delete/`,
+		modalConfig: {
+			addModalUrl: `/components/users/add_user`,
+			editModalUrl: `/components/users/add_user`,
+			addModalTitle: 'Добавить пользователя',
+			editModalTitle: 'Изменить пользователя',
+		},
+		dataUrls: [{ id: 'user_type', url: `/${USERS}/types/` }],
+		editFunc: () => {
+			const form = document.getElementById('users-form')
+			if (!form) return
+
+			const is_active = form.querySelector('#is_active')
+			if (is_active) {
+				const modalFormGroup = is_active.closest('.modal-form__group')
+				if (modalFormGroup) {
+					modalFormGroup.hidden = false
+				}
+			}
+		},
+	},
+	user_types: {
+		containerId: `user-types-container`,
+		tableId: `user-types-table`,
+		formId: `user-types-form`,
+		getUrl: `/users/types/`,
+		addUrl: `/users/types/create/`,
+		editUrl: `/users/types/update/`,
+		deleteUrl: `/users/types/delete/`,
+		modalConfig: {
+			addModalUrl: `/components/users/add_user_type`,
+			editModalUrl: `/components/users/add_user_type`,
+			addModalTitle: 'Добавить тип пользователя',
+			editModalTitle: 'Изменить тип пользователя',
+		},
+		dataUrls: [{ id: 'permissions', url: `/users/permissions/` }],
+	},
+	order_work_statuses: {
+		containerId: 'order-work-statuses-container',
+		tableId: 'order-work-statuses-table',
+		formId: 'order-work-statuses-form',
+		getUrl: '/departments/work-status/',
+		addUrl: '/departments/work-status/create/',
+		editUrl: '/departments/work-status/update/',
+		deleteUrl: '/departments/work-status/delete/',
+		modalConfig: {
+			addModalUrl: '/components/departments/add_work_status',
+			editModalUrl: '/components/departments/add_work_status',
+			addModalTitle: 'Добавить статус работы',
+			editModalTitle: 'Редактировать статус работы',
+		},
+		dataUrls: [{ id: 'department', url: '/departments/list/' }],
+	},
+	filetypes: {
+		containerId: 'filetypes-container',
+		tableId: 'filetypes-table',
+		formId: 'filetypes-form',
+		getUrl: '/commerce/filetypes/',
+		addUrl: '/commerce/filetypes/add/',
+		editUrl: '/commerce/filetypes/edit/',
+		deleteUrl: '/commerce/filetypes/delete/',
+		modalConfig: {
+			addModalUrl: '/components/commerce/add_filetype',
+			editModalUrl: '/components/commerce/add_filetype',
+			addModalTitle: 'Добавить тип файла',
+			editModalTitle: 'Изменить тип файла',
+		},
+		dataUrls: [{ id: 'user_type', url: '/users/types/' }],
+	},
+}
+
+function addSwapButtonToModalHeader() {
+	const modalHeader = document.querySelector('.modal__header')
+	if (modalHeader) {
+		const existingSwap = modalHeader.querySelector('.button--swap')
+		if (existingSwap) return
+
+		const swapButton = document.createElement('button')
+		swapButton.className = 'button--swap'
+		swapButton.innerHTML =
+			'<img src="/static/images/swap.svg" alt="Swap" style="width: 14px; height: 14px;" />'
+		swapButton.style.position = 'absolute'
+		swapButton.style.right = '30px'
+		swapButton.style.width = '30px'
+		swapButton.style.height = '30px'
+		swapButton.style.opacity = '0.5'
+
+		swapButton.addEventListener('mouseover', () => {
+			swapButton.style.opacity = '1.0'
+		})
+		swapButton.addEventListener('mouseout', () => {
+			swapButton.style.opacity = '0.5'
+		})
+
+		swapButton.addEventListener('click', async () => {
+			const documentsContainer = document.getElementById('documents-container')
+			if (!documentsContainer) return
+			const orderId = documentsContainer.dataset.orderId
+			const currentView = documentsContainer.dataset.viewType
+			const newView = currentView === 'table' ? 'cards' : 'table'
+			documentsContainer.dataset.viewType = newView
+			localStorage.setItem('orderFilesView', newView)
+			await reloadOrderFiles(orderId, newView, documentsContainer)
+		})
+
+		modalHeader.appendChild(swapButton)
+	}
+}
+
+/**
+ * Форматирует объект Date в строку DD.MM.YYYY.
+ * @param {Date} date
+ * @returns {string}
+ */
+const formatDate = date => {
+	const d = val => String(val).padStart(2, '0')
+	return `${d(date.getDate())}.${d(date.getMonth() + 1)}.${date.getFullYear()}`
+}
+
+/**
+ * Форматирует объект Date в ISO формат для сервера (YYYY-MM-DD).
+ * @param {Date} date
+ * @returns {string}
+ */
+const formatDateForServer = date => {
+	const d = val => String(val).padStart(2, '0')
+	return `${date.getFullYear()}-${d(date.getMonth() + 1)}-${d(date.getDate())}`
+}
+
+/**
+ * Инициализирует виджет выбора даты Flatpickr.
+ * @param {string} inputSelector
+ * @param {string} iconSelector
+ * @param {string} defaultDateStr
+ * @returns {Object|null} Экземпляр flatpickr.
+ */
+const initDatePicker = (inputSelector, iconSelector, defaultDateStr) => {
+	const inputElement = document.querySelector(inputSelector)
+	const iconElement = document.querySelector(iconSelector)
+
+	if (!inputElement || !iconElement) {
+		console.warn(
+			`Date picker elements not found: ${inputSelector}, ${iconSelector}`,
+		)
+		return null
+	}
+
+	let isIconClicked = false
+	iconElement.addEventListener('mousedown', () => {
+		isIconClicked = true
+	})
+
+	const instance = flatpickr(inputElement, {
+		dateFormat: 'd.m.Y',
+		clickOpens: false,
+		defaultDate: defaultDateStr,
+		allowInput: true,
+		locale: 'ru',
+		onClose: () => {
+			setTimeout(() => {
+				isIconClicked = false
+			}, 100)
+		},
+	})
+
+	iconElement.addEventListener('click', () => {
+		if (isIconClicked) instance.toggle()
+		isIconClicked = false
+	})
+
+	return instance
+}
+
+/**
+ * Перезагружает содержимое файлов заказа в зависимости от viewType
+ * @param {string} orderId - ID заказа
+ * @param {string} viewType - 'table' или 'cards'
+ * @param {HTMLElement} documentsContainer - контейнер для документов
+ */
+async function reloadOrderFiles(orderId, viewType, documentsContainer) {
+	if (!documentsContainer) return
+
+	addSwapButtonToModalHeader()
+
+	const loader = createLoader()
+	document.body.appendChild(loader)
+	try {
+		if (viewType === 'table') {
+			if (orderId) {
+				const docsResp = await fetch(`${BASE_URL}documents/table/${orderId}/`, {
+					headers: { 'X-Requested-With': 'XMLHttpRequest' },
+				})
+				const data = await docsResp.json()
+				if (docsResp.ok) {
+					documentsContainer.innerHTML = data.html || ''
+
+					try {
+						const urls = Array.isArray(data.urls) ? data.urls : []
+						if (urls.length) {
+							const table =
+								documentsContainer.querySelector(
+									`table#order-documents-${orderId}`,
+								) || documentsContainer.querySelector('table')
+							if (table) {
+								const ths = Array.from(table.querySelectorAll('thead th'))
+								const fileColIndex = ths.findIndex(
+									th => th && th.dataset && th.dataset.name === 'file_display',
+								)
+								if (fileColIndex !== -1) {
+									const rows = table.querySelectorAll(
+										'tbody tr:not(.table__row--summary):not(.table__row--empty)',
+									)
+									rows.forEach((row, idx) => {
+										const cell = row.children[fileColIndex]
+										if (!cell) return
+										const text = cell.textContent.trim()
+										const fileUrl = urls[idx] || ''
+										if (fileUrl && text) {
+											cell.innerHTML = `<a href="${fileUrl}" target="_blank" rel="noopener noreferrer">${text}</a>`
+										}
+									})
+								}
+							}
+						}
+					} catch (err) {
+						console.warn(
+							'Не удалось применить ссылки к колонке file_display:',
+							err,
+						)
+					}
+					if (data && data.ids) {
+						setIds(data.ids, data.table_id || `order-documents-${orderId}`)
+					}
+				} else {
+					documentsContainer.innerHTML = data.html || ''
+					showError(
+						data.error || data.message || 'Ошибка загрузки документов заказа',
+					)
+				}
+			} else {
+				documentsContainer.innerHTML = '<div class="info">Не выбран заказ</div>'
+			}
+		} else {
+			if (orderId) {
+				const filesResp = await fetch(
+					`/commerce/order/${orderId}/files/cards/`,
+					{
+						headers: { 'X-Requested-With': 'XMLHttpRequest' },
+					},
+				)
+				const data = await filesResp.json()
+				if (filesResp.ok && data.status === 'success') {
+					displayFiles(data.images, data.others, documentsContainer)
+				} else {
+					documentsContainer.innerHTML = data.html || ''
+					showError(
+						data.error || data.message || 'Ошибка загрузки файлов заказа',
+					)
+				}
+			} else {
+				documentsContainer.innerHTML = '<div class="info">Не выбран заказ</div>'
+			}
+		}
+	} catch (err) {
+		showError(err.message || 'Ошибка загрузки файлов заказа')
+	} finally {
+		loader.remove()
+	}
+
+	try {
+		const uploadForm = document.getElementById('upload-form')
+		const uploadBtn = document.getElementById('upload-btn')
+		const fileInput = document.getElementById('upload-file-input')
+		const fileTypeInput = document.getElementById('file_type')
+
+		if (uploadBtn && fileInput) {
+			uploadBtn.addEventListener('click', () => {
+				fileInput.click()
+			})
+		}
+
+		const modal = document.querySelector('.modal')
+		if (modal && documentsContainer) {
+			let dragCounter = 0
+
+			modal.addEventListener('dragover', e => {
+				e.preventDefault()
+				e.stopPropagation()
+			})
+
+			modal.addEventListener('dragenter', e => {
+				e.preventDefault()
+				e.stopPropagation()
+				dragCounter++
+				if (dragCounter === 1) {
+					const orderDocumentsDiv =
+						document.querySelector('.order-documents') || documentsContainer
+					orderDocumentsDiv.style.border = '2px dashed #ccc'
+				}
+			})
+
+			modal.addEventListener('dragleave', e => {
+				e.preventDefault()
+				e.stopPropagation()
+				dragCounter--
+				if (dragCounter === 0) {
+					const orderDocumentsDiv =
+						document.querySelector('.order-documents') || documentsContainer
+					orderDocumentsDiv.style.border = ''
+				}
+			})
+
+			modal.addEventListener('drop', async e => {
+				e.preventDefault()
+				e.stopPropagation()
+				dragCounter = 0
+				const orderDocumentsDiv =
+					document.querySelector('.order-documents') || documentsContainer
+				orderDocumentsDiv.style.border = ''
+
+				const files = e.dataTransfer.files
+				if (files.length > 0) {
+					const f = files[0]
+
+					if (!orderId) {
+						showError('Не выбран заказ')
+						return
+					}
+					const fileTypeVal = fileTypeInput ? fileTypeInput.value : ''
+					if (!fileTypeVal) {
+						showError('Выберите тип файла')
+						return
+					}
+
+					const modalFileName = new Modal()
+					const resp = await fetch('/components/commerce/file_name', {
+						headers: { 'X-Requested-With': 'XMLHttpRequest' },
+					})
+					const html = await resp.text()
+					await modalFileName.open(html, 'Введите название файла')
+
+					const form = document.getElementById('file_name-form')
+					const nameInput = form.querySelector('#name')
+					nameInput.value = f.name.replace(/\.[^/.]+$/, '')
+					nameInput.focus()
+
+					return new Promise(resolve => {
+						form.onsubmit = async e => {
+							e.preventDefault()
+							let newName = nameInput.value.trim()
+							if (!newName) {
+								showError('Имя файла не может быть пустым')
+								return
+							}
+							const ext = f.name.substring(f.name.lastIndexOf('.'))
+							const finalName = newName + ext
+
+							const l = createLoader()
+							document.body.appendChild(l)
+							uploadBtn.disabled = true
+
+							try {
+								const fd = new FormData()
+								const fileWithNewName = new File([f], finalName, {
+									type: f.type,
+								})
+								fd.append('file', fileWithNewName)
+								fd.append('order', orderId)
+								fd.append('file_type', fileTypeVal)
+								fd.append('filename', finalName)
+
+								const uploadResp = await fetch(`${BASE_URL}documents/upload/`, {
+									method: 'POST',
+									headers: {
+										'X-CSRFToken': getCSRFToken(),
+										'X-Requested-With': 'XMLHttpRequest',
+									},
+									credentials: 'same-origin',
+									body: fd,
+								})
+
+								const payload = await uploadResp.json()
+
+								if (!uploadResp.ok || payload.status !== 'success') {
+									showError(
+										payload.message || payload.error || 'Ошибка загрузки файла',
+									)
+								} else {
+									const tableId = `order-documents-${orderId}`
+									const newRow = await TableManager.addTableRow(
+										payload,
+										tableId,
+									)
+									if (
+										newRow &&
+										payload &&
+										(payload.id || payload.pk) &&
+										!newRow.hasAttribute('data-id')
+									) {
+										newRow.setAttribute(
+											'data-id',
+											String(payload.id || payload.pk),
+										)
+									}
+
+									showSuccess('Файл успешно загружен')
+
+									try {
+										const table = document.getElementById(tableId)
+										if (table && payload.url) {
+											const ths = Array.from(table.querySelectorAll('thead th'))
+											const fileColIndex = ths.findIndex(
+												th =>
+													th &&
+													th.dataset &&
+													th.dataset.name === 'file_display',
+											)
+											if (fileColIndex !== -1) {
+												const row = table.querySelector('tbody tr:last-child')
+												if (row) {
+													const cell = row.children[fileColIndex]
+													if (cell) {
+														const text = cell.textContent.trim()
+														if (payload.url && text) {
+															cell.innerHTML = `<a href="${payload.url}" target="_blank" rel="noopener noreferrer">${text}</a>`
+														}
+													}
+												}
+											}
+										}
+									} catch (e) {
+										console.warn(
+											'Не удалось применить ссылку к новой строке:',
+											e,
+										)
+									}
+
+									if (viewType === 'cards') {
+										const filesResp = await fetch(
+											`/commerce/order/${orderId}/files/cards/`,
+											{
+												headers: { 'X-Requested-With': 'XMLHttpRequest' },
+											},
+										)
+										const data = await filesResp.json()
+										if (filesResp.ok && data.status === 'success') {
+											displayFiles(data.images, data.others, documentsContainer)
+										}
+									}
+								}
+								modalFileName.close()
+							} catch (err) {
+								showError(err.message || 'Ошибка загрузки файла')
+							} finally {
+								l.remove()
+								uploadBtn.disabled = false
+							}
+						}
+						form.querySelector('.button--cancel').onclick = () => {
+							modalFileName.close()
+						}
+					})
+				}
+			})
+		}
+
+		if (fileInput) {
+			fileInput.addEventListener('change', async () => {
+				const f = fileInput.files && fileInput.files[0]
+				if (!f) return
+
+				if (!orderId) {
+					showError('Не выбран заказ')
+					fileInput.value = ''
+					return
+				}
+				const fileTypeVal = fileTypeInput ? fileTypeInput.value : ''
+				if (!fileTypeVal) {
+					showError('Выберите тип файла')
+					fileInput.value = ''
+					return
+				}
+
+				const modal = new Modal()
+				const resp = await fetch('/components/commerce/file_name', {
+					headers: { 'X-Requested-With': 'XMLHttpRequest' },
+				})
+				const html = await resp.text()
+				await modal.open(html, 'Введите название файла')
+
+				const form = document.getElementById('file_name-form')
+				const nameInput = form.querySelector('#name')
+				nameInput.value = f.name.replace(/\.[^/.]+$/, '')
+				nameInput.focus()
+
+				return new Promise(resolve => {
+					form.onsubmit = async e => {
+						e.preventDefault()
+						let newName = nameInput.value.trim()
+						if (!newName) {
+							showError('Имя файла не может быть пустым')
+							return
+						}
+						const ext = f.name.substring(f.name.lastIndexOf('.'))
+						const finalName = newName + ext
+
+						const l = createLoader()
+						document.body.appendChild(l)
+						uploadBtn.disabled = true
+
+						try {
+							const fd = new FormData()
+							const fileWithNewName = new File([f], finalName, {
+								type: f.type,
+							})
+
+							const commentInput = form.querySelector('#comment')
+							const comment = commentInput.value
+
+							fd.append('file', fileWithNewName)
+							fd.append('order', orderId)
+							fd.append('file_type', fileTypeVal)
+							fd.append('filename', finalName)
+							fd.append('comment', comment)
+
+							const uploadResp = await fetch(`${BASE_URL}documents/upload/`, {
+								method: 'POST',
+								headers: {
+									'X-CSRFToken': getCSRFToken(),
+									'X-Requested-With': 'XMLHttpRequest',
+								},
+								credentials: 'same-origin',
+								body: fd,
+							})
+
+							const payload = await uploadResp.json()
+
+							if (!uploadResp.ok || payload.status !== 'success') {
+								showError(
+									payload.message || payload.error || 'Ошибка загрузки файла',
+								)
+							} else {
+								const tableId = `order-documents-${orderId}`
+								const newRow = await TableManager.addTableRow(payload, tableId)
+								if (
+									newRow &&
+									payload &&
+									(payload.id || payload.pk) &&
+									!newRow.hasAttribute('data-id')
+								) {
+									newRow.setAttribute(
+										'data-id',
+										String(payload.id || payload.pk),
+									)
+								}
+								showSuccess('Файл успешно загружен')
+
+								try {
+									const table = document.getElementById(tableId)
+									if (table && payload.url) {
+										const ths = Array.from(table.querySelectorAll('thead th'))
+										const fileColIndex = ths.findIndex(
+											th =>
+												th && th.dataset && th.dataset.name === 'file_display',
+										)
+										if (fileColIndex !== -1) {
+											const row = table.querySelector('tbody tr:last-child')
+											if (row) {
+												const cell = row.children[fileColIndex]
+												if (cell) {
+													const text = cell.textContent.trim()
+													if (payload.url && text) {
+														cell.innerHTML = `<a href="${payload.url}" target="_blank" rel="noopener noreferrer">${text}</a>`
+													}
+												}
+											}
+										}
+									}
+								} catch (e) {
+									console.warn('Не удалось применить ссылку к новой строке:', e)
+								}
+
+								if (viewType === 'cards') {
+									const filesResp = await fetch(
+										`/commerce/order/${orderId}/files/cards/`,
+										{
+											headers: { 'X-Requested-With': 'XMLHttpRequest' },
+										},
+									)
+									const data = await filesResp.json()
+									if (filesResp.ok && data.status === 'success') {
+										displayFiles(data.images, data.others, documentsContainer)
+									}
+								}
+							}
+							modal.close()
+						} catch (err) {
+							showError(err.message || 'Ошибка загрузки файла')
+						} finally {
+							l.remove()
+							uploadBtn.disabled = false
+							try {
+								fileInput.value = ''
+							} catch (e) {}
+						}
+					}
+					form.querySelector('.button--cancel').onclick = () => {
+						modal.close()
+						fileInput.value = ''
+					}
+				})
+			})
+		}
+	} catch (e) {
+		console.warn(
+			'Ошибка инициализации загрузчика документов в модальном окне:',
+			e,
+		)
+	}
+
+	try {
+		const table = documentsContainer.querySelector('table')
+		if (table) {
+			if (!table.id) table.id = `order-documents-${orderId || 'tmp'}`
+			TableManager.initTable(table.id)
+			table.querySelectorAll('tbody tr').forEach(row => {
+				TableManager.attachRowCellHandlers(row)
+				TableManager.formatCurrencyValuesForRow(table.id, row)
+				TableManager.applyColumnWidthsForRow(table.id, row)
+			})
+		}
+	} catch (e) {
+		console.warn('Не удалось инициализировать таблицу документов:', e)
+	}
+
+	const refreshButton = document.getElementById('refresh-button')
+	if (refreshButton) {
+		refreshButton.addEventListener('click', async () => {
+			if (!orderId) return
+			const loader2 = createLoader()
+			document.body.appendChild(loader2)
+			try {
+				if (viewType === 'table') {
+					const docsResp2 = await fetch(
+						`${BASE_URL}documents/table/${orderId}/`,
+						{ headers: { 'X-Requested-With': 'XMLHttpRequest' } },
+					)
+					const data = await docsResp2.json()
+					if (docsResp2.ok) {
+						documentsContainer.innerHTML = data.html || ''
+
+						try {
+							const urls = Array.isArray(data.urls) ? data.urls : []
+							if (urls.length) {
+								const table =
+									documentsContainer.querySelector(
+										`table#order-documents-${orderId}`,
+									) || documentsContainer.querySelector('table')
+								if (table) {
+									const ths = Array.from(table.querySelectorAll('thead th'))
+									const fileColIndex = ths.findIndex(
+										th =>
+											th && th.dataset && th.dataset.name === 'file_display',
+									)
+
+									if (fileColIndex !== -1) {
+										const rows = table.querySelectorAll(
+											'tbody tr:not(.table__row--summary):not(.table__row--empty)',
+										)
+										rows.forEach((row, idx) => {
+											const cell = row.children[fileColIndex]
+											if (!cell) return
+											const text = cell.textContent.trim()
+											const fileUrl = urls[idx] || ''
+											if (fileUrl && text) {
+												cell.innerHTML = `<a href="${fileUrl}" target="_blank" rel="noopener noreferrer">${text}</a>`
+											}
+										})
+									}
+								}
+							}
+						} catch (err) {
+							console.warn(
+								'Не удалось применить ссылки к колонке file_display:',
+								err,
+							)
+						}
+
+						try {
+							const table = documentsContainer.querySelector('table')
+							if (table) {
+								if (!table.id) table.id = `order-documents-${orderId || 'tmp'}`
+								TableManager.initTable(table.id)
+								table.querySelectorAll('tbody tr').forEach(row => {
+									TableManager.attachRowCellHandlers(row)
+									TableManager.formatCurrencyValuesForRow(table.id, row)
+									TableManager.applyColumnWidthsForRow(table.id, row)
+								})
+							}
+						} catch (e) {
+							console.warn(
+								'Не удалось инициализировать таблицу документов после обновления:',
+								e,
+							)
+						}
+					} else {
+						documentsContainer.innerHTML = data.html || ''
+						showError(
+							data.error || data.message || 'Ошибка загрузки документов заказа',
+						)
+					}
+				} else {
+					const filesResp = await fetch(
+						`/commerce/order/${orderId}/files/cards/`,
+						{
+							headers: { 'X-Requested-With': 'XMLHttpRequest' },
+						},
+					)
+					const data = await filesResp.json()
+					if (filesResp.ok && data.status === 'success') {
+						displayFiles(data.images, data.others, documentsContainer)
+					} else {
+						documentsContainer.innerHTML = data.html || ''
+						showError(
+							data.error || data.message || 'Ошибка загрузки файлов заказа',
+						)
+					}
+				}
+			} catch (err) {
+				showError(err.message || 'Ошибка загрузки файлов заказа')
+			} finally {
+				loader2.remove()
+			}
+		})
+	}
+}
+
+/**
+ * Универсальный обработчик для кнопки "Файлы заказа"
+ * @param {HTMLElement} button - DOM элемент кнопки
+ * @param {function(): (number|null)} [getOrderId] - функция для получения orderId (опционально)
+ */
+function setupOrderFilesButton(button, getOrderId) {
+	if (!button) return
+	button.addEventListener('click', async () => {
+		const modal = new Modal()
+		const resp = await fetch('/components/commerce/order_documents', {
+			headers: { 'X-Requested-With': 'XMLHttpRequest' },
+		})
+		const html = await resp.text()
+		await modal.open(html, 'Файлы заказа')
+
+		addSwapButtonToModalHeader()
+
+		const fileTypeSelectInput = document.getElementById('file_type')
+		const fileTypeSelect =
+			fileTypeSelectInput && fileTypeSelectInput.closest('.select')
+		if (fileTypeSelect) {
+			SelectHandler.setupSelects({
+				select: fileTypeSelect,
+				url: `${BASE_URL}documents/types/`,
+			})
+		}
+
+		let orderId = null
+		if (typeof getOrderId === 'function') {
+			orderId = getOrderId()
+		} else {
+			const selectedCell = document.querySelector('td.table__cell--selected')
+			if (selectedCell) {
+				const v = selectedCell.textContent.trim()
+				orderId = Number.isNaN(Number(v)) ? null : parseInt(v, 10)
+			}
+			if (!orderId) {
+				const selectedRow = document.querySelector('tr.table__row--selected')
+				if (selectedRow) {
+					const firstCell = selectedRow.querySelector('td')
+					if (firstCell) {
+						const v = firstCell.textContent.trim()
+						orderId = Number.isNaN(Number(v)) ? null : parseInt(v, 10)
+					}
+				}
+			}
+		}
+
+		const documentsContainer = document.getElementById('documents-container')
+		if (!documentsContainer) return
+
+		const viewType = localStorage.getItem('orderFilesView') || 'table'
+		documentsContainer.dataset.orderId = orderId
+		documentsContainer.dataset.viewType = viewType
+
+		await reloadOrderFiles(orderId, viewType, documentsContainer)
+	})
+}
+
+/**
+ * Экспериментальная функция для отображения файлов заказа: изображения как карточки, остальные как список.
+ * @param {HTMLElement} button - DOM элемент кнопки
+ * @param {function(): (number|null)} [getOrderId] - функция для получения orderId (опционально)
+ */
+function setupOrderFilesButton2(button, getOrderId) {
+	if (!button) return
+	button.addEventListener('click', async () => {
+		const modal = new Modal()
+		const resp = await fetch('/components/commerce/order_documents', {
+			headers: { 'X-Requested-With': 'XMLHttpRequest' },
+		})
+		const html = await resp.text()
+		await modal.open(html, 'Файлы заказа')
+
+		addSwapButtonToModalHeader()
+
+		const fileTypeSelectInput = document.getElementById('file_type')
+		const fileTypeSelect =
+			fileTypeSelectInput && fileTypeSelectInput.closest('.select')
+		if (fileTypeSelect) {
+			SelectHandler.setupSelects({
+				select: fileTypeSelect,
+				url: `${BASE_URL}documents/types/`,
+			})
+		}
+
+		let orderId = null
+		if (typeof getOrderId === 'function') {
+			orderId = getOrderId()
+		} else {
+			const selectedRow = document.querySelector('tr.table__row--selected')
+			if (selectedRow) {
+				const firstCell = selectedRow.querySelector('td:first-child')
+				if (firstCell) {
+					const v = firstCell.textContent.trim()
+					orderId = Number.isNaN(Number(v)) ? null : parseInt(v, 10)
+				}
+			}
+		}
+
+		const documentsContainer = document.getElementById('documents-container')
+		if (!documentsContainer) return
+
+		const viewType = localStorage.getItem('orderFilesView') || 'cards'
+		documentsContainer.dataset.orderId = orderId
+		documentsContainer.dataset.viewType = viewType
+		await reloadOrderFiles(orderId, viewType, documentsContainer)
+	})
+}
+
+function displayFiles(images, others, container) {
+	if (!container) return
+
+	container.innerHTML = ''
+
+	if (images.length > 0) {
+		const imagesRow = document.createElement('div')
+		imagesRow.className = 'images-row'
+		imagesRow.style.display = 'flex'
+		imagesRow.style.flexWrap = 'wrap'
+		imagesRow.style.gap = '30px 10px'
+
+		images.forEach(img => {
+			const card = document.createElement('div')
+			card.className = 'image-card'
+			card.style.border = '1px solid #ccc'
+			card.style.textAlign = 'center'
+			card.style.width = '100px'
+			card.style.height = '100px'
+
+			const imgElement = document.createElement('img')
+			imgElement.src = img.url
+			imgElement.alt = img.name
+			imgElement.style.width = '100%'
+			imgElement.style.height = '100%'
+			imgElement.style.objectFit = 'contain'
+			imgElement.style.cursor = 'pointer'
+
+			imgElement.addEventListener('click', () => {
+				window.open(img.url, '_blank')
+			})
+
+			const nameElement = document.createElement('p')
+			nameElement.textContent = img.name
+			nameElement.style.fontSize = '12px'
+			nameElement.style.margin = '5px 0 0 0'
+			nameElement.style.overflow = 'hidden'
+			nameElement.style.textOverflow = 'ellipsis'
+			nameElement.style.whiteSpace = 'nowrap'
+			nameElement.title = img.name
+
+			card.appendChild(imgElement)
+			card.appendChild(nameElement)
+			imagesRow.appendChild(card)
+		})
+
+		container.appendChild(imagesRow)
+	}
+
+	if (others.length > 0) {
+		const othersList = document.createElement('ul')
+		othersList.className = 'files-list'
+		othersList.style.marginTop = '30px'
+
+		others.forEach(file => {
+			const li = document.createElement('li')
+			const link = document.createElement('a')
+			link.href = file.url
+			link.textContent = file.name
+			link.target = '_blank'
+			link.style.textDecoration = 'none'
+			link.style.color = 'var(--color-primary)'
+			link.style.cursor = 'pointer'
+			link.title = file.name
+
+			link.addEventListener('mouseover', () => {
+				link.style.textDecoration = 'underline'
+			})
+			link.addEventListener('mouseout', () => {
+				link.style.textDecoration = 'none'
+			})
+
+			li.appendChild(link)
+			othersList.appendChild(li)
+		})
+
+		container.appendChild(othersList)
+	}
+
+	if (images.length === 0 && others.length === 0) {
+		container.innerHTML = '<div class="info">Нет файлов</div>'
+	}
 }
 
 let lastLoadedClientId = null
@@ -124,38 +1062,35 @@ const initGenericPage = pageConfig => {
 
 const setupCurrencyInput = (inputId, decimalPlaces = 2) => {
 	const input = document.getElementById(inputId)
-	if (!input) {
-		console.error(`Input with id "${inputId}" not found`)
-		return null
-	}
+	if (!input) return null
 
-	if (input.autoNumeric) {
-		input.autoNumeric.remove()
-	}
+	if (input.autoNumeric) input.autoNumeric.remove()
 
-	const anElement = new AutoNumeric(input, {
-		allowDecimalPadding: decimalPlaces === 0 ? false : true,
+	const options = {
 		alwaysAllowDecimalCharacter: decimalPlaces > 0,
 		currencySymbol: CURRENCY_SUFFIX,
 		currencySymbolPlacement: 's',
 		decimalCharacter: ',',
 		decimalCharacterAlternative: '.',
-		decimalPlacesRawValue: decimalPlaces,
 		decimalPlaces: decimalPlaces,
+		decimalPlacesRawValue: decimalPlaces,
 		digitGroupSeparator: ' ',
 		emptyInputBehavior: 'null',
 		minimumValue: '0',
 		allowEmpty: true,
-	})
+	}
+	if (decimalPlaces > 0) {
+		options.allowDecimalPadding = true
+	}
 
+	const anElement = new AutoNumeric(input, options)
 	input.autoNumeric = anElement
-
 	return anElement
 }
 
 const setIds = (ids, tableId) => {
 	const tableRows = document.querySelectorAll(
-		`#${tableId} tbody tr:not(.table__row--summary)`
+		`#${tableId} tbody tr:not(.table__row--summary)`,
 	)
 	if (!tableRows || tableRows.length === 0 || !ids || ids.length === 0) {
 		return
@@ -186,6 +1121,25 @@ const addMenuHandler = () => {
 	const viewButton = document.getElementById('view-button')
 
 	const refreshButton = document.getElementById('refresh-button')
+
+	const renameOrderDocumentButton = document.getElementById(
+		'rename-order-document-button',
+	)
+	const deleteOrderDocumentButton = document.getElementById(
+		'delete-order-document-button',
+	)
+	const viewOrderPayments = document.getElementById(
+		'view_order_payments-button',
+	)
+	const assignExecutorButton = document.getElementById('assign_executor-button')
+	const updateStatusButton = document.getElementById('update_status-button')
+	const viewCorrespondenceButton = document.getElementById(
+		'view_correspondence-button',
+	)
+
+	const addEmergencyButton = document.getElementById('add-emergency-button')
+	const editEmergencyButton = document.getElementById('edit-emergency-button')
+	const closeEmergencyButton = document.getElementById('close-emergency-button')
 
 	if (menu) {
 		if (menu.parentNode !== document.body) {
@@ -238,7 +1192,7 @@ const addMenuHandler = () => {
 	if (menu) {
 		document.addEventListener('contextmenu', function (e) {
 			const row = e.target.closest(
-				'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+				'tbody tr:not(.table__row--summary):not(.table__row--empty)',
 			)
 
 			const pathname = window.location.pathname
@@ -271,10 +1225,15 @@ const addMenuHandler = () => {
 						addButton.textContent = 'Новый расчет'
 					}
 
-					if (table.id && table.id.startsWith('order-viewers-')) {
+					if (
+						table.id &&
+						(table.id.startsWith('order-viewers-') ||
+							table.id.startsWith('order-documents-'))
+					) {
 						addButton.style.display = 'none'
 					}
 				}
+
 				if (editButton) {
 					if (table.id === 'transactions-bank-accounts-table') {
 						editButton.style.display = 'none'
@@ -282,10 +1241,14 @@ const addMenuHandler = () => {
 						editButton.style.display = 'block'
 					}
 
-					if (table.id.startsWith('order-viewers-')) {
+					if (
+						table.id.startsWith('order-viewers-') ||
+						table.id.startsWith('order-documents-')
+					) {
 						editButton.style.display = 'none'
 					}
 				}
+
 				if (deleteButton) {
 					if (table.id === 'transactions-bank-accounts-table') {
 						deleteButton.style.display = 'none'
@@ -295,6 +1258,10 @@ const addMenuHandler = () => {
 
 					if (table.id.startsWith('order-viewers-')) {
 						deleteButton.textContent = 'Убрать из списка'
+					}
+
+					if (table.id.startsWith('order-documents-')) {
+						deleteButton.style.display = 'none'
 					}
 				}
 
@@ -314,11 +1281,11 @@ const addMenuHandler = () => {
 						settleDebtButton.style.display = 'none'
 					} else if (table.id === 'investors-table') {
 						const selectedCell = document.querySelector(
-							'td.table__cell--selected'
+							'td.table__cell--selected',
 						)
 						if (selectedCell) {
 							const cellIndex = Array.from(
-								selectedCell.parentNode.children
+								selectedCell.parentNode.children,
 							).indexOf(selectedCell)
 							const th = table.querySelectorAll('thead th')[cellIndex]
 							const colName = th ? th.dataset.name : null
@@ -374,6 +1341,18 @@ const addMenuHandler = () => {
 						deleteContactButton.style.display = 'none'
 					}
 				}
+				if (viewOrderPayments) {
+					viewOrderPayments.style.display = 'block'
+				}
+				if (viewCorrespondenceButton) {
+					viewCorrespondenceButton.style.display = 'block'
+				}
+				if (updateStatusButton) {
+					updateStatusButton.style.display = 'block'
+				}
+				if (assignExecutorButton) {
+					assignExecutorButton.style.display = 'block'
+				}
 
 				if (table.id === 'cash_flow-table') {
 					const headers = table.querySelectorAll('thead th')
@@ -415,42 +1394,49 @@ const addMenuHandler = () => {
 				}
 
 				const viewOrderFilesBtn = document.getElementById(
-					'view_order_files-button'
+					'view_order_files-button',
 				)
+				const emergencyButton = document.getElementById('emergency-button')
 				const updateStatusBtn = document.getElementById('update_status-button')
 				const assignExecutorBtn = document.getElementById(
-					'assign_executor-button'
+					'assign_executor-button',
 				)
 				const viewCorrespondenceBtn = document.getElementById(
-					'view_correspondence-button'
+					'view_correspondence-button',
 				)
 				const newMessageBtn = document.getElementById('new_message-button')
 				const editMessageBtn = document.getElementById('edit_message-button')
 				const deleteMessageBtn = document.getElementById(
-					'delete_message-button'
+					'delete_message-button',
 				)
 				const refreshMessagesBtn = document.getElementById(
-					'refresh_messages-button'
+					'refresh_messages-button',
 				)
 
 				if (
 					table.id.startsWith('order-documents-') ||
-					table.id.startsWith('order-work-messages-')
+					table.id.startsWith('order-work-messages-') ||
+					table.id.startsWith('order-messages-')
 				) {
 					if (viewOrderFilesBtn) viewOrderFilesBtn.style.display = 'none'
+					if (emergencyButton) emergencyButton.style.display = 'none'
 					if (updateStatusBtn) updateStatusBtn.style.display = 'none'
 					if (assignExecutorBtn) assignExecutorBtn.style.display = 'none'
 					if (viewCorrespondenceBtn)
 						viewCorrespondenceBtn.style.display = 'none'
 				} else {
 					if (viewOrderFilesBtn) viewOrderFilesBtn.style.display = 'block'
+					if (emergencyButton) emergencyButton.style.display = 'block'
 					if (updateStatusBtn) updateStatusBtn.style.display = 'block'
 					if (assignExecutorBtn) assignExecutorBtn.style.display = 'block'
 					if (viewCorrespondenceBtn)
 						viewCorrespondenceBtn.style.display = 'block'
 				}
 
-				if (table.id.startsWith('order-work-messages-')) {
+				if (
+					table.id.startsWith('order-work-messages-') ||
+					table.id.startsWith('order-messages-')
+				) {
 					if (newMessageBtn) newMessageBtn.style.display = 'block'
 					if (editMessageBtn) editMessageBtn.style.display = 'block'
 					if (deleteMessageBtn) deleteMessageBtn.style.display = 'block'
@@ -483,11 +1469,44 @@ const addMenuHandler = () => {
 				if (addViewerButton && urlName === 'works') {
 					addViewerButton.style.display = 'block'
 
-					if (table.id && table.id.startsWith('order-viewers-')) {
+					if (
+						table.id &&
+						(table.id.startsWith('order-viewers-') ||
+							table.id.startsWith('order-documents-'))
+					) {
 						addViewerButton.style.display = 'none'
 					}
 				} else if (addViewerButton) {
 					addViewerButton.style.display = 'none'
+				}
+
+				if (table.id && table.id.startsWith('order-documents-')) {
+					if (renameOrderDocumentButton)
+						renameOrderDocumentButton.style.display = 'block'
+					if (deleteOrderDocumentButton)
+						deleteOrderDocumentButton.style.display = 'block'
+				} else {
+					if (renameOrderDocumentButton)
+						renameOrderDocumentButton.style.display = 'none'
+					if (deleteOrderDocumentButton)
+						deleteOrderDocumentButton.style.display = 'none'
+				}
+
+				if (table.id && table.id.startsWith('emergencies-')) {
+					if (addEmergencyButton) addEmergencyButton.style.display = 'block'
+					if (editEmergencyButton) editEmergencyButton.style.display = 'block'
+					if (closeEmergencyButton) closeEmergencyButton.style.display = 'block'
+
+					if (assignExecutorButton) assignExecutorButton.style.display = 'none'
+					if (updateStatusButton) updateStatusButton.style.display = 'none'
+					if (viewCorrespondenceButton)
+						viewCorrespondenceButton.style.display = 'none'
+					if (viewOrderFilesBtn) viewOrderFilesBtn.style.display = 'none'
+					if (emergencyButton) emergencyButton.style.display = 'none'
+				} else {
+					if (addEmergencyButton) addEmergencyButton.style.display = 'none'
+					if (editEmergencyButton) editEmergencyButton.style.display = 'none'
+					if (closeEmergencyButton) closeEmergencyButton.style.display = 'none'
 				}
 
 				showMenu(e.pageX, e.pageY)
@@ -506,11 +1525,18 @@ const addMenuHandler = () => {
 				if (settleDebtAllButton) settleDebtAllButton.style.display = 'none'
 				if (repaymentsEditButton) repaymentsEditButton.style.display = 'none'
 				if (viewButton) viewButton.style.display = 'none'
+				if (renameOrderDocumentButton)
+					renameOrderDocumentButton.style.display = 'none'
+				if (deleteOrderDocumentButton)
+					deleteOrderDocumentButton.style.display = 'none'
 
 				if (editContactButton) editContactButton.style.display = 'none'
 				if (deleteContactButton) deleteContactButton.style.display = 'none'
 
 				if (refreshButton) refreshButton.style.display = 'none'
+				if (addEmergencyButton) addEmergencyButton.style.display = 'none'
+				if (editEmergencyButton) editEmergencyButton.style.display = 'none'
+				if (closeEmergencyButton) closeEmergencyButton.style.display = 'none'
 
 				const pathname = window.location.pathname
 
@@ -552,28 +1578,54 @@ const addMenuHandler = () => {
 				}
 
 				const viewOrderFilesBtn = document.getElementById(
-					'view_order_files-button'
+					'view_order_files-button',
 				)
+				const emergencyButton = document.getElementById('emergency-button')
 				const updateStatusBtn = document.getElementById('update_status-button')
 				const assignExecutorBtn = document.getElementById(
-					'assign_executor-button'
+					'assign_executor-button',
 				)
 				const viewCorrespondenceBtn = document.getElementById(
-					'view_correspondence-button'
+					'view_correspondence-button',
+				)
+				const viewOrderPayments = document.getElementById(
+					'view_order_payments-button',
+				)
+				const viewCorrespondenceButton = document.getElementById(
+					'view_correspondence-button',
+				)
+				const updateStatusButton = document.getElementById(
+					'update_status-button',
+				)
+				const assignExecutorButton = document.getElementById(
+					'assign_executor-button',
 				)
 
-				if (viewOrderFilesBtn) viewOrderFilesBtn.style.display = 'block'
-				if (updateStatusBtn) updateStatusBtn.style.display = 'block'
-				if (assignExecutorBtn) assignExecutorBtn.style.display = 'block'
-				if (viewCorrespondenceBtn) viewCorrespondenceBtn.style.display = 'block'
+				if (viewOrderFilesBtn) viewOrderFilesBtn.style.display = 'none'
+				if (emergencyButton) emergencyButton.style.display = 'none'
+				if (viewOrderPayments) {
+					viewOrderPayments.style.display = 'none'
+				}
+				if (viewCorrespondenceButton) {
+					viewCorrespondenceButton.style.display = 'none'
+				}
+				if (updateStatusButton) {
+					updateStatusButton.style.display = 'none'
+				}
+				if (assignExecutorButton) {
+					assignExecutorButton.style.display = 'none'
+				}
+				if (updateStatusBtn) updateStatusBtn.style.display = 'none'
+				if (assignExecutorBtn) assignExecutorBtn.style.display = 'none'
+				if (viewCorrespondenceBtn) viewCorrespondenceBtn.style.display = 'none'
 
 				const newMessageBtn = document.getElementById('new_message-button')
 				const editMessageBtn = document.getElementById('edit_message-button')
 				const deleteMessageBtn = document.getElementById(
-					'delete_message-button'
+					'delete_message-button',
 				)
 				const refreshMessagesBtn = document.getElementById(
-					'refresh_messages-button'
+					'refresh_messages-button',
 				)
 				if (newMessageBtn) newMessageBtn.style.display = 'none'
 				if (editMessageBtn) editMessageBtn.style.display = 'none'
@@ -586,6 +1638,21 @@ const addMenuHandler = () => {
 				showMenu(e.pageX, e.pageY)
 			}
 
+			const tbody = table ? table.querySelector('tbody') : null
+
+			if (urlName === 'enterprise_balance_report') {
+				if (tbody) {
+					e.preventDefault()
+					addButton.style.display = 'block'
+					showMenu(e.pageX, e.pageY)
+					return
+				} else {
+					e.preventDefault()
+					addButton.style.display = 'none'
+					showMenu(e.pageX, e.pageY)
+				}
+			}
+
 			const item = e.target.closest('.debtors-office-list__row-item')
 			if (item) {
 				const h4 = item.querySelector('h4')
@@ -593,7 +1660,7 @@ const addMenuHandler = () => {
 				if (
 					h4 &&
 					['Оборудование', 'Кредит', 'Краткосрочные обязательства'].includes(
-						h4.textContent.trim()
+						h4.textContent.trim(),
 					)
 				) {
 					if (settleDebtButton) {
@@ -610,10 +1677,10 @@ const addMenuHandler = () => {
 				const newMessageBtn = document.getElementById('new_message-button')
 				const editMessageBtn = document.getElementById('edit_message-button')
 				const deleteMessageBtn = document.getElementById(
-					'delete_message-button'
+					'delete_message-button',
 				)
 				const refreshMessagesBtn = document.getElementById(
-					'refresh_messages-button'
+					'refresh_messages-button',
 				)
 				if (newMessageBtn) newMessageBtn.style.display = 'block'
 				if (editMessageBtn) editMessageBtn.style.display = 'block'
@@ -636,17 +1703,19 @@ const addMenuHandler = () => {
 				if (refreshButton) refreshButton.style.display = 'none'
 
 				const viewOrderFilesBtn = document.getElementById(
-					'view_order_files-button'
+					'view_order_files-button',
 				)
+				const emergencyButton = document.getElementById('emergency-button')
 				const updateStatusBtn = document.getElementById('update_status-button')
 				const assignExecutorBtn = document.getElementById(
-					'assign_executor-button'
+					'assign_executor-button',
 				)
 				const viewCorrespondenceBtn = document.getElementById(
-					'view_correspondence-button'
+					'view_correspondence-button',
 				)
 
 				if (viewOrderFilesBtn) viewOrderFilesBtn.style.display = 'none'
+				if (emergencyButton) emergencyButton.style.display = 'none'
 				if (updateStatusBtn) updateStatusBtn.style.display = 'none'
 				if (assignExecutorBtn) assignExecutorBtn.style.display = 'none'
 				if (viewCorrespondenceBtn) viewCorrespondenceBtn.style.display = 'none'
@@ -689,7 +1758,7 @@ const addMenuHandler = () => {
 					touchTimer = null
 				}, LONG_PRESS_DELAY)
 			},
-			{ passive: true }
+			{ passive: true },
 		)
 
 		document.addEventListener(
@@ -700,7 +1769,7 @@ const addMenuHandler = () => {
 					touchTimer = null
 				}
 			},
-			{ passive: true }
+			{ passive: true },
 		)
 
 		document.addEventListener(
@@ -711,7 +1780,7 @@ const addMenuHandler = () => {
 					touchTimer = null
 				}
 			},
-			{ passive: true }
+			{ passive: true },
 		)
 
 		document.addEventListener('click', () => {
@@ -736,7 +1805,7 @@ function addSearchInput(
 	placeholder,
 	selector,
 	marginLeft = '0px',
-	type = 'clients'
+	type = 'clients',
 ) {
 	if (!listEl) return
 	const wrapper = document.createElement('div')
@@ -773,7 +1842,7 @@ async function deleteDepartmentWork(workId, card) {
 				loader.remove()
 				if (!resp.ok || data.status !== 'success') {
 					showError(
-						data.message || data.error || 'Ошибка при удалении работы отдела'
+						data.message || data.error || 'Ошибка при удалении работы отдела',
 					)
 					return
 				}
@@ -783,7 +1852,7 @@ async function deleteDepartmentWork(workId, card) {
 				loader.remove()
 				showError(err.message || 'Ошибка при удалении работы отдела')
 			}
-		}
+		},
 	)
 }
 
@@ -797,7 +1866,7 @@ const initWorksPage = () => {
 
 	clientsList.addEventListener('click', function (e) {
 		const clientRow = e.target.closest(
-			'.debtors-office-list__row[data-target^="branch-"]'
+			'.debtors-office-list__row[data-target^="branch-"]',
 		)
 		if (clientRow) {
 			const branchId = clientRow.getAttribute('data-target')
@@ -810,13 +1879,13 @@ const initWorksPage = () => {
 						'Поиск объекта...',
 						'h4',
 						'16px',
-						'objects'
+						'objects',
 					)
 				}
 			}
 		}
 		const objectRow = e.target.closest(
-			'.debtors-office-list__row[data-target^="object-"]'
+			'.debtors-office-list__row[data-target^="object-"]',
 		)
 		if (objectRow) {
 			const objectIdAttr = objectRow.getAttribute('data-target')
@@ -829,12 +1898,22 @@ const initWorksPage = () => {
 						'Поиск продукции...',
 						'.debtors-office-list__title',
 						'32px',
-						'products'
+						'products',
 					)
 				}
 			}
 		}
 	})
+
+	function getQueryParam(name) {
+		const url = new URL(window.location.href)
+		return url.searchParams.get(name)
+	}
+
+	const orderIdFromQuery = getQueryParam('order_id')
+	const clientIdFromQuery = getQueryParam('client_id')
+	const productIdFromQuery = getQueryParam('product_id')
+	const objectIdFromQuery = getQueryParam('client_object_id')
 
 	document.querySelectorAll('.debtors-office-list__row').forEach(row => {
 		row.addEventListener('click', async function (e) {
@@ -860,7 +1939,7 @@ const initWorksPage = () => {
 				if (!productId || !clientId || !objectId) return
 
 				const resp = await fetch(
-					`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`
+					`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`,
 				)
 				const data = await resp.json()
 				loader.remove()
@@ -890,6 +1969,25 @@ const initWorksPage = () => {
 					{ name: 'comment' },
 					{ name: 'additional_info' },
 				])
+
+				if (orderIdFromQuery) {
+					const tableId = data.table_id
+					const observer = new MutationObserver(() => {
+						const idInput = document.querySelector(
+							`#${tableId} thead input[name="id"]`,
+						)
+						if (idInput) {
+							idInput.value = orderIdFromQuery
+							idInput.dispatchEvent(new Event('input', { bubbles: true }))
+							idInput.dispatchEvent(new Event('change', { bubbles: true }))
+							observer.disconnect()
+						}
+					})
+					observer.observe(document.getElementById(tableId), {
+						childList: true,
+						subtree: true,
+					})
+				}
 			}
 		})
 	})
@@ -923,6 +2021,35 @@ const initWorksPage = () => {
 		}
 	})
 
+	const openLevels = async () => {
+		if (!clientIdFromQuery || !objectIdFromQuery || !productIdFromQuery) return
+
+		const clientRow = document.querySelector(
+			`.debtors-office-list__row[data-target="branch-${clientIdFromQuery}"]`,
+		)
+		if (clientRow) {
+			clientRow.click()
+			await new Promise(resolve => setTimeout(resolve, 100))
+		}
+
+		const objectRow = document.querySelector(
+			`.debtors-office-list__row[data-target="object-${clientIdFromQuery}-${objectIdFromQuery}"]`,
+		)
+		if (objectRow) {
+			objectRow.click()
+			await new Promise(resolve => setTimeout(resolve, 100))
+		}
+
+		const productRow = document.querySelector(
+			`.debtors-office-list__row[data-target="product-${clientIdFromQuery}-${objectIdFromQuery}-${productIdFromQuery}"]`,
+		)
+		if (productRow) {
+			productRow.click()
+		}
+	}
+
+	openLevels()
+
 	const addButton = document.getElementById('add-button')
 	const editButton = document.getElementById('edit-button')
 	const deleteButton = document.getElementById('delete-button')
@@ -949,7 +2076,7 @@ const initWorksPage = () => {
 							result.client_id
 						) {
 							const branchDetails = document.getElementById(
-								`branch-${result.client_id}`
+								`branch-${result.client_id}`,
 							)
 							if (branchDetails) {
 								let ul = branchDetails.querySelector('ul')
@@ -972,7 +2099,7 @@ const initWorksPage = () => {
 								const newItem = ul.lastElementChild
 								if (newItem) {
 									const newRow = newItem.querySelector(
-										'.debtors-office-list__row'
+										'.debtors-office-list__row',
 									)
 									if (newRow) {
 										newRow.addEventListener('click', async function (e) {
@@ -982,7 +2109,7 @@ const initWorksPage = () => {
 											if (!details) return
 
 											const btn = newRow.querySelector(
-												'.debtors-office-list__toggle'
+												'.debtors-office-list__toggle',
 											)
 											if (btn) btn.classList.toggle('open')
 											details.classList.toggle('open')
@@ -1001,7 +2128,7 @@ const initWorksPage = () => {
 												if (productId && clientId && objectId) {
 													try {
 														const resp = await fetch(
-															`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`
+															`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`,
 														)
 														const data = await resp.json()
 														loader.remove()
@@ -1022,7 +2149,7 @@ const initWorksPage = () => {
 									}
 
 									const productRows = newItem.querySelectorAll(
-										'.debtors-office-list__row[data-target^="product-"]'
+										'.debtors-office-list__row[data-target^="product-"]',
 									)
 									productRows.forEach(row => {
 										row.addEventListener('click', async function (e) {
@@ -1032,7 +2159,7 @@ const initWorksPage = () => {
 											if (!details) return
 
 											const btn = row.querySelector(
-												'.debtors-office-list__toggle'
+												'.debtors-office-list__toggle',
 											)
 											if (btn) btn.classList.toggle('open')
 											details.classList.toggle('open')
@@ -1051,7 +2178,7 @@ const initWorksPage = () => {
 												if (productId && clientId && objectId) {
 													try {
 														const resp = await fetch(
-															`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`
+															`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`,
 														)
 														const data = await resp.json()
 														loader.remove()
@@ -1092,7 +2219,7 @@ const initWorksPage = () => {
 				}
 			} else if (buttonText === 'Новый расчет') {
 				const row = document.querySelector(
-					'.debtors-office-list__row[data-target^="product-"]'
+					'.debtors-office-list__row[data-target^="product-"]',
 				)
 				if (!row) {
 					showError('Не выбран продукт для создания расчета.')
@@ -1124,7 +2251,7 @@ const initWorksPage = () => {
 					onSuccess: async result => {
 						if (result.status === 'success' && result.id) {
 							const debtorsOfficeDetails = document.getElementById(
-								`product-${clientId}-${objectId}-${productId}`
+								`product-${clientId}-${objectId}-${productId}`,
 							)
 							if (!debtorsOfficeDetails) return
 
@@ -1138,7 +2265,7 @@ const initWorksPage = () => {
 								const newRow = await TableManager.addTableRow(
 									result,
 									tableId,
-									true
+									true,
 								)
 
 								if (newRow) {
@@ -1225,11 +2352,11 @@ const initWorksPage = () => {
 					const selectWrapper = clientInput.closest('.select')
 					if (selectWrapper) {
 						const displaySpan = selectWrapper.querySelector(
-							'.select__display span'
+							'.select__display span',
 						)
 						if (displaySpan) {
 							const clientRow = document.querySelector(
-								`[data-target="branch-${clientId}"]`
+								`[data-target="branch-${clientId}"]`,
 							)
 							if (clientRow) {
 								displaySpan.textContent =
@@ -1245,7 +2372,7 @@ const initWorksPage = () => {
 					const selectWrapper = productInput.closest('.select')
 					if (selectWrapper) {
 						const displaySpan = selectWrapper.querySelector(
-							'.select__display span'
+							'.select__display span',
 						)
 						if (displaySpan) {
 							displaySpan.textContent =
@@ -1261,11 +2388,11 @@ const initWorksPage = () => {
 					const selectWrapper = clientObjectInput.closest('.select')
 					if (selectWrapper) {
 						const displaySpan = selectWrapper.querySelector(
-							'.select__display span'
+							'.select__display span',
 						)
 						if (displaySpan) {
 							const objectRow = document.querySelector(
-								`[data-target="object-${clientId}-${objectId}"]`
+								`[data-target="object-${clientId}-${objectId}"]`,
 							)
 							if (objectRow) {
 								displaySpan.textContent =
@@ -1287,11 +2414,11 @@ const initWorksPage = () => {
 						const unitPrice = unitPriceAN
 							? unitPriceAN.getNumber()
 							: parseFloat(
-									unit_priceInput.value.replace(/\s/g, '').replace(',', '.')
-							  ) || 0
+									unit_priceInput.value.replace(/\s/g, '').replace(',', '.'),
+								) || 0
 						const quantity =
 							parseFloat(
-								quantityInput.value.replace(/\s/g, '').replace(',', '.')
+								quantityInput.value.replace(/\s/g, '').replace(',', '.'),
 							) || 0
 
 						if (unitPrice > 0 && quantity > 0) {
@@ -1317,34 +2444,54 @@ const initWorksPage = () => {
 					quantityInput.addEventListener('change', calculateAmount)
 				}
 
-				const modalBody = document.querySelector('.modal__body')
-				if (modalBody) {
+				try {
+					const resp = await fetch(
+						`/commerce/products/${productId}/departments/`,
+						{
+							headers: { 'X-Requested-With': 'XMLHttpRequest' },
+						},
+					)
+					const data = await resp.json()
+
+					if (!resp.ok || !Array.isArray(data)) return
+
+					const modalBody = document.querySelector('.modal__body')
+					if (!modalBody) return
+
+					const form = modalBody.querySelector('form.modal-form')
+					if (!form) return
+
 					let carousel = modalBody.querySelector('.departments-carousel')
 					if (!carousel) {
 						carousel = document.createElement('div')
 						carousel.className = 'departments-carousel'
-						const form = modalBody.querySelector('form.modal-form')
-						if (form) {
-							form.insertAdjacentElement('afterend', carousel)
-						} else {
-							modalBody.appendChild(carousel)
-						}
+						form.insertAdjacentElement('afterend', carousel)
+					}
+
+					if (data.length === 0) {
+						const noDepartmentsMessage = document.createElement('div')
+						noDepartmentsMessage.style.textAlign = 'center'
+						noDepartmentsMessage.style.padding = '20px'
+						noDepartmentsMessage.style.fontSize = '16px'
+						noDepartmentsMessage.style.color = '#666'
+						noDepartmentsMessage.textContent =
+							'Стандартные отделы для продукта не заданы.'
+
+						carousel.appendChild(noDepartmentsMessage)
 					} else {
-						carousel.innerHTML = ''
+						data.forEach(dep => {
+							const card = document.createElement('div')
+							card.className = 'department-card'
+							card.dataset.id = dep.id
+							card.innerHTML = `
+            <img src="/static/images/departments/${dep.slug || 'default'}.png" alt="${dep.name}" class="department-card__img">
+            <div class="department-card__title">${dep.name}</div>
+        `
+							carousel.appendChild(card)
+						})
 					}
-					let addCard = carousel.querySelector('.department-card--add')
-					if (!addCard) {
-						addCard = document.createElement('div')
-						addCard.className = 'department-card department-card--add'
-						addCard.innerHTML = `<button class="department-card__add" title="Добавить отдел">+</button>`
-						carousel.appendChild(addCard)
-					}
-					const addBtn = carousel.querySelector('.department-card__add')
-					if (addBtn) {
-						addBtn.onclick = async () => {
-							showError('Сначала создайте расчет, затем добавьте отделы')
-						}
-					}
+				} catch (e) {
+					console.warn('Ошибка загрузки отделов:', e)
 				}
 			}
 		})
@@ -1377,7 +2524,7 @@ const initWorksPage = () => {
 						) {
 							const existingObjectItem = document
 								.querySelector(
-									`[data-target="object-${result.client_id}-${result.id}"]`
+									`[data-target="object-${result.client_id}-${result.id}"]`,
 								)
 								?.closest('li')
 
@@ -1386,13 +2533,13 @@ const initWorksPage = () => {
 
 								const newItem = document
 									.querySelector(
-										`[data-target="object-${result.client_id}-${result.id}"]`
+										`[data-target="object-${result.client_id}-${result.id}"]`,
 									)
 									?.closest('li')
 
 								if (newItem) {
 									const newRow = newItem.querySelector(
-										'.debtors-office-list__row'
+										'.debtors-office-list__row',
 									)
 									if (newRow) {
 										newRow.addEventListener('click', async function (e) {
@@ -1402,7 +2549,7 @@ const initWorksPage = () => {
 											if (!details) return
 
 											const btn = newRow.querySelector(
-												'.debtors-office-list__toggle'
+												'.debtors-office-list__toggle',
 											)
 											if (btn) btn.classList.toggle('open')
 											details.classList.toggle('open')
@@ -1410,7 +2557,7 @@ const initWorksPage = () => {
 									}
 
 									const productRows = newItem.querySelectorAll(
-										'.debtors-office-list__row[data-target^="product-"]'
+										'.debtors-office-list__row[data-target^="product-"]',
 									)
 									productRows.forEach(row => {
 										row.addEventListener('click', async function (e) {
@@ -1420,7 +2567,7 @@ const initWorksPage = () => {
 											if (!details) return
 
 											const btn = row.querySelector(
-												'.debtors-office-list__toggle'
+												'.debtors-office-list__toggle',
 											)
 											if (btn) btn.classList.toggle('open')
 											details.classList.toggle('open')
@@ -1439,7 +2586,7 @@ const initWorksPage = () => {
 												if (productId && clientId && objectId) {
 													try {
 														const resp = await fetch(
-															`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`
+															`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`,
 														)
 														const data = await resp.json()
 														loader.remove()
@@ -1566,12 +2713,9 @@ const initWorksPage = () => {
 						card.className = 'department-card'
 						card.dataset.id = dw.id
 
-						const statusIndicator =
-							dw.status_name === 'Готово'
-								? `<span style="position:absolute;top:10px;right:10px;display:inline-block;width:14px;height:14px;background:#4caf50;border-radius:50%;border:2px solid #fff;" title="Готово${
-										dw.completed_at ? ' — ' + dw.completed_at : ''
-								  }"></span>`
-								: ''
+						const statusIndicator = dw.is_completed
+							? `<span style="position:absolute;top:10px;right:10px;display:inline-block;width:14px;height:14px;background:#4caf50;border-radius:50%;border:2px solid #fff;" title="Готово${dw.completed_at ? ' — ' + dw.completed_at : ''}"></span>`
+							: ''
 
 						card.innerHTML = `
 							<button class="department-card__delete" title="Удалить отдел">&times;</button>
@@ -1592,11 +2736,12 @@ const initWorksPage = () => {
 						addBtn.onclick = async () => {
 							if (!orderId) {
 								showError(
-									'Не удалось определить заказ для добавления работы отделу'
+									'Не удалось определить заказ для добавления работы отделу',
 								)
 								return
 							}
 
+							// TODO: Нужно показывать не список отделов а в виде карточек
 							const config = {
 								submitUrl: '/departments/work/create/',
 								formId: 'add-work-form',
@@ -1610,41 +2755,37 @@ const initWorksPage = () => {
 										url: '/departments/list/',
 									},
 								],
-								beforeSubmit: formData => {
-									formData.append('order', orderId)
-									return formData
-								},
 								onSuccess: async result => {
-									if (result.status === 'success') {
+									if (
+										result.status === 'success' &&
+										Array.isArray(result.created)
+									) {
 										showSuccess('Работа отдела успешно добавлена')
+										result.created.forEach(createdWork => {
+											const dep = departments.find(
+												d => d.name === createdWork.department_name,
+											)
+											if (!dep) return
 
-										const dep = departments.find(
-											d => d.name === result.department_name
-										)
-										if (!dep) return
+											const card = document.createElement('div')
+											card.className = 'department-card'
+											card.dataset.id = createdWork.id
+											card.innerHTML = `
+												<button class="department-card__delete" title="Удалить отдел">&times;</button>
+												<img src="/static/images/departments/${dep.img}" alt="${dep.name}" class="department-card__img">
+												<div class="department-card__title">${dep.name}</div>
+												<p class="department-card__work-status">${createdWork.status_name}</p>
+											`
+											card.querySelector('.department-card__delete').onclick =
+												() => {
+													deleteDepartmentWork(createdWork.id, card)
+												}
 
-										const card = document.createElement('div')
-										card.className = 'department-card'
-										card.dataset.id = result.id
-										card.innerHTML = `
-                    <button class="department-card__delete" title="Удалить отдел">&times;</button>
-                    <img src="/static/images/departments/${dep.img}" alt="${dep.name}" class="department-card__img">
-                    <div class="department-card__title">${dep.name}</div>
-                    <p class="department-card__work-status">${result.status_name}</p>
-                `
-										card.querySelector('.department-card__delete').onclick =
-											() => {
-												deleteDepartmentWork(result.id, card)
-											}
-
-										const addCard = carousel.querySelector(
-											'.department-card--add'
-										)
-										carousel.insertBefore(card, addCard)
-									} else {
-										showError(
-											result.message || 'Ошибка при добавлении работы отделу'
-										)
+											const addCard = carousel.querySelector(
+												'.department-card--add',
+											)
+											carousel.insertBefore(card, addCard)
+										})
 									}
 								},
 							}
@@ -1653,6 +2794,12 @@ const initWorksPage = () => {
 							await formHandler.init()
 							const orderField = document.getElementById('order')
 							if (orderField) orderField.value = orderId
+
+							const departmentSelect = document.getElementById('department')
+							const selectWrapper = departmentSelect?.closest('.select')
+							if (selectWrapper) {
+								selectWrapper.dataset.multiple = 'true'
+							}
 						}
 					}
 				}
@@ -1671,11 +2818,11 @@ const initWorksPage = () => {
 						const unitPrice = unitPriceAN
 							? unitPriceAN.getNumber()
 							: parseFloat(
-									unit_priceInput.value.replace(/\s/g, '').replace(',', '.')
-							  ) || 0
+									unit_priceInput.value.replace(/\s/g, '').replace(',', '.'),
+								) || 0
 						const quantity =
 							parseFloat(
-								quantityInput.value.replace(/\s/g, '').replace(',', '.')
+								quantityInput.value.replace(/\s/g, '').replace(',', '.'),
 							) || 0
 
 						if (unitPrice > 0 && quantity > 0) {
@@ -1729,7 +2876,7 @@ const initWorksPage = () => {
 										'X-CSRFToken': getCSRFToken(),
 									},
 									credentials: 'same-origin',
-								}
+								},
 							)
 
 							const data = await resp.json()
@@ -1737,7 +2884,7 @@ const initWorksPage = () => {
 
 							if (!resp.ok || data.status !== 'success') {
 								showError(
-									data.message || data.error || 'Ошибка при удалении объекта'
+									data.message || data.error || 'Ошибка при удалении объекта',
 								)
 								return
 							}
@@ -1750,12 +2897,12 @@ const initWorksPage = () => {
 								objectItem.remove()
 
 								const branchDetails = document.getElementById(
-									`branch-${clientId}`
+									`branch-${clientId}`,
 								)
 								if (branchDetails) {
 									const ul = branchDetails.querySelector('ul')
 									const remainingObjects = ul?.querySelectorAll(
-										'li.debtors-office-list__item'
+										'li.debtors-office-list__item',
 									)
 
 									if (!remainingObjects || remainingObjects.length === 0) {
@@ -1777,7 +2924,7 @@ const initWorksPage = () => {
 							loader.remove()
 							showError(err.message || 'Ошибка при удалении объекта')
 						}
-					}
+					},
 				)
 			} else if (deleteButton.textContent.trim() === 'Удалить расчет') {
 				const selectedRow = document.querySelector('.table__row--selected')
@@ -1809,7 +2956,7 @@ const initWorksPage = () => {
 
 							if (!resp.ok || data.status !== 'success') {
 								showError(
-									data.message || data.error || 'Ошибка при удалении расчета'
+									data.message || data.error || 'Ошибка при удалении расчета',
 								)
 								return
 							}
@@ -1820,7 +2967,7 @@ const initWorksPage = () => {
 							loader.remove()
 							showError(err.message || 'Ошибка при удалении расчета')
 						}
-					}
+					},
 				)
 			} else if (deleteButton.textContent.trim() === 'Убрать из списка') {
 				const selectedRow = document.querySelector('.table__row--selected')
@@ -1828,7 +2975,7 @@ const initWorksPage = () => {
 				const tableId = table?.id || ''
 				if (!selectedRow || !tableId.startsWith('order-viewers-')) {
 					showError(
-						'Выберите пользователя для удаления из списка наблюдателей.'
+						'Выберите пользователя для удаления из списка наблюдателей.',
 					)
 					return
 				}
@@ -1857,7 +3004,7 @@ const initWorksPage = () => {
 									},
 									body: `user_id=${encodeURIComponent(userId)}`,
 									credentials: 'same-origin',
-								}
+								},
 							)
 							const data = await resp.json()
 							loader.remove()
@@ -1865,7 +3012,7 @@ const initWorksPage = () => {
 								showError(
 									data.message ||
 										data.error ||
-										'Ошибка при удалении пользователя из списка'
+										'Ошибка при удалении пользователя из списка',
 								)
 								return
 							}
@@ -1874,10 +3021,10 @@ const initWorksPage = () => {
 						} catch (err) {
 							loader.remove()
 							showError(
-								err.message || 'Ошибка при удалении пользователя из списка'
+								err.message || 'Ошибка при удалении пользователя из списка',
 							)
 						}
-					}
+					},
 				)
 			}
 		})
@@ -1923,7 +3070,7 @@ const initWorksPage = () => {
 					`/commerce/orders/${orderId}/viewers/`,
 					{
 						headers: { 'X-Requested-With': 'XMLHttpRequest' },
-					}
+					},
 				)
 				const viewersData = await viewersResp.json()
 				container.innerHTML = viewersData.html || '<div>Нет наблюдателей</div>'
@@ -1939,7 +3086,7 @@ const initWorksPage = () => {
 					if (viewersSelectInput) {
 						if (viewersSelectInput.multiple) {
 							viewers = Array.from(viewersSelectInput.selectedOptions).map(
-								opt => opt.value
+								opt => opt.value,
 							)
 						} else {
 							if (viewersSelectInput.value) viewers = [viewersSelectInput.value]
@@ -1965,13 +3112,13 @@ const initWorksPage = () => {
 									.map(id => `viewers[]=${encodeURIComponent(id)}`)
 									.join('&'),
 								credentials: 'same-origin',
-							}
+							},
 						)
 						const data = await resp.json()
 						loader.remove()
 						if (!resp.ok || data.status !== 'success') {
 							showError(
-								data.message || data.error || 'Ошибка добавления наблюдателей'
+								data.message || data.error || 'Ошибка добавления наблюдателей',
 							)
 							return
 						}
@@ -1988,6 +3135,11 @@ const initWorksPage = () => {
 				})
 			}
 		})
+	}
+
+	const viewOrderFilesBtn = document.getElementById('view_order_files-button')
+	if (viewOrderFilesBtn) {
+		setupOrderFilesButton2(viewOrderFilesBtn)
 	}
 }
 
@@ -2135,7 +3287,7 @@ async function loadFirstClientFromTable() {
 	if (!table) return
 
 	const firstRow = table.querySelector(
-		'tbody tr:not(.table__row--empty):not(.table__row--summary)'
+		'tbody tr:not(.table__row--empty):not(.table__row--summary)',
 	)
 	if (!firstRow) return
 
@@ -2440,14 +3592,14 @@ function attachClientFormHandlers() {
 				e.preventDefault()
 				active = Math.min(active + 1, items.length - 1)
 				items.forEach(
-					(it, i) => (it.style.background = i === active ? '#eef' : '')
+					(it, i) => (it.style.background = i === active ? '#eef' : ''),
 				)
 				items[active].scrollIntoView({ block: 'nearest' })
 			} else if (e.key === 'ArrowUp') {
 				e.preventDefault()
 				active = Math.max(active - 1, 0)
 				items.forEach(
-					(it, i) => (it.style.background = i === active ? '#eef' : '')
+					(it, i) => (it.style.background = i === active ? '#eef' : ''),
 				)
 				items[active].scrollIntoView({ block: 'nearest' })
 			} else if (e.key === 'Enter') {
@@ -2462,7 +3614,7 @@ function attachClientFormHandlers() {
 		document.addEventListener('click', ev => {
 			if (innInput) {
 				const container = innInput.parentNode.querySelector(
-					'.dadata-suggestions'
+					'.dadata-suggestions',
 				)
 				if (
 					container &&
@@ -2542,7 +3694,7 @@ function initClientsPagination() {
 				`${BASE_URL}clients/list/paginate/?page=${pageNum}`,
 				{
 					headers: { 'X-Requested-With': 'XMLHttpRequest' },
-				}
+				},
 			)
 			const data = await response.json()
 
@@ -2570,7 +3722,7 @@ function initClientsPagination() {
 				const tableElem = document.getElementById(clientsTableId)
 				if (tableElem) {
 					const rows = tableElem.querySelectorAll(
-						'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+						'tbody tr:not(.table__row--summary):not(.table__row--empty)',
 					)
 					hasRows = rows && rows.length > 0
 					if (rows && client_ids && client_ids.length === rows.length) {
@@ -2582,7 +3734,7 @@ function initClientsPagination() {
 
 				if (hasRows) {
 					const prev = document.querySelector(
-						'#clients-table tbody tr.table__row--selected'
+						'#clients-table tbody tr.table__row--selected',
 					)
 					if (prev) prev.classList.remove('table__row--selected')
 					setTimeout(loadFirstClientFromTable, 50)
@@ -2607,7 +3759,7 @@ function initClientsPagination() {
 				})
 				if (!response.ok) {
 					showError(
-						data?.error || data?.message || 'Ошибка загрузки списка клиентов.'
+						data?.error || data?.message || 'Ошибка загрузки списка клиентов.',
 					)
 				}
 			}
@@ -2723,7 +3875,7 @@ function initArchivePage() {
 						`${BASE_URL}documents/table/${orderId}/`,
 						{
 							headers: { 'X-Requested-With': 'XMLHttpRequest' },
-						}
+						},
 					)
 					const data = await docsResp.json()
 					if (docsResp.ok) {
@@ -2734,16 +3886,17 @@ function initArchivePage() {
 							if (urls.length) {
 								const table =
 									documentsContainer.querySelector(
-										`table#order-documents-${orderId}`
+										`table#order-documents-${orderId}`,
 									) || documentsContainer.querySelector('table')
 								if (table) {
 									const ths = Array.from(table.querySelectorAll('thead th'))
 									const fileColIndex = ths.findIndex(
-										th => th && th.dataset && th.dataset.name === 'file_display'
+										th =>
+											th && th.dataset && th.dataset.name === 'file_display',
 									)
 									if (fileColIndex !== -1) {
 										const rows = table.querySelectorAll(
-											'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+											'tbody tr:not(.table__row--summary):not(.table__row--empty)',
 										)
 										rows.forEach((row, idx) => {
 											const cell = row.children[fileColIndex]
@@ -2760,13 +3913,13 @@ function initArchivePage() {
 						} catch (err) {
 							console.warn(
 								'Не удалось применить ссылки к колонке file_display:',
-								err
+								err,
 							)
 						}
 					} else {
 						documentsContainer.innerHTML = data.html || ''
 						showError(
-							data.error || data.message || 'Ошибка загрузки документов заказа'
+							data.error || data.message || 'Ошибка загрузки документов заказа',
 						)
 					}
 				} else {
@@ -2855,7 +4008,7 @@ function initArchivePage() {
 											},
 											credentials: 'same-origin',
 											body: fd,
-										}
+										},
 									)
 
 									const payload = await uploadResp.json()
@@ -2864,27 +4017,38 @@ function initArchivePage() {
 										showError(
 											payload.message ||
 												payload.error ||
-												'Ошибка загрузки файла'
+												'Ошибка загрузки файла',
 										)
 									} else {
 										const tableId = `order-documents-${orderId}`
 										const newRow = await TableManager.addTableRow(
 											payload,
-											tableId
+											tableId,
 										)
+										if (
+											newRow &&
+											payload &&
+											(payload.id || payload.pk) &&
+											!newRow.hasAttribute('data-id')
+										) {
+											newRow.setAttribute(
+												'data-id',
+												String(payload.id || payload.pk),
+											)
+										}
 										showSuccess('Файл успешно загружен')
 
 										try {
 											const table = document.getElementById(tableId)
 											if (table && payload.url) {
 												const ths = Array.from(
-													table.querySelectorAll('thead th')
+													table.querySelectorAll('thead th'),
 												)
 												const fileColIndex = ths.findIndex(
 													th =>
 														th &&
 														th.dataset &&
-														th.dataset.name === 'file_display'
+														th.dataset.name === 'file_display',
 												)
 												if (fileColIndex !== -1) {
 													const row = table.querySelector('tbody tr:last-child')
@@ -2902,7 +4066,7 @@ function initArchivePage() {
 										} catch (e) {
 											console.warn(
 												'Не удалось применить ссылку к новой строке:',
-												e
+												e,
 											)
 										}
 									}
@@ -2927,7 +4091,7 @@ function initArchivePage() {
 			} catch (e) {
 				console.warn(
 					'Ошибка инициализации загрузчика документов в модальном окне:',
-					e
+					e,
 				)
 			}
 
@@ -2955,7 +4119,7 @@ function initArchivePage() {
 					try {
 						const docsResp2 = await fetch(
 							`${BASE_URL}documents/table/${orderId}/`,
-							{ headers: { 'X-Requested-With': 'XMLHttpRequest' } }
+							{ headers: { 'X-Requested-With': 'XMLHttpRequest' } },
 						)
 						const data = await docsResp2.json()
 						if (docsResp2.ok) {
@@ -2966,18 +4130,18 @@ function initArchivePage() {
 								if (urls.length) {
 									const table =
 										documentsContainer.querySelector(
-											`table#order-documents-${orderId}`
+											`table#order-documents-${orderId}`,
 										) || documentsContainer.querySelector('table')
 									if (table) {
 										const ths = Array.from(table.querySelectorAll('thead th'))
 										const fileColIndex = ths.findIndex(
 											th =>
-												th && th.dataset && th.dataset.name === 'file_display'
+												th && th.dataset && th.dataset.name === 'file_display',
 										)
 
 										if (fileColIndex !== -1) {
 											const rows = table.querySelectorAll(
-												'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+												'tbody tr:not(.table__row--summary):not(.table__row--empty)',
 											)
 											rows.forEach((row, idx) => {
 												const cell = row.children[fileColIndex]
@@ -2994,7 +4158,7 @@ function initArchivePage() {
 							} catch (err) {
 								console.warn(
 									'Не удалось применить ссылки к колонке file_display:',
-									err
+									err,
 								)
 							}
 
@@ -3013,7 +4177,7 @@ function initArchivePage() {
 							} catch (e) {
 								console.warn(
 									'Не удалось инициализировать таблицу документов после обновления:',
-									e
+									e,
 								)
 							}
 						} else {
@@ -3021,7 +4185,7 @@ function initArchivePage() {
 							showError(
 								data.error ||
 									data.message ||
-									'Ошибка загрузки документов заказа'
+									'Ошибка загрузки документов заказа',
 							)
 						}
 					} catch (err) {
@@ -3036,7 +4200,7 @@ function initArchivePage() {
 
 	document.addEventListener('dblclick', function (e) {
 		const row = e.target.closest(
-			'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+			'tbody tr:not(.table__row--summary):not(.table__row--empty)',
 		)
 		const table = e.target.closest('table')
 		if (!row || !table) return
@@ -3063,11 +4227,27 @@ function initArchivePage() {
 				viewBtn.click()
 			} catch (err) {
 				viewBtn.dispatchEvent(
-					new MouseEvent('click', { bubbles: true, cancelable: true })
+					new MouseEvent('click', { bubbles: true, cancelable: true }),
 				)
 			}
 		}
 	})
+}
+
+function getDragAfterElement(list, y) {
+	const items = [...list.querySelectorAll('.menu-item-row:not(.dragging)')]
+	return items.reduce(
+		(closest, child) => {
+			const box = child.getBoundingClientRect()
+			const offset = y - box.top - box.height / 2
+			if (offset < 0 && offset > closest.offset) {
+				return { offset: offset, element: child }
+			} else {
+				return closest
+			}
+		},
+		{ offset: -Infinity, element: null },
+	).element
 }
 
 const initDepartmentPage = departmentSlug => {
@@ -3091,6 +4271,36 @@ const initDepartmentPage = departmentSlug => {
 		{ name: 'legal_name' },
 	])
 
+	function getQueryParam(name) {
+		const url = new URL(window.location.href)
+		return url.searchParams.get(name)
+	}
+
+	const orderIdFromQuery = getQueryParam('order_id')
+	if (orderIdFromQuery) {
+		const observer = new MutationObserver(() => {
+			const idInput = document.querySelector(
+				'#department_orders-table thead input[name="id"]',
+			)
+			if (idInput) {
+				idInput.value = orderIdFromQuery
+				idInput.dispatchEvent(new Event('input', { bubbles: true }))
+				idInput.dispatchEvent(new Event('change', { bubbles: true }))
+				observer.disconnect()
+			}
+		})
+		observer.observe(document.getElementById('department_orders-table'), {
+			childList: true,
+			subtree: true,
+		})
+	}
+
+	const orderIds = JSON.parse(
+		document.getElementById('order-ids').textContent || '[]',
+	)
+
+	setIds(orderIds, tableId)
+
 	const assignExecutorBtn = document.getElementById('assign_executor-button')
 	if (assignExecutorBtn) {
 		assignExecutorBtn.addEventListener('click', async () => {
@@ -3109,7 +4319,7 @@ const initDepartmentPage = departmentSlug => {
 			}
 
 			const config = {
-				submitUrl: `/departments/${departmentSlug}/orders/${orderId}/assign-executor/`,
+				submitUrl: `/departments/${departmentSlug}/orders/assign-executor/`,
 				tableId: tableId,
 				formId: 'assign-executor-form',
 				modalConfig: {
@@ -3169,7 +4379,7 @@ const initDepartmentPage = departmentSlug => {
 			}
 
 			const config = {
-				submitUrl: `/departments/${departmentSlug}/orders/${orderId}/update-status/`,
+				submitUrl: `/departments/${departmentSlug}/orders/update-status/`,
 				tableId: tableId,
 				formId: 'update-status-form',
 				modalConfig: {
@@ -3214,366 +4424,12 @@ const initDepartmentPage = departmentSlug => {
 
 	const viewOrderFilesBtn = document.getElementById('view_order_files-button')
 	if (viewOrderFilesBtn) {
-		viewOrderFilesBtn.addEventListener('click', async () => {
-			const modal = new Modal()
-			const resp = await fetch('/components/commerce/order_documents', {
-				headers: { 'X-Requested-With': 'XMLHttpRequest' },
-			})
-			const html = await resp.text()
-			await modal.open(html, 'Файлы заказа')
-
-			const fileTypeSelectInput = document.getElementById('file_type')
-			const fileTypeSelect =
-				fileTypeSelectInput && fileTypeSelectInput.closest('.select')
-			if (fileTypeSelect) {
-				SelectHandler.setupSelects({
-					select: fileTypeSelect,
-					url: `${BASE_URL}documents/types/`,
-				})
-			}
-
-			let orderId = null
-			const selectedCell = document.querySelector('td.table__cell--selected')
-			if (selectedCell) {
-				const v = selectedCell.textContent.trim()
-				orderId = Number.isNaN(Number(v)) ? null : parseInt(v, 10)
-			}
-			if (!orderId) {
-				const selectedRow = document.querySelector('tr.table__row--selected')
-				if (selectedRow) {
-					const firstCell = selectedRow.querySelector('td')
-					if (firstCell) {
-						const v = firstCell.textContent.trim()
-						orderId = Number.isNaN(Number(v)) ? null : parseInt(v, 10)
-					}
-				}
-			}
-
-			const documentsContainer = document.getElementById('documents-container')
-			if (!documentsContainer) return
-
-			const loader = createLoader()
-			document.body.appendChild(loader)
-			try {
-				if (orderId) {
-					const docsResp = await fetch(
-						`${BASE_URL}documents/table/${orderId}/`,
-						{
-							headers: { 'X-Requested-With': 'XMLHttpRequest' },
-						}
-					)
-					const data = await docsResp.json()
-					if (docsResp.ok) {
-						documentsContainer.innerHTML = data.html || ''
-
-						try {
-							const urls = Array.isArray(data.urls) ? data.urls : []
-							if (urls.length) {
-								const table =
-									documentsContainer.querySelector(
-										`table#order-documents-${orderId}`
-									) || documentsContainer.querySelector('table')
-								if (table) {
-									const ths = Array.from(table.querySelectorAll('thead th'))
-									const fileColIndex = ths.findIndex(
-										th => th && th.dataset && th.dataset.name === 'file_display'
-									)
-									if (fileColIndex !== -1) {
-										const rows = table.querySelectorAll(
-											'tbody tr:not(.table__row--summary):not(.table__row--empty)'
-										)
-										rows.forEach((row, idx) => {
-											const cell = row.children[fileColIndex]
-											if (!cell) return
-											const text = cell.textContent.trim()
-											const fileUrl = urls[idx] || ''
-											if (fileUrl && text) {
-												cell.innerHTML = `<a href="${fileUrl}" target="_blank" rel="noopener noreferrer">${text}</a>`
-											}
-										})
-									}
-								}
-							}
-						} catch (err) {
-							console.warn(
-								'Не удалось применить ссылки к колонке file_display:',
-								err
-							)
-						}
-					} else {
-						documentsContainer.innerHTML = data.html || ''
-						showError(
-							data.error || data.message || 'Ошибка загрузки документов заказа'
-						)
-					}
-				} else {
-					documentsContainer.innerHTML =
-						'<div class="info">Не выбран заказ</div>'
-				}
-			} catch (err) {
-				showError(err.message || 'Ошибка загрузки документов заказа')
-			} finally {
-				loader.remove()
-			}
-
-			try {
-				const uploadForm = document.getElementById('upload-form')
-				const uploadBtn = document.getElementById('upload-btn')
-				const fileInput = document.getElementById('upload-file-input')
-				const fileTypeInput = document.getElementById('file_type')
-
-				if (uploadBtn && fileInput) {
-					uploadBtn.addEventListener('click', () => {
-						fileInput.click()
-					})
-				}
-
-				if (fileInput) {
-					fileInput.addEventListener('change', async () => {
-						const f = fileInput.files && fileInput.files[0]
-						if (!f) return
-
-						if (!orderId) {
-							showError('Не выбран заказ')
-							fileInput.value = ''
-							return
-						}
-						const fileTypeVal = fileTypeInput ? fileTypeInput.value : ''
-						if (!fileTypeVal) {
-							showError('Выберите тип файла')
-							fileInput.value = ''
-							return
-						}
-
-						const modal = new Modal()
-						const resp = await fetch('/components/commerce/file_name', {
-							headers: { 'X-Requested-With': 'XMLHttpRequest' },
-						})
-						const html = await resp.text()
-						await modal.open(html, 'Введите название файла')
-
-						const form = document.getElementById('file_name-form')
-						const nameInput = form.querySelector('#name')
-						nameInput.value = f.name.replace(/\.[^/.]+$/, '')
-						nameInput.focus()
-
-						return new Promise(resolve => {
-							form.onsubmit = async e => {
-								e.preventDefault()
-								let newName = nameInput.value.trim()
-								if (!newName) {
-									showError('Имя файла не может быть пустым')
-									return
-								}
-								const ext = f.name.substring(f.name.lastIndexOf('.'))
-								const finalName = newName + ext
-
-								const l = createLoader()
-								document.body.appendChild(l)
-								uploadBtn.disabled = true
-
-								try {
-									const fd = new FormData()
-									const fileWithNewName = new File([f], finalName, {
-										type: f.type,
-									})
-									fd.append('file', fileWithNewName)
-									fd.append('order', orderId)
-									fd.append('file_type', fileTypeVal)
-									fd.append('filename', finalName)
-
-									const uploadResp = await fetch(
-										`${BASE_URL}documents/upload/`,
-										{
-											method: 'POST',
-											headers: {
-												'X-CSRFToken': getCSRFToken(),
-												'X-Requested-With': 'XMLHttpRequest',
-											},
-											credentials: 'same-origin',
-											body: fd,
-										}
-									)
-
-									const payload = await uploadResp.json()
-
-									if (!uploadResp.ok || payload.status !== 'success') {
-										showError(
-											payload.message ||
-												payload.error ||
-												'Ошибка загрузки файла'
-										)
-									} else {
-										const tableId = `order-documents-${orderId}`
-										const newRow = await TableManager.addTableRow(
-											payload,
-											tableId
-										)
-										showSuccess('Файл успешно загружен')
-
-										try {
-											const table = document.getElementById(tableId)
-											if (table && payload.url) {
-												const ths = Array.from(
-													table.querySelectorAll('thead th')
-												)
-												const fileColIndex = ths.findIndex(
-													th =>
-														th &&
-														th.dataset &&
-														th.dataset.name === 'file_display'
-												)
-												if (fileColIndex !== -1) {
-													const row = table.querySelector('tbody tr:last-child')
-													if (row) {
-														const cell = row.children[fileColIndex]
-														if (cell) {
-															const text = cell.textContent.trim()
-															if (payload.url && text) {
-																cell.innerHTML = `<a href="${payload.url}" target="_blank" rel="noopener noreferrer">${text}</a>`
-															}
-														}
-													}
-												}
-											}
-										} catch (e) {
-											console.warn(
-												'Не удалось применить ссылку к новой строке:',
-												e
-											)
-										}
-									}
-									modal.close()
-								} catch (err) {
-									showError(err.message || 'Ошибка загрузки файла')
-								} finally {
-									l.remove()
-									uploadBtn.disabled = false
-									try {
-										fileInput.value = ''
-									} catch (e) {}
-								}
-							}
-							form.querySelector('.button--cancel').onclick = () => {
-								modal.close()
-								fileInput.value = ''
-							}
-						})
-					})
-				}
-			} catch (e) {
-				console.warn(
-					'Ошибка инициализации загрузчика документов в модальном окне:',
-					e
-				)
-			}
-
-			try {
-				const table = documentsContainer.querySelector('table')
-				if (table) {
-					if (!table.id) table.id = `order-documents-${orderId || 'tmp'}`
-					TableManager.initTable(table.id)
-					table.querySelectorAll('tbody tr').forEach(row => {
-						TableManager.attachRowCellHandlers(row)
-						TableManager.formatCurrencyValuesForRow(table.id, row)
-						TableManager.applyColumnWidthsForRow(table.id, row)
-					})
-				}
-			} catch (e) {
-				console.warn('Не удалось инициализировать таблицу документов:', e)
-			}
-
-			const refreshButton = document.getElementById('refresh-button')
-			if (refreshButton) {
-				refreshButton.addEventListener('click', async () => {
-					if (!orderId) return
-					const loader2 = createLoader()
-					document.body.appendChild(loader2)
-					try {
-						const docsResp2 = await fetch(
-							`${BASE_URL}documents/table/${orderId}/`,
-							{ headers: { 'X-Requested-With': 'XMLHttpRequest' } }
-						)
-						const data = await docsResp2.json()
-						if (docsResp2.ok) {
-							documentsContainer.innerHTML = data.html || ''
-
-							try {
-								const urls = Array.isArray(data.urls) ? data.urls : []
-								if (urls.length) {
-									const table =
-										documentsContainer.querySelector(
-											`table#order-documents-${orderId}`
-										) || documentsContainer.querySelector('table')
-									if (table) {
-										const ths = Array.from(table.querySelectorAll('thead th'))
-										const fileColIndex = ths.findIndex(
-											th =>
-												th && th.dataset && th.dataset.name === 'file_display'
-										)
-
-										if (fileColIndex !== -1) {
-											const rows = table.querySelectorAll(
-												'tbody tr:not(.table__row--summary):not(.table__row--empty)'
-											)
-											rows.forEach((row, idx) => {
-												const cell = row.children[fileColIndex]
-												if (!cell) return
-												const text = cell.textContent.trim()
-												const fileUrl = urls[idx] || ''
-												if (fileUrl && text) {
-													cell.innerHTML = `<a href="${fileUrl}" target="_blank" rel="noopener noreferrer">${text}</a>`
-												}
-											})
-										}
-									}
-								}
-							} catch (err) {
-								console.warn(
-									'Не удалось применить ссылки к колонке file_display:',
-									err
-								)
-							}
-
-							try {
-								const table = documentsContainer.querySelector('table')
-								if (table) {
-									if (!table.id)
-										table.id = `order-documents-${orderId || 'tmp'}`
-									TableManager.initTable(table.id)
-									table.querySelectorAll('tbody tr').forEach(row => {
-										TableManager.attachRowCellHandlers(row)
-										TableManager.formatCurrencyValuesForRow(table.id, row)
-										TableManager.applyColumnWidthsForRow(table.id, row)
-									})
-								}
-							} catch (e) {
-								console.warn(
-									'Не удалось инициализировать таблицу документов после обновления:',
-									e
-								)
-							}
-						} else {
-							documentsContainer.innerHTML = data.html || ''
-							showError(
-								data.error ||
-									data.message ||
-									'Ошибка загрузки документов заказа'
-							)
-						}
-					} catch (err) {
-						showError(err.message || 'Ошибка загрузки документов заказа')
-					} finally {
-						loader2.remove()
-					}
-				})
-			}
-		})
+		setupOrderFilesButton2(viewOrderFilesBtn)
 	}
 
 	document.addEventListener('dblclick', function (e) {
 		const row = e.target.closest(
-			'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+			'tbody tr:not(.table__row--summary):not(.table__row--empty)',
 		)
 		const table = e.target.closest('table')
 
@@ -3595,7 +4451,7 @@ const initDepartmentPage = departmentSlug => {
 			if (rowId) {
 				viewBtn =
 					document.querySelector(
-						`.view_order_files-button[data-row-id="${rowId}"]`
+						`.view_order_files-button[data-row-id="${rowId}"]`,
 					) || null
 			}
 		}
@@ -3605,14 +4461,14 @@ const initDepartmentPage = departmentSlug => {
 				viewBtn.click()
 			} catch (err) {
 				viewBtn.dispatchEvent(
-					new MouseEvent('click', { bubbles: true, cancelable: true })
+					new MouseEvent('click', { bubbles: true, cancelable: true }),
 				)
 			}
 		}
 	})
 
 	const viewCorrespondenceBtn = document.getElementById(
-		'view_correspondence-button'
+		'view_correspondence-button',
 	)
 
 	if (viewCorrespondenceBtn) {
@@ -3634,12 +4490,14 @@ const initDepartmentPage = departmentSlug => {
 			const loader = createLoader()
 			document.body.appendChild(loader)
 
+			let orderWorkId = null
+
 			try {
 				const orderWorkResp = await fetch(
 					`/departments/${departmentSlug}/orders/${orderId}/work/`,
 					{
 						headers: { 'X-Requested-With': 'XMLHttpRequest' },
-					}
+					},
 				)
 
 				if (!orderWorkResp.ok) {
@@ -3649,7 +4507,7 @@ const initDepartmentPage = departmentSlug => {
 				}
 
 				const orderWorkData = await orderWorkResp.json()
-				const orderWorkId = orderWorkData.order_work_id
+				orderWorkId = orderWorkData.order_work_id
 
 				if (!orderWorkId) {
 					loader.remove()
@@ -3657,110 +4515,172 @@ const initDepartmentPage = departmentSlug => {
 					return
 				}
 
-				const messagesResp = await fetch(
-					`/departments/work-messages/${orderWorkId}/`,
-					{
-						headers: { 'X-Requested-With': 'XMLHttpRequest' },
+				async function loadMessages(type) {
+					let url, title
+
+					if (type === 'order') {
+						url = `/departments/work-messages/0/?order_id=${orderId}`
+						title = `Переписка по заказу №${orderId}`
+					} else {
+						url = `/departments/work-messages/${orderWorkId}/`
+						title = `Переписка отдела по заказу №${orderId}`
 					}
-				)
 
-				const messagesData = await messagesResp.json()
+					const messagesResp = await fetch(url, {
+						headers: { 'X-Requested-With': 'XMLHttpRequest' },
+					})
+					const messagesData = await messagesResp.json()
 
-				loader.remove()
+					const modalBody = document.querySelector('.modal__body')
+					if (!modalBody) return
 
-				if (!messagesResp.ok) {
-					showError(
-						messagesData.error ||
-							messagesData.message ||
-							'Ошибка загрузки сообщений'
-					)
-					return
+					let messagesHtml = messagesData.html
+
+					let isEmpty = false
+					if (messagesHtml) {
+						const tbodyMatch = messagesHtml.match(
+							/<tbody[^>]*>([\s\S]*?)<\/tbody>/i,
+						)
+						if (tbodyMatch) {
+							const tbodyContent = tbodyMatch[1].trim()
+							isEmpty = !/<tr[\s\S]*?>[\s\S]*?<\/tr>/i.test(tbodyContent)
+							if (isEmpty) {
+								messagesHtml = messagesHtml.replace(
+									/<tbody[^>]*>[\s\S]*?<\/tbody>/i,
+									`<tbody>
+                    <tr class="table__row--empty">
+                        <td colspan="100%" style="text-align: center; padding: 20px;">
+                            Нет сообщений
+                        </td>
+                    </tr>
+                </tbody>`,
+								)
+							}
+						}
+					}
+					if (!messagesHtml) {
+						messagesHtml = `
+        <table class="table">
+            <thead>
+                <tr><th>Сообщение</th></tr>
+            </thead>
+            <tbody>
+                <tr class="table__row--empty">
+                    <td colspan="100%" style="text-align: center; padding: 20px;">
+                        Нет сообщений
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    `
+					}
+
+					modalBody.innerHTML = `
+        <div style="margin: 16px 8px; display: flex; gap: 8px;">
+            <button id="switch-to-order" class="button button--small${
+							type === 'order' ? ' button--primary' : ''
+						}">Сообщения заказа</button>
+            <button id="switch-to-department" class="button button--small${
+							type === 'department' ? ' button--primary' : ''
+						}">Сообщения отдела</button>
+        </div>
+        <div class="correspondence-container" id="messages-container">
+            ${messagesHtml}
+        </div>
+    `
+
+					document.getElementById('switch-to-order').onclick = () =>
+						loadMessages('order')
+					document.getElementById('switch-to-department').onclick = () =>
+						loadMessages('department')
+
+					try {
+						const table = document.querySelector('#messages-container table')
+						if (table && messagesData.messages_meta) {
+							const ths = Array.from(table.querySelectorAll('thead th'))
+							const authorColIndex = ths.findIndex(
+								th => th && th.dataset && th.dataset.name === 'author',
+							)
+
+							if (authorColIndex !== -1) {
+								const rows = table.querySelectorAll(
+									'tbody tr:not(.table__row--summary):not(.table__row--empty)',
+								)
+
+								messagesData.messages_meta.forEach((meta, idx) => {
+									if (meta.unread_type && rows[idx]) {
+										const authorCell = rows[idx].children[authorColIndex]
+										if (authorCell) {
+											const old = authorCell.querySelector('.unread-indicator')
+											if (old) old.remove()
+
+											let indicator = document.createElement('span')
+											indicator.className = 'unread-indicator'
+											indicator.style.display = 'inline-block'
+											indicator.style.verticalAlign = 'middle'
+											indicator.style.marginRight = '6px'
+											indicator.style.marginBottom = '2px'
+
+											if (meta.unread_type === 'sent') {
+												indicator.innerHTML = `<img src="/static/images/check_one.svg" alt="Не прочитано" style="width:14px;height:14px;vertical-align:middle;">`
+												indicator.title = 'Ваше сообщение не прочитано'
+											} else if (meta.unread_type === 'sent_read') {
+												indicator.innerHTML = `<img src="/static/images/check_two.svg" alt="Прочитано" style="width:14px;height:14px;vertical-align:middle;">`
+												indicator.title = 'Ваше сообщение прочитали'
+											} else if (meta.unread_type === 'received') {
+												indicator.innerHTML = `<span style="display:inline-block;width:10px;height:10px;background:#2563eb;border-radius:50%;"></span>`
+												indicator.title = 'Новое сообщение для вас'
+											}
+
+											authorCell.insertBefore(indicator, authorCell.firstChild)
+										}
+									}
+								})
+							}
+						}
+					} catch (e) {
+						console.warn(
+							'Не удалось добавить индикаторы непрочитанных сообщений:',
+							e,
+						)
+					}
+
+					try {
+						const table = document.querySelector('#messages-container table')
+						if (table) {
+							table.id =
+								type === 'order'
+									? `order-messages-${orderId}`
+									: `order-work-messages-${orderWorkId}`
+							TableManager.initTable(table.id)
+							table.querySelectorAll('tbody tr').forEach(row => {
+								TableManager.attachRowCellHandlers(row)
+								TableManager.formatCurrencyValuesForRow(table.id, row)
+								TableManager.applyColumnWidthsForRow(table.id, row)
+							})
+						}
+					} catch (e) {
+						console.warn('Не удалось инициализировать таблицу сообщений:', e)
+					}
+
+					if (messagesData.messages_id_list) {
+						setIds(
+							messagesData.messages_id_list,
+							type === 'order'
+								? `order-messages-${orderId}`
+								: `order-work-messages-${orderWorkId}`,
+						)
+					}
 				}
 
 				const modal = new Modal()
-
-				const modalContent = `
-                <div class="correspondence-container" id="messages-container">
-                    ${
-											messagesData.html ||
-											'<div class="info">Нет сообщений</div>'
-										}
-                </div>
-            `
-
-				await modal.open(modalContent, `Переписка по заказу №${orderId}`)
-
-				try {
-					const table = document.querySelector('#messages-container table')
-					if (table && messagesData.messages_meta) {
-						const ths = Array.from(table.querySelectorAll('thead th'))
-						const authorColIndex = ths.findIndex(
-							th => th && th.dataset && th.dataset.name === 'author'
-						)
-
-						if (authorColIndex !== -1) {
-							const rows = table.querySelectorAll(
-								'tbody tr:not(.table__row--summary):not(.table__row--empty)'
-							)
-
-							messagesData.messages_meta.forEach((meta, idx) => {
-								if (meta.unread_type && rows[idx]) {
-									const authorCell = rows[idx].children[authorColIndex]
-									if (authorCell) {
-										const unreadDot = document.createElement('span')
-										unreadDot.className = 'unread-indicator'
-
-										const bgColor =
-											meta.unread_type === 'received' ? '#10b981' : '#f59e0b'
-
-										unreadDot.style.cssText = `
-                                        display: inline-block;
-                                        width: 8px;
-                                        height: 8px;
-                                        background-color: ${bgColor};
-                                        border-radius: 50%;
-                                        margin-right: 6px;
-                                        vertical-align: middle;
-                                        margin-bottom: 2px;
-                                    `
-
-										unreadDot.title =
-											meta.unread_type === 'received'
-												? 'Непрочитанное сообщение для вас'
-												: 'Ваше сообщение не прочитано'
-
-										authorCell.insertBefore(unreadDot, authorCell.firstChild)
-									}
-								}
-							})
-						}
-					}
-				} catch (e) {
-					console.warn(
-						'Не удалось добавить индикаторы непрочитанных сообщений:',
-						e
-					)
-				}
-
-				try {
-					const table = document.querySelector('#messages-container table')
-					if (table) {
-						if (!table.id) table.id = `order-work-messages-${orderWorkId}`
-						TableManager.initTable(table.id)
-						table.querySelectorAll('tbody tr').forEach(row => {
-							TableManager.attachRowCellHandlers(row)
-							TableManager.formatCurrencyValuesForRow(table.id, row)
-							TableManager.applyColumnWidthsForRow(table.id, row)
-						})
-					}
-				} catch (e) {
-					console.warn('Не удалось инициализировать таблицу сообщений:', e)
-				}
-
-				setIds(
-					messagesData.messages_id_list,
-					`order-work-messages-${orderWorkId}`
+				await modal.open(
+					'<div class="modal__body"></div>',
+					`Переписка по заказу №${orderId}`,
 				)
+				loader.remove()
+
+				loadMessages('department')
 			} catch (err) {
 				loader.remove()
 				showError(err.message || 'Ошибка загрузки переписки')
@@ -3788,11 +4708,21 @@ const initDepartmentPage = departmentSlug => {
 			}
 
 			const tableIdMatch = messagesTable.id.match(/order-work-messages-(\d+)/)
-			if (!tableIdMatch || !tableIdMatch[1]) {
-				showError('Не удалось определить ID работы отдела')
+			const tableIdOrderMatch = messagesTable.id.match(/order-messages-(\d+)/)
+			let orderWorkId = null
+			let orderId = null
+			let isOrderMessagesTab = false
+
+			if (tableIdMatch && tableIdMatch[1]) {
+				orderWorkId = tableIdMatch[1]
+			} else if (tableIdOrderMatch && tableIdOrderMatch[1]) {
+				orderId = tableIdOrderMatch[1]
+				isOrderMessagesTab = true
+			}
+			if (!orderWorkId && !orderId) {
+				showError('Не удалось определить ID работы отдела или заказа')
 				return
 			}
-			const orderWorkId = tableIdMatch[1]
 
 			const config = {
 				getUrl: `${DEPARTMENTS_BASE_URL}work-messages/detail/`,
@@ -3804,19 +4734,27 @@ const initDepartmentPage = departmentSlug => {
 					title: 'Новое сообщение',
 				},
 				dataUrls: [
-					{
-						id: 'recipient',
-						url: `/departments/users/${departmentSlug}/`,
-					},
+					isOrderMessagesTab
+						? {
+								id: 'recipient',
+								url: `/users/orders/${orderId}/users/`,
+							}
+						: {
+								id: 'recipient',
+								url: `/departments/users/${departmentSlug}/?order_work_id=${orderWorkId}`,
+							},
 				],
-				beforeSubmit: formData => {
-					formData.append('order_work', orderWorkId)
-					return formData
-				},
 				onSuccess: async result => {
-					if (result.status === 'success' && result.html && result.message) {
+					if (
+						result.status === 'success' &&
+						result.html &&
+						result.message_meta
+					) {
 						const tbody = messagesTable.querySelector('tbody')
 						if (tbody) {
+							const emptyRow = tbody.querySelector('.table__row--empty')
+							if (emptyRow) emptyRow.remove()
+
 							tbody.insertAdjacentHTML('afterbegin', result.html)
 							const newRow = tbody.firstElementChild
 
@@ -3827,42 +4765,58 @@ const initDepartmentPage = departmentSlug => {
 
 								try {
 									const ths = Array.from(
-										messagesTable.querySelectorAll('thead th')
+										messagesTable.querySelectorAll('thead th'),
 									)
 									const authorColIndex = ths.findIndex(
-										th => th && th.dataset && th.dataset.name === 'author'
+										th => th && th.dataset && th.dataset.name === 'author',
 									)
 
-									if (authorColIndex !== -1) {
+									if (
+										authorColIndex !== -1 &&
+										result.message_meta &&
+										result.message_meta.unread_type
+									) {
 										const authorCell = newRow.children[authorColIndex]
 										if (authorCell) {
-											const unreadDot = document.createElement('span')
-											unreadDot.className = 'unread-indicator'
-											unreadDot.style.cssText = `
-                                        display: inline-block;
-                                        width: 8px;
-                                        height: 8px;
-                                        background-color: #f59e0b;
-                                        border-radius: 50%;
-                                        margin-right: 6px;
-                                        vertical-align: middle;
-                                        margin-bottom: 2px;
-                                    `
-											unreadDot.title = 'Ваше сообщение не прочитано'
-											authorCell.insertBefore(unreadDot, authorCell.firstChild)
+											const old = authorCell.querySelector('.unread-indicator')
+											if (old) old.remove()
+
+											let indicator = document.createElement('span')
+											indicator.className = 'unread-indicator'
+											indicator.style.display = 'inline-block'
+											indicator.style.verticalAlign = 'middle'
+											indicator.style.marginRight = '6px'
+											indicator.style.marginBottom = '2px'
+
+											if (result.message_meta.unread_type === 'sent') {
+												indicator.innerHTML = `<img src="/static/images/check_one.svg" alt="Не прочитано" style="width:14px;height:14px;vertical-align:middle;">`
+												indicator.title = 'Ваше сообщение не прочитано'
+											} else if (
+												result.message_meta.unread_type === 'sent_read'
+											) {
+												indicator.innerHTML = `<img src="/static/images/check_two.svg" alt="Прочитано" style="width:14px;height:14px;vertical-align:middle;">`
+												indicator.title = 'Ваше сообщение прочитали'
+											} else if (
+												result.message_meta.unread_type === 'received'
+											) {
+												indicator.innerHTML = `<span style="display:inline-block;width:10px;height:10px;background:#2563eb;border-radius:50%;"></span>`
+												indicator.title = 'Новое сообщение для вас'
+											}
+
+											authorCell.insertBefore(indicator, authorCell.firstChild)
 										}
 									}
 								} catch (e) {
 									console.warn(
 										'Не удалось добавить индикатор к новому сообщению:',
-										e
+										e,
 									)
 								}
 
 								TableManager.attachRowCellHandlers(newRow)
 								TableManager.formatCurrencyValuesForRow(
 									messagesTable.id,
-									newRow
+									newRow,
 								)
 								TableManager.applyColumnWidthsForRow(messagesTable.id, newRow)
 
@@ -3879,14 +4833,26 @@ const initDepartmentPage = departmentSlug => {
 			const messageForm = document.getElementById('message-form')
 			if (messageForm) {
 				let hiddenInput = messageForm.querySelector('#order_work')
-				if (!hiddenInput) {
+				if (!hiddenInput && orderWorkId) {
 					hiddenInput = document.createElement('input')
 					hiddenInput.type = 'hidden'
 					hiddenInput.id = 'order_work'
 					hiddenInput.name = 'order_work'
 					messageForm.appendChild(hiddenInput)
 				}
-				hiddenInput.value = orderWorkId
+				if (hiddenInput && orderWorkId) hiddenInput.value = orderWorkId
+
+				if (isOrderMessagesTab) {
+					let orderInput = messageForm.querySelector('#order')
+					if (!orderInput) {
+						orderInput = document.createElement('input')
+						orderInput.type = 'hidden'
+						orderInput.id = 'order'
+						orderInput.name = 'order'
+						messageForm.appendChild(orderInput)
+					}
+					orderInput.value = orderId
+				}
 			}
 		})
 	}
@@ -3956,7 +4922,7 @@ const initDepartmentPage = departmentSlug => {
 
 						const tbody = existingRow.parentNode
 						const existingRowIndex = Array.from(tbody.children).indexOf(
-							existingRow
+							existingRow,
 						)
 
 						existingRow.outerHTML = result.html
@@ -3970,10 +4936,10 @@ const initDepartmentPage = departmentSlug => {
 
 							try {
 								const ths = Array.from(
-									messagesTable.querySelectorAll('thead th')
+									messagesTable.querySelectorAll('thead th'),
 								)
 								const authorColIndex = ths.findIndex(
-									th => th && th.dataset && th.dataset.name === 'author'
+									th => th && th.dataset && th.dataset.name === 'author',
 								)
 
 								if (
@@ -3983,40 +4949,36 @@ const initDepartmentPage = departmentSlug => {
 								) {
 									const authorCell = newRow.children[authorColIndex]
 									if (authorCell) {
-										const unreadDot = document.createElement('span')
-										unreadDot.className = 'unread-indicator'
+										const old = authorCell.querySelector('.unread-indicator')
+										if (old) old.remove()
 
-										const bgColor =
-											result.message_meta.unread_type === 'received'
-												? '#10b981'
-												: '#f59e0b'
+										let indicator = document.createElement('span')
+										indicator.className = 'unread-indicator'
+										indicator.style.display = 'inline-block'
+										indicator.style.verticalAlign = 'middle'
+										indicator.style.marginRight = '6px'
+										indicator.style.marginBottom = '2px'
 
-										unreadDot.style.cssText = `
-                                            display: inline-block;
-                                            width: 8px;
-                                            height: 8px;
-                                            background-color: ${bgColor};
-                                            border-radius: 50%;
-                                            margin-right: 6px;
-                                            vertical-align: middle;
-                                            margin-bottom: 2px;
-                                        `
-										unreadDot.title =
-											result.message_meta.unread_type === 'received'
-												? 'Непрочитанное сообщение для вас'
-												: 'Ваше сообщение не прочитано'
+										if (result.message_meta.unread_type === 'sent') {
+											indicator.innerHTML = `<img src="/static/images/check_one.svg" alt="Не прочитано" style="width:14px;height:14px;vertical-align:middle;">`
+											indicator.title = 'Ваше сообщение не прочитано'
+										} else if (
+											result.message_meta.unread_type === 'sent_read'
+										) {
+											indicator.innerHTML = `<img src="/static/images/check_two.svg" alt="Прочитано" style="width:14px;height:14px;vertical-align:middle;">`
+											indicator.title = 'Ваше сообщение прочитали'
+										} else if (result.message_meta.unread_type === 'received') {
+											indicator.innerHTML = `<span style="display:inline-block;width:10px;height:10px;background:#2563eb;border-radius:50%;"></span>`
+											indicator.title = 'Новое сообщение для вас'
+										}
 
-										const existingDot =
-											authorCell.querySelector('.unread-indicator')
-										if (existingDot) existingDot.remove()
-
-										authorCell.insertBefore(unreadDot, authorCell.firstChild)
+										authorCell.insertBefore(indicator, authorCell.firstChild)
 									}
 								}
 							} catch (e) {
 								console.warn(
 									'Не удалось обновить индикатор непрочитанности:',
-									e
+									e,
 								)
 							}
 
@@ -4027,7 +4989,7 @@ const initDepartmentPage = departmentSlug => {
 							showSuccess('Сообщение успешно обновлено')
 						} else {
 							console.warn(
-								'Не удалось найти или заменить строку после обновления'
+								'Не удалось найти или заменить строку после обновления',
 							)
 						}
 					}
@@ -4090,7 +5052,7 @@ const initDepartmentPage = departmentSlug => {
 									'X-CSRFToken': getCSRFToken(),
 								},
 								credentials: 'same-origin',
-							}
+							},
 						)
 
 						const data = await resp.json()
@@ -4098,7 +5060,7 @@ const initDepartmentPage = departmentSlug => {
 
 						if (!resp.ok || data.status !== 'success') {
 							showError(
-								data.message || data.error || 'Ошибка при удалении сообщения'
+								data.message || data.error || 'Ошибка при удалении сообщения',
 							)
 							return
 						}
@@ -4106,7 +5068,7 @@ const initDepartmentPage = departmentSlug => {
 						selectedRow.remove()
 
 						const remainingRows = messagesTable.querySelectorAll(
-							'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+							'tbody tr:not(.table__row--summary):not(.table__row--empty)',
 						)
 
 						if (remainingRows.length === 0) {
@@ -4127,7 +5089,7 @@ const initDepartmentPage = departmentSlug => {
 						loader.remove()
 						showError(err.message || 'Ошибка при удалении сообщения')
 					}
-				}
+				},
 			)
 		})
 	}
@@ -4147,22 +5109,28 @@ const initDepartmentPage = departmentSlug => {
 			}
 
 			const tableIdMatch = messagesTable.id.match(/order-work-messages-(\d+)/)
-			if (!tableIdMatch || !tableIdMatch[1]) {
-				showError('Не удалось определить ID работы отдела')
+			const tableIdOrderMatch = messagesTable.id.match(/order-messages-(\d+)/)
+
+			let url = null
+
+			if (tableIdMatch && tableIdMatch[1]) {
+				const orderWorkId = tableIdMatch[1]
+				url = `${DEPARTMENTS_BASE_URL}work-messages/${orderWorkId}/`
+			} else if (tableIdOrderMatch && tableIdOrderMatch[1]) {
+				const orderId = tableIdOrderMatch[1]
+				url = `${DEPARTMENTS_BASE_URL}work-messages/0/?order_id=${orderId}`
+			} else {
+				showError('Не удалось определить ID работы отдела или заказа')
 				return
 			}
-			const orderWorkId = tableIdMatch[1]
 
 			const loader = createLoader()
 			document.body.appendChild(loader)
 
 			try {
-				const messagesResp = await fetch(
-					`${DEPARTMENTS_BASE_URL}work-messages/${orderWorkId}/`,
-					{
-						headers: { 'X-Requested-With': 'XMLHttpRequest' },
-					}
-				)
+				const messagesResp = await fetch(url, {
+					headers: { 'X-Requested-With': 'XMLHttpRequest' },
+				})
 
 				const messagesData = await messagesResp.json()
 				loader.remove()
@@ -4171,85 +5139,141 @@ const initDepartmentPage = departmentSlug => {
 					showError(
 						messagesData.error ||
 							messagesData.message ||
-							'Ошибка загрузки сообщений'
+							'Ошибка загрузки сообщений',
 					)
 					return
 				}
 
 				messagesContainer.innerHTML =
-					messagesData.html || '<div class="info">Нет сообщений</div>'
+					messagesData.html ||
+					`
+                                    <tr class="table__row--empty">
+                                        <td colspan="100%" style="text-align: center; padding: 20px;">
+                                            Нет сообщений
+                                        </td>
+                                    </tr>
+                                `
 
 				try {
-					const table = messagesContainer.querySelector('table')
-					if (table && messagesData.messages_meta) {
-						const ths = Array.from(table.querySelectorAll('thead th'))
-						const authorColIndex = ths.findIndex(
-							th => th && th.dataset && th.dataset.name === 'author'
-						)
+					const messagesResp = await fetch(url, {
+						headers: { 'X-Requested-With': 'XMLHttpRequest' },
+					})
 
-						if (authorColIndex !== -1) {
-							const rows = table.querySelectorAll(
-								'tbody tr:not(.table__row--summary):not(.table__row--empty)'
+					const messagesData = await messagesResp.json()
+					loader.remove()
+
+					if (!messagesResp.ok) {
+						showError(
+							messagesData.error ||
+								messagesData.message ||
+								'Ошибка загрузки сообщений',
+						)
+						return
+					}
+
+					messagesContainer.innerHTML =
+						messagesData.html ||
+						`
+                                    <tr class="table__row--empty">
+                                        <td colspan="100%" style="text-align: center; padding: 20px;">
+                                            Нет сообщений
+                                        </td>
+                                    </tr>
+                                `
+
+					try {
+						const table = messagesContainer.querySelector('table')
+						if (table && messagesData.messages_meta) {
+							const ths = Array.from(table.querySelectorAll('thead th'))
+							const authorColIndex = ths.findIndex(
+								th => th && th.dataset && th.dataset.name === 'author',
 							)
 
-							messagesData.messages_meta.forEach((meta, idx) => {
-								if (meta.unread_type && rows[idx]) {
-									const authorCell = rows[idx].children[authorColIndex]
-									if (authorCell) {
-										const unreadDot = document.createElement('span')
-										unreadDot.className = 'unread-indicator'
+							if (authorColIndex !== -1) {
+								const rows = table.querySelectorAll(
+									'tbody tr:not(.table__row--summary):not(.table__row--empty)',
+								)
 
-										const bgColor =
-											meta.unread_type === 'received' ? '#10b981' : '#f59e0b'
+								messagesData.messages_meta.forEach((meta, idx) => {
+									if (meta.unread_type && rows[idx]) {
+										const authorCell = rows[idx].children[authorColIndex]
+										if (authorCell) {
+											const old = authorCell.querySelector('.unread-indicator')
+											if (old) old.remove()
 
-										unreadDot.style.cssText = `
-                                            display: inline-block;
-                                            width: 8px;
-                                            height: 8px;
-                                            background-color: ${bgColor};
-                                            border-radius: 50%;
-                                            margin-right: 6px;
-                                            vertical-align: middle;
-                                            margin-bottom: 2px;
-                                        `
+											let indicator = document.createElement('span')
+											indicator.className = 'unread-indicator'
+											indicator.style.display = 'inline-block'
+											indicator.style.verticalAlign = 'middle'
+											indicator.style.marginRight = '6px'
+											indicator.style.marginBottom = '2px'
 
-										unreadDot.title =
-											meta.unread_type === 'received'
-												? 'Непрочитанное сообщение для вас'
-												: 'Ваше сообщение не прочитано'
+											if (meta.unread_type === 'sent') {
+												indicator.innerHTML = `<img src="/static/images/check_one.svg" alt="Не прочитано" style="width:14px;height:14px;vertical-align:middle;">`
+												indicator.title = 'Ваше сообщение не прочитано'
+											} else if (meta.unread_type === 'sent_read') {
+												indicator.innerHTML = `<img src="/static/images/check_two.svg" alt="Прочитано" style="width:14px;height:14px;vertical-align:middle;">`
+												indicator.title = 'Ваше сообщение прочитали'
+											} else if (meta.unread_type === 'received') {
+												indicator.innerHTML = `<span style="display:inline-block;width:10px;height:10px;background:#2563eb;border-radius:50%;"></span>`
+												indicator.title = 'Новое сообщение для вас'
+											}
 
-										authorCell.insertBefore(unreadDot, authorCell.firstChild)
+											authorCell.insertBefore(indicator, authorCell.firstChild)
+										}
 									}
+								})
+							}
+						}
+					} catch (e) {
+						console.warn(
+							'Не удалось добавить индикаторы непрочитанных сообщений:',
+							e,
+						)
+					}
+
+					try {
+						const table = messagesContainer.querySelector('table')
+						if (table) {
+							if (!table.id) {
+								if (tableIdMatch && tableIdMatch[1]) {
+									table.id = `order-work-messages-${tableIdMatch[1]}`
+								} else if (tableIdOrderMatch && tableIdOrderMatch[1]) {
+									table.id = `order-messages-${tableIdOrderMatch[1]}`
 								}
+							}
+							TableManager.initTable(table.id)
+							table.querySelectorAll('tbody tr').forEach(row => {
+								TableManager.attachRowCellHandlers(row)
+								TableManager.formatCurrencyValuesForRow(table.id, row)
+								TableManager.applyColumnWidthsForRow(table.id, row)
 							})
 						}
+					} catch (e) {
+						console.warn('Не удалось инициализировать таблицу сообщений:', e)
 					}
-				} catch (e) {
-					console.warn(
-						'Не удалось добавить индикаторы непрочитанных сообщений:',
-						e
-					)
-				}
 
-				try {
-					const table = messagesContainer.querySelector('table')
-					if (table) {
-						if (!table.id) table.id = `order-work-messages-${orderWorkId}`
-						TableManager.initTable(table.id)
-						table.querySelectorAll('tbody tr').forEach(row => {
-							TableManager.attachRowCellHandlers(row)
-							TableManager.formatCurrencyValuesForRow(table.id, row)
-							TableManager.applyColumnWidthsForRow(table.id, row)
-						})
+					if (messagesData.messages_id_list) {
+						setIds(
+							messagesData.messages_id_list,
+							tableIdMatch && tableIdMatch[1]
+								? `order-work-messages-${tableIdMatch[1]}`
+								: `order-messages-${tableIdOrderMatch[1]}`,
+						)
 					}
-				} catch (e) {
-					console.warn('Не удалось инициализировать таблицу сообщений:', e)
+
+					showSuccess('Сообщения обновлены')
+				} catch (err) {
+					loader.remove()
+					showError(err.message || 'Ошибка при обновлении сообщений')
 				}
 
 				if (messagesData.messages_id_list) {
 					setIds(
 						messagesData.messages_id_list,
-						`order-work-messages-${orderWorkId}`
+						tableIdMatch && tableIdMatch[1]
+							? `order-work-messages-${tableIdMatch[1]}`
+							: `order-messages-${tableIdOrderMatch[1]}`,
 					)
 				}
 
@@ -4259,6 +5283,731 @@ const initDepartmentPage = departmentSlug => {
 				showError(err.message || 'Ошибка при обновлении сообщений')
 			}
 		})
+	}
+
+	const emergencyButton = document.getElementById('emergency-button')
+	if (emergencyButton) {
+		emergencyButton.addEventListener('click', async () => {
+			const selectedRow = document.querySelector('.table__row--selected')
+			if (!selectedRow) {
+				showError('Выберите заказ для просмотра аварий')
+				return
+			}
+
+			const orderIdCell = selectedRow.querySelector('td:first-child')
+			const orderId = orderIdCell?.textContent.trim()
+
+			if (!orderId) {
+				showError('Не удалось определить ID заказа')
+				return
+			}
+
+			const orderDepartmentWorkId =
+				selectedRow.getAttribute('data-id') || orderId
+
+			const modal = new Modal()
+			await modal.open('<div id="emergencies-container"></div>', 'Аварии')
+
+			const container = document.getElementById('emergencies-container')
+			const loader = createLoader()
+			document.body.appendChild(loader)
+
+			try {
+				const resp = await fetch(
+					`/commerce/emergencies/list/${orderDepartmentWorkId}/`,
+					{
+						headers: { 'X-Requested-With': 'XMLHttpRequest' },
+					},
+				)
+				const data = await resp.json()
+				loader.remove()
+
+				if (resp.ok) {
+					container.innerHTML = data.html || ''
+
+					const tbody = container.querySelector('tbody')
+					if (tbody) {
+						const hasRows = tbody.querySelector(
+							'tr:not(.table__row--empty):not(.table__row--summary)',
+						)
+						if (!hasRows) {
+							tbody.innerHTML =
+								'<tr class="table__row"><td colspan="100%" style="text-align: center; padding: 20px; max-width: 90px;">Нет аварий</td></tr>'
+						}
+					}
+
+					const table = container.querySelector('table')
+					if (table) {
+						table.id = data.table_id || `emergencies-${orderDepartmentWorkId}`
+						TableManager.initTable(table.id)
+						table.querySelectorAll('tbody tr').forEach(row => {
+							TableManager.attachRowCellHandlers(row)
+							TableManager.formatCurrencyValuesForRow(table.id, row)
+							TableManager.applyColumnWidthsForRow(table.id, row)
+						})
+					}
+
+					if (data.ids) {
+						setIds(
+							data.ids,
+							data.table_id || `emergencies-${orderDepartmentWorkId}`,
+						)
+					}
+				} else {
+					container.innerHTML = '<div class="info">Ошибка загрузки аварий</div>'
+					showError(data.message || 'Ошибка загрузки аварий')
+				}
+			} catch (err) {
+				loader.remove()
+				showError(err.message || 'Ошибка загрузки аварий')
+			}
+		})
+	}
+
+	const addEmergencyButton = document.getElementById('add-emergency-button')
+	if (addEmergencyButton) {
+		addEmergencyButton.addEventListener('click', async () => {
+			const table = document.querySelector('table[id^="emergencies-"]')
+			if (!table) {
+				showError('Таблица аварий не найдена')
+				return
+			}
+			const orderDepartmentWorkId = table.id.replace('emergencies-', '')
+			if (!orderDepartmentWorkId) {
+				showError('Не удалось определить ID работы отдела')
+				return
+			}
+
+			const loader = createLoader()
+			document.body.appendChild(loader)
+			try {
+				const workResp = await fetch(
+					`/departments/work/${orderDepartmentWorkId}/`,
+					{
+						headers: { 'X-Requested-With': 'XMLHttpRequest' },
+					},
+				)
+				const workData = await workResp.json()
+				loader.remove()
+				if (!workResp.ok) {
+					showError('Не удалось получить данные работы отдела')
+					return
+				}
+
+				const modal = new Modal()
+				const resp = await fetch('/components/commerce/add_emergency', {
+					headers: { 'X-Requested-With': 'XMLHttpRequest' },
+				})
+				const html = await resp.text()
+				await modal.open(html, 'Добавить аварию')
+
+				const orderInput = document.getElementById('order')
+				const departmentInput = document.getElementById('department')
+				if (orderInput) orderInput.value = workData.order_id || ''
+				if (departmentInput)
+					departmentInput.value = workData.department_id || ''
+
+				const resolverSelect = document.getElementById('resolver')
+				if (resolverSelect) {
+					const selectWrapper = resolverSelect.closest('.select')
+					if (selectWrapper) {
+						SelectHandler.setupSelects({
+							select: selectWrapper,
+							url: `/users/departments/${workData.department_id}/workers/`,
+						})
+					}
+				}
+
+				const form = document.getElementById('emergency-form')
+				if (form) {
+					form.onsubmit = async e => {
+						e.preventDefault()
+						const formData = new FormData(form)
+						const submitResp = await fetch('/commerce/emergencies/create/', {
+							method: 'POST',
+							headers: {
+								'X-CSRFToken': getCSRFToken(),
+							},
+							body: formData,
+						})
+						const data = await submitResp.json()
+						if (submitResp.ok && data.status === 'success') {
+							showSuccess('Авария успешно добавлена')
+							modal.close()
+							const emergenciesContainer = document.getElementById(
+								'emergencies-container',
+							)
+							if (emergenciesContainer) {
+								const listResp = await fetch(
+									`/commerce/emergencies/list/${orderDepartmentWorkId}/`,
+									{
+										headers: { 'X-Requested-With': 'XMLHttpRequest' },
+									},
+								)
+								const listData = await listResp.json()
+								if (listResp.ok) {
+									emergenciesContainer.innerHTML = listData.html || ''
+									const updatedTable =
+										emergenciesContainer.querySelector('table')
+									if (updatedTable) {
+										updatedTable.id =
+											listData.table_id ||
+											`emergencies-${orderDepartmentWorkId}`
+										TableManager.initTable(updatedTable.id)
+										updatedTable.querySelectorAll('tbody tr').forEach(row => {
+											TableManager.attachRowCellHandlers(row)
+											TableManager.formatCurrencyValuesForRow(
+												updatedTable.id,
+												row,
+											)
+											TableManager.applyColumnWidthsForRow(updatedTable.id, row)
+										})
+										if (listData.ids) {
+											setIds(listData.ids, updatedTable.id)
+										}
+									}
+								}
+							}
+						} else {
+							showError(data.message || 'Ошибка добавления аварии')
+						}
+					}
+
+					const cancelBtn = form.querySelector('.button--cancel')
+					if (cancelBtn) {
+						cancelBtn.onclick = () => modal.close()
+					}
+				}
+			} catch (err) {
+				loader.remove()
+				showError(err.message || 'Ошибка загрузки формы добавления аварии')
+			}
+		})
+	}
+
+	const editEmergencyButton = document.getElementById('edit-emergency-button')
+	if (editEmergencyButton) {
+		editEmergencyButton.addEventListener('click', async () => {
+			const table = document.querySelector('table[id^="emergencies-"]')
+			if (!table) {
+				showError('Таблица аварий не найдена')
+				return
+			}
+
+			let selectedRow =
+				table.querySelector('tbody tr.table__row--selected') ||
+				table.querySelector('tbody tr td.table__cell--selected')?.closest('tr')
+			if (!selectedRow) {
+				showError('Выберите аварию для редактирования')
+				return
+			}
+
+			const emergencyId =
+				selectedRow.getAttribute('data-id') ||
+				selectedRow.querySelector('td')?.textContent?.trim()
+			if (!emergencyId) {
+				showError('Не удалось определить ID аварии')
+				return
+			}
+
+			const orderDepartmentWorkId = table.id.replace('emergencies-', '')
+
+			const loader = createLoader()
+			document.body.appendChild(loader)
+			try {
+				const detailResp = await fetch(
+					`/commerce/emergencies/${emergencyId}/`,
+					{
+						headers: { 'X-Requested-With': 'XMLHttpRequest' },
+					},
+				)
+				const detailData = await detailResp.json()
+				loader.remove()
+				if (!detailResp.ok) {
+					showError('Не удалось загрузить данные аварии')
+					return
+				}
+
+				const modal = new Modal()
+				const resp = await fetch('/components/commerce/add_emergency', {
+					headers: { 'X-Requested-With': 'XMLHttpRequest' },
+				})
+				const html = await resp.text()
+				await modal.open(html, 'Редактировать аварию')
+
+				const workLoader = createLoader()
+				document.body.appendChild(workLoader)
+				try {
+					const workResp = await fetch(
+						`/departments/work/${orderDepartmentWorkId}/`,
+						{
+							headers: { 'X-Requested-With': 'XMLHttpRequest' },
+						},
+					)
+					const workData = await workResp.json()
+					workLoader.remove()
+					if (!workResp.ok) {
+						showError('Не удалось получить данные работы отдела')
+						return
+					}
+
+					const resolverSelect = document.getElementById('resolver')
+					if (resolverSelect) {
+						const selectWrapper = resolverSelect.closest('.select')
+						if (selectWrapper) {
+							SelectHandler.setupSelects({
+								select: selectWrapper,
+								url: `/users/departments/${workData.department_id}/workers/`,
+							})
+							await SelectHandler.populateSelectOptions(
+								selectWrapper,
+								`/users/departments/${workData.department_id}/workers/`,
+							)
+						}
+					}
+
+					const orderInput = document.getElementById('order')
+					const departmentInput = document.getElementById('department')
+					if (orderInput) orderInput.value = workData.order_id || ''
+					if (departmentInput)
+						departmentInput.value = workData.department_id || ''
+
+					const descriptionInput = document.getElementById('description')
+					const resolverInput = document.getElementById('resolver')
+					if (descriptionInput && detailData.data.description) {
+						descriptionInput.value = detailData.data.description
+					}
+					if (resolverInput && detailData.data.resolver) {
+						resolverInput.value = detailData.data.resolver
+						const selectWrapper = resolverInput.closest('.select')
+						if (selectWrapper) {
+							SelectHandler.restoreSelectValue(
+								selectWrapper,
+								detailData.data.resolver,
+							)
+						}
+					}
+
+					const form = document.getElementById('emergency-form')
+					if (form) {
+						form.onsubmit = async e => {
+							e.preventDefault()
+							const formData = new FormData(form)
+							if (formData.has('resolver')) {
+								formData.set('resolver_id', formData.get('resolver'))
+								formData.delete('resolver')
+							}
+							const submitResp = await fetch(
+								`/commerce/emergencies/update/${emergencyId}/`,
+								{
+									method: 'POST',
+									headers: {
+										'X-CSRFToken': getCSRFToken(),
+									},
+									body: formData,
+								},
+							)
+							const data = await submitResp.json()
+							if (submitResp.ok && data.status === 'success') {
+								showSuccess('Авария успешно обновлена')
+								modal.close()
+								if (data.html) {
+									selectedRow.outerHTML = data.html
+									const newRow = table.querySelector(
+										`tbody tr[data-id="${emergencyId}"]`,
+									)
+									if (newRow) {
+										TableManager.attachRowCellHandlers(newRow)
+										TableManager.formatCurrencyValuesForRow(table.id, newRow)
+										TableManager.applyColumnWidthsForRow(table.id, newRow)
+									}
+								}
+							} else {
+								showError(data.message || 'Ошибка обновления аварии')
+							}
+						}
+
+						const cancelBtn = form.querySelector('.button--cancel')
+						if (cancelBtn) {
+							cancelBtn.onclick = () => modal.close()
+						}
+					}
+				} catch (workErr) {
+					workLoader.remove()
+					showError(workErr.message || 'Ошибка загрузки данных работы отдела')
+					return
+				}
+			} catch (err) {
+				loader.remove()
+				showError(err.message || 'Ошибка загрузки формы редактирования аварии')
+			}
+		})
+	}
+
+	const closeEmergencyButton = document.getElementById('close-emergency-button')
+	if (closeEmergencyButton) {
+		closeEmergencyButton.addEventListener('click', async () => {
+			const table = document.querySelector('table[id^="emergencies-"]')
+			if (!table) {
+				showError('Таблица аварий не найдена')
+				return
+			}
+
+			let selectedRow =
+				table.querySelector('tbody tr.table__row--selected') ||
+				table.querySelector('tbody tr td.table__cell--selected')?.closest('tr')
+			if (!selectedRow) {
+				showError('Выберите аварию для закрытия')
+				return
+			}
+
+			const emergencyId =
+				selectedRow.getAttribute('data-id') ||
+				selectedRow.querySelector('td')?.textContent?.trim()
+			if (!emergencyId) {
+				showError('Не удалось определить ID аварии')
+				return
+			}
+
+			showQuestion(
+				'Вы действительно хотите закрыть аварию?',
+				'Закрытие аварии',
+				async () => {
+					const loader = createLoader()
+					document.body.appendChild(loader)
+					try {
+						const resp = await fetch('/commerce/emergencies/resolve/', {
+							method: 'POST',
+							headers: {
+								'Content-Type': 'application/x-www-form-urlencoded',
+								'X-CSRFToken': getCSRFToken(),
+							},
+							body: `emergency_id=${encodeURIComponent(emergencyId)}`,
+						})
+						const data = await resp.json()
+						loader.remove()
+						if (!resp.ok || data.status !== 'success') {
+							showError(data.message || 'Ошибка закрытия аварии')
+							return
+						}
+						if (data.html) {
+							selectedRow.outerHTML = data.html
+							const newRow = table.querySelector(
+								`tbody tr[data-id="${emergencyId}"]`,
+							)
+							if (newRow) {
+								TableManager.attachRowCellHandlers(newRow)
+								TableManager.formatCurrencyValuesForRow(table.id, newRow)
+								TableManager.applyColumnWidthsForRow(table.id, newRow)
+							}
+						}
+						showSuccess('Авария успешно закрыта')
+					} catch (err) {
+						loader.remove()
+						showError(err.message || 'Ошибка закрытия аварии')
+					}
+				},
+			)
+		})
+	}
+}
+
+function initEnterpriseBalanceReportPage() {
+	document.querySelectorAll('.debtors-office-list__row').forEach(row => {
+		row.addEventListener('click', async function (e) {
+			const li = row.closest('.debtors-office-list__item')
+			if (!li) return
+			const content = li.querySelector('.expand-content')
+			if (!content) return
+
+			const toggle = row.querySelector('.debtors-office-list__toggle')
+			if (!content.hasAttribute('data-loaded')) {
+				content.innerHTML = '<div class="loader">Загрузка...</div>'
+				const type = row.querySelector('.debtors-office-list__toggle')?.dataset
+					.type
+				if (!type) return
+				const resp = await fetch(
+					`/ledger/enterprise-balance-expand/?type=${type}`,
+					{
+						headers: { 'X-Requested-With': 'XMLHttpRequest' },
+					},
+				)
+				const data = await resp.json()
+				content.innerHTML = data.html
+				const tbody = content.querySelector('tbody')
+				if (tbody && tbody.children.length === 0) {
+					tbody.style.height = '50px'
+				}
+				content.setAttribute('data-loaded', '1')
+				content.style.display = ''
+				if (toggle) toggle.classList.add('open')
+				TableManager.init()
+
+				Object.keys(ENTERPRISE_BALANCE_MODEL_MAP).forEach(tableId => {
+					if (content.querySelector(`#${tableId}`)) {
+						setupEnterpriseBalanceTable(tableId)
+					}
+				})
+			} else {
+				const isOpen =
+					content.style.display === '' || content.style.display === 'block'
+				content.style.display = isOpen ? 'none' : ''
+				if (toggle) {
+					if (isOpen) {
+						toggle.classList.remove('open')
+					} else {
+						toggle.classList.add('open')
+					}
+				}
+			}
+		})
+	})
+}
+
+const ENTERPRISE_BALANCE_MODEL_MAP = {
+	'fixed-asset-table': 'fixedasset',
+	'inventory-item-table': 'inventoryitem',
+	'credit-table': 'credit',
+	'accounts-payable-table': 'accountspayable',
+	'short-term-liability-table': 'shorttermliability',
+	'bonus-table': 'bonus',
+}
+
+function setupEnterpriseBalanceTable(tableId) {
+	const modelKey = ENTERPRISE_BALANCE_MODEL_MAP[tableId]
+	const table = document.getElementById(tableId)
+	if (!table || !modelKey) return
+
+	const addBtn = document.querySelector('#add-button')
+	if (addBtn) {
+		addBtn.addEventListener('click', async () => {
+			const config = {
+				submitUrl: '/commerce/assets/items/add/',
+				getUrl: '/commerce/assets/items/',
+				tableId: tableId,
+				formId: 'assets-form',
+				modalConfig: {
+					url: '/components/commerce/add_assets',
+					title: 'Добавить элемент',
+					context: {},
+				},
+				onSuccess: async result => {
+					if (result.html) {
+						const tbody = table.querySelector('tbody')
+						if (tbody) {
+							TableManager.addTableRow(result, tableId)
+						}
+
+						if (result.totals) {
+							for (const [key, value] of Object.entries(result.totals)) {
+								const el = document.querySelector(`[data-total-key="${key}"]`)
+								if (el) el.textContent = value
+							}
+						}
+
+						showSuccess('Элемент успешно добавлен')
+					} else if (result.message) {
+						showError(result.message)
+					}
+				},
+			}
+			const formHandler = new DynamicFormHandler(config)
+			await formHandler.init()
+
+			const form = document.getElementById('assets-form')
+			if (form) {
+				const modelKeyInput = form.querySelector('input[name="model"]')
+				if (modelKeyInput) modelKeyInput.value = modelKey
+
+				setupCurrencyInput('amount', 0)
+			}
+		})
+	}
+
+	const editBtn = document.querySelector('#edit-button')
+	if (editBtn) {
+		editBtn.addEventListener('click', async () => {
+			const itemId = TableManager.getSelectedRowId(tableId)
+			if (!itemId) {
+				showError('Не удалось определить элемент')
+				return
+			}
+
+			const config = {
+				submitUrl: `/commerce/assets/items/edit/`,
+				getUrl: `/commerce/assets/items/${modelKey}/`,
+				tableId: tableId,
+				formId: 'assets-form',
+				modalConfig: {
+					url: '/components/commerce/add_assets',
+					title: 'Редактировать элемент',
+				},
+				onSuccess: async result => {
+					if (result.html) {
+						TableManager.updateTableRow(result, tableId)
+						if (result.totals) {
+							for (const [key, value] of Object.entries(result.totals)) {
+								const el = document.querySelector(`[data-total-key="${key}"]`)
+								if (el) el.textContent = value
+							}
+						}
+						showSuccess('Элемент успешно обновлён')
+					} else if (result.message) {
+						showError(result.message)
+					}
+				},
+			}
+
+			const formHandler = new DynamicFormHandler(config)
+			await formHandler.init(itemId)
+
+			const form = document.getElementById('assets-form')
+			if (form) {
+				const modelKeyInput = form.querySelector('input[name="model"]')
+				if (modelKeyInput) modelKeyInput.value = modelKey
+				setupCurrencyInput('amount', 0)
+			}
+		})
+	}
+
+	const deleteBtn = document.querySelector('#delete-button')
+	if (deleteBtn) {
+		deleteBtn.addEventListener('click', async () => {
+			TableManager.hideForm('assets-form', tableId)
+			const selectedRowId = TableManager.getSelectedRowId(tableId)
+			if (selectedRowId) {
+				showQuestion(
+					'Вы действительно хотите удалить элемент?',
+					'Удаление',
+					async () => {
+						const result = await TableManager.sendDeleteRequest(
+							selectedRowId,
+							'/commerce/assets/items/delete/',
+							tableId,
+						)
+
+						if (result && result.totals) {
+							for (const [key, value] of Object.entries(result.totals)) {
+								const el = document.querySelector(`[data-total-key="${key}"]`)
+								if (el) el.textContent = value
+							}
+						}
+						showSuccess('Элемент успешно удалён')
+					},
+				)
+			} else {
+				showError('Выберите строку для удаления!')
+			}
+		})
+	}
+}
+
+async function loadManagerOrders(managerId, page = 1, details = null) {
+	// Получаем даты из фильтров (например, input#salary-start-date и input#salary-end-date)
+	const startInput = document.getElementById('start-date')
+	const endInput = document.getElementById('end-date')
+	const startDate = startInput?.value
+	const endDate = endInput?.value
+
+	const url = `/commerce/manager-orders-table/${managerId}/?start_date=${startDate}&end_date=${endDate}&page=${page}`
+
+	if (!details) {
+		// ищем по DOM, если не передали
+		const row = document.querySelector(
+			`.debtors-office-list__row[data-manager-id="${managerId}"]`,
+		)
+		details = row?.parentElement.querySelector('.expand-content')
+	}
+	if (details) details.innerHTML = '<div class="loader"></div>'
+
+	try {
+		const response = await fetch(url, {
+			headers: { 'X-Requested-With': 'XMLHttpRequest' },
+		})
+		const data = await response.json()
+		if (details) {
+			details.innerHTML = data.html
+
+			if (data.pagination) {
+				// Удаляем старую пагинацию, если есть
+				let oldPagination = details.querySelector('.pagination-controls')
+				if (oldPagination) oldPagination.remove()
+
+				// Создаём блок пагинации (можно через шаблон или строкой)
+				const paginationHtml = `
+        <div class="pagination-controls">
+            <button class="pagination-button" data-page="first" title="Первая страница"${data.pagination.current_page === 1 ? ' disabled' : ''}>
+                <img src="/static/images/angle-double-left.svg" alt="First" class="icon">
+            </button>
+            <button class="pagination-button" data-page="prev" title="Предыдущая страница"${data.pagination.current_page === 1 ? ' disabled' : ''}>
+                <img src="/static/images/angle-left.svg" alt="Previous" class="icon">
+            </button>
+            <div class="pagination-line"></div>
+            <div class="pagination-input-container">
+                <span>Страница</span>
+                <input type="text" class="pagination-input" value="${data.pagination.current_page}" style="width:40px">
+                <span>из</span>
+                <span>${data.pagination.total_pages}</span>
+            </div>
+            <div class="pagination-line"></div>
+            <button class="pagination-button" data-page="next" title="Следующая страница"${data.pagination.current_page === data.pagination.total_pages ? ' disabled' : ''}>
+                <img src="/static/images/angle-right.svg" alt="Next" class="icon">
+            </button>
+            <button class="pagination-button" data-page="last" title="Последняя страница"${data.pagination.current_page === data.pagination.total_pages ? ' disabled' : ''}>
+                <img src="/static/images/angle-double-right.svg" alt="Last" class="icon">
+            </button>
+            <div class="pagination-line"></div>
+            <button class="pagination-button" data-page="refresh" title="Обновить">
+                <img src="/static/images/arrows-rotate.svg" alt="Refresh" class="icon">
+            </button>
+        </div>
+        `
+				details.insertAdjacentHTML('beforeend', paginationHtml)
+
+				// Навесить обработчики на кнопки пагинации
+				const pag = details.querySelector('.pagination-controls')
+				if (pag) {
+					pag.querySelectorAll('.pagination-button').forEach(btn => {
+						btn.addEventListener('click', e => {
+							const type = btn.getAttribute('data-page')
+							let page = data.pagination.current_page
+							if (type === 'first') page = 1
+							else if (type === 'prev') page = Math.max(1, page - 1)
+							else if (type === 'next')
+								page = Math.min(data.pagination.total_pages, page + 1)
+							else if (type === 'last') page = data.pagination.total_pages
+							else if (type === 'refresh') page = data.pagination.current_page
+							else return
+							loadManagerOrders(managerId, page, details)
+						})
+					})
+					// Обработка ввода номера страницы
+					const input = pag.querySelector('.pagination-input')
+					input?.addEventListener('change', () => {
+						let val = parseInt(input.value, 10)
+						if (isNaN(val) || val < 1) val = 1
+						if (val > data.pagination.total_pages)
+							val = data.pagination.total_pages
+						loadManagerOrders(managerId, val, details)
+					})
+				}
+			}
+		}
+
+		TableManager.initTable(`manager-orders-${managerId}`)
+
+		// Навесить обработчики пагинации для этого менеджера
+		if (details) {
+			details.querySelectorAll('.pagination-btn').forEach(btn => {
+				btn.addEventListener('click', e => {
+					const page = btn.getAttribute('data-page')
+					if (page) loadManagerOrders(managerId, page)
+				})
+			})
+		}
+	} catch (e) {
+		if (details)
+			details.innerHTML = '<div class="error">Ошибка загрузки заказов</div>'
 	}
 }
 
@@ -4313,18 +6062,412 @@ document.addEventListener('DOMContentLoaded', () => {
 				{ name: 'paid_percent' },
 				{ name: 'additional_info' },
 			])
+
+			const viewOrderFilesBtn = document.getElementById(
+				'view_order_files-button',
+			)
+			if (viewOrderFilesBtn) {
+				setupOrderFilesButton2(viewOrderFilesBtn)
+			}
+
+			const viewOrderPaymentsBtn = document.getElementById(
+				'view_order_payments-button',
+			)
+
+			if (viewOrderPaymentsBtn) {
+				viewOrderPaymentsBtn.addEventListener('click', () => {
+					let orderId = null
+					const selectedCell = document.querySelector(
+						'td.table__cell--selected',
+					)
+					if (selectedCell) {
+						const v = selectedCell.textContent.trim()
+						orderId = Number.isNaN(Number(v)) ? null : parseInt(v, 10)
+					}
+					if (!orderId) {
+						const selectedRow = document.querySelector(
+							'tr.table__row--selected',
+						)
+						if (selectedRow) {
+							const firstCell = selectedRow.querySelector('td')
+							if (firstCell) {
+								const v = firstCell.textContent.trim()
+								orderId = Number.isNaN(Number(v)) ? null : parseInt(v, 10)
+							}
+						}
+					}
+					if (!orderId) {
+						showError('Сначала выберите заказ в таблице.')
+						return
+					}
+					window.location.href = `/ledger/payments/?order_id=${orderId}`
+				})
+			}
 		} else if (segments[0] === 'departments' && segments[1]) {
 			const departmentSlug = segments[1]
 			initDepartmentPage(departmentSlug)
+		} else if (pathname.includes('/users/list')) {
+			initGenericPage(configs['users'])
+		} else if (pathname.includes('/users/types')) {
+			initGenericPage(configs['user_types'])
+
+			const menuSettingsButton = document.getElementById('menu-settings-button')
+			if (menuSettingsButton) {
+				menuSettingsButton.addEventListener('click', async () => {
+					const selectedRow = document.querySelector(
+						'#user-types-table .table__row--selected',
+					)
+					if (!selectedRow) {
+						showError('Сначала выберите тип пользователя в таблице.')
+						return
+					}
+					const typeId = selectedRow.querySelector('td')?.textContent?.trim()
+					if (!typeId) {
+						showError('Не удалось определить тип пользователя.')
+						return
+					}
+
+					const modal = new Modal()
+					await modal.open(
+						'<div id="menu-settings-modal-body"></div>',
+						'Настройка пунктов меню',
+					)
+
+					const modalBody = document.getElementById('menu-settings-modal-body')
+					if (!modalBody) return
+
+					const resp = await fetch(`/users/types/${typeId}/menu_items/`, {
+						headers: { 'X-Requested-With': 'XMLHttpRequest' },
+					})
+					const data = await resp.json()
+
+					modalBody.innerHTML = `
+            <div id="menu-settings-categories">
+                ${data
+									.map(
+										cat => `
+                    <div class="menu-category-block" data-category-id="${cat.category_id}">
+                        <h4>${cat.category_name}</h4>
+                        <ul class="menu-items-list" data-category-id="${cat.category_id}">
+                            ${cat.items
+															.map(
+																item => `
+                                <li class="menu-item-row" draggable="true" data-id="${item.id}">
+                                    <input type="text" value="${item.name}" />
+                                    <button class="remove-menu-item" title="Удалить">✕</button>
+                                </li>
+                            `,
+															)
+															.join('')}
+                        </ul>
+                        <button class="add-menu-item" data-category-id="${cat.category_id}">Добавить пункт</button>
+                    </div>
+                `,
+									)
+									.join('')}
+            </div>
+            <div class="menu-settings-modal-footer">
+                <button id="save-menu-settings" class="button button--primary">Сохранить</button>
+                <button id="cancel-menu-settings" class="button button--cancel">Отмена</button>
+            </div>
+        `
+
+					const lists = modalBody.querySelectorAll('.menu-items-list')
+					lists.forEach(list => {
+						let draggedItem = null
+
+						list.addEventListener('dragstart', e => {
+							if (e.target.classList.contains('menu-item-row')) {
+								draggedItem = e.target
+								e.dataTransfer.effectAllowed = 'move'
+								e.dataTransfer.setData('text/plain', e.target.dataset.id)
+								e.dataTransfer.setData(
+									'source-category',
+									list.dataset.categoryId,
+								)
+								e.target.classList.add('dragging')
+							}
+						})
+
+						list.addEventListener('dragend', e => {
+							e.target.classList.remove('dragging')
+							draggedItem = null
+						})
+
+						list.addEventListener('dragover', e => {
+							e.preventDefault()
+							e.dataTransfer.dropEffect = 'move'
+
+							const afterElement = getDragAfterElement(list, e.clientY)
+							list
+								.querySelectorAll('.drag-over')
+								.forEach(el => el.classList.remove('drag-over'))
+							if (afterElement) afterElement.classList.add('drag-over')
+						})
+
+						list.addEventListener('dragleave', e => {
+							list
+								.querySelectorAll('.drag-over')
+								.forEach(el => el.classList.remove('drag-over'))
+						})
+
+						list.addEventListener('drop', e => {
+							e.preventDefault()
+							list
+								.querySelectorAll('.drag-over')
+								.forEach(el => el.classList.remove('drag-over'))
+							const id = e.dataTransfer.getData('text/plain')
+							const sourceCat = e.dataTransfer.getData('source-category')
+							const targetCat = list.dataset.categoryId
+							const dragged = modalBody.querySelector(
+								`.menu-item-row[data-id="${id}"]`,
+							)
+							if (!dragged) return
+
+							if (sourceCat !== targetCat) {
+								list.appendChild(dragged)
+								return
+							}
+
+							const afterElement = getDragAfterElement(list, e.clientY)
+							if (afterElement && afterElement !== dragged) {
+								list.insertBefore(dragged, afterElement)
+							} else {
+								list.appendChild(dragged)
+							}
+						})
+					})
+
+					modalBody.querySelectorAll('.add-menu-item').forEach(btn => {
+						btn.addEventListener('click', async () => {
+							if (btn.parentNode.querySelector('.menu-settings-select')) return
+
+							btn.style.display = 'none'
+
+							const categoryId = btn.dataset.categoryId
+							const availableResp = await fetch(
+								`/users/types/${typeId}/menu_items/available/`,
+								{ headers: { 'X-Requested-With': 'XMLHttpRequest' } },
+							)
+							const available = await availableResp.json()
+							if (!available.length) {
+								showError('Нет доступных пунктов меню для добавления.')
+								btn.style.display = ''
+								return
+							}
+
+							const select = document.createElement('select')
+							select.className = 'menu-settings-select'
+							available.forEach(item => {
+								const option = document.createElement('option')
+								option.value = item.id
+								option.textContent = item.title
+								select.appendChild(option)
+							})
+
+							const addBtn = document.createElement('button')
+							addBtn.textContent = 'Добавить'
+							addBtn.type = 'button'
+							addBtn.className = 'button button--primary'
+
+							const cancelBtn = document.createElement('button')
+							cancelBtn.textContent = 'Отмена'
+							cancelBtn.type = 'button'
+							cancelBtn.className = 'button button--cancel'
+
+							const buttonsWrapper = document.createElement('div')
+							buttonsWrapper.className = 'menu-settings-buttons-wrapper'
+							buttonsWrapper.appendChild(addBtn)
+							buttonsWrapper.appendChild(cancelBtn)
+
+							const wrapper = document.createElement('div')
+							wrapper.className = 'menu-settings-add-wrapper'
+							wrapper.appendChild(select)
+							wrapper.appendChild(buttonsWrapper)
+
+							addBtn.onclick = () => {
+								const selectedId = select.value
+								const selectedItem = available.find(i => i.id == selectedId)
+								const ul = modalBody.querySelector(
+									`.menu-items-list[data-category-id="${categoryId}"]`,
+								)
+								const li = document.createElement('li')
+								li.className = 'menu-item-row'
+								li.draggable = true
+								li.dataset.id = selectedItem.id
+								li.innerHTML = `<input type="text" value="${selectedItem.title}" />
+                <button class="remove-menu-item" title="Удалить">✕</button>`
+								ul.appendChild(li)
+								wrapper.remove()
+								btn.style.display = ''
+								li.querySelector('.remove-menu-item').addEventListener(
+									'click',
+									e => {
+										const li = e.target.closest('li')
+										if (li) li.remove()
+									},
+								)
+							}
+							cancelBtn.onclick = () => {
+								wrapper.remove()
+								btn.style.display = ''
+							}
+
+							btn.parentNode.insertBefore(wrapper, btn)
+						})
+					})
+
+					modalBody.querySelectorAll('.remove-menu-item').forEach(btn => {
+						btn.addEventListener('click', e => {
+							const li = btn.closest('li')
+							if (li) li.remove()
+						})
+					})
+
+					modalBody.querySelector('#save-menu-settings').onclick = async () => {
+						const categories = []
+						modalBody
+							.querySelectorAll('.menu-category-block')
+							.forEach(catBlock => {
+								const catId = catBlock.dataset.categoryId
+								const items = []
+								catBlock
+									.querySelectorAll('.menu-item-row')
+									.forEach((li, idx) => {
+										items.push({
+											id: li.dataset.id,
+											name: li.querySelector('input').value,
+											order: idx,
+										})
+									})
+								categories.push({
+									category_id: catId,
+									items: items,
+								})
+							})
+						const resp = await fetch(
+							`/users/types/${typeId}/menu_items/update/`,
+							{
+								method: 'POST',
+								headers: {
+									'Content-Type': 'application/json',
+									'X-CSRFToken': getCSRFToken(),
+								},
+								body: JSON.stringify(categories),
+							},
+						)
+						const result = await resp.json()
+						if (result.status === 'success') {
+							showSuccess('Пункты меню успешно сохранены')
+							modal.close()
+						} else {
+							showError(result.message || 'Ошибка сохранения')
+						}
+					}
+
+					modalBody.querySelector('#cancel-menu-settings').onclick = () => {
+						modal.close()
+					}
+				})
+			}
+		} else if (urlName === 'work_statuses_table') {
+			initGenericPage(configs['order_work_statuses'])
+		} else if (pathname.includes('/filetypes/table')) {
+			if (configs['filetypes']) {
+				initGenericPage(configs['filetypes'])
+			} else {
+				console.error('Config not found for generic page: filetypes')
+			}
+		} else if (urlName === 'enterprise_balance_report') {
+			initEnterpriseBalanceReportPage()
+		} else if (urlName === 'salary_calculation') {
+			// Настройка дат (последние 30 дней)
+			const today = new Date()
+			const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
+			const pickers = {
+				start: initDatePicker(
+					'#start-date',
+					'.date-filter__icon[data-target="start-date"]',
+					formatDate(firstDay),
+				),
+				end: initDatePicker(
+					'#end-date',
+					'.date-filter__icon[data-target="end-date"]',
+					formatDate(today),
+				),
+			}
+
+			document.addEventListener('click', async function (e) {
+				const row = e.target.closest(
+					'.debtors-office-list__row[data-manager-id]',
+				)
+				if (!row) return
+
+				const managerId = row.getAttribute('data-manager-id')
+				const details = row.parentElement.querySelector('.expand-content')
+				const toggle = row.querySelector('.debtors-office-list__toggle')
+
+				// Если уже открыт — просто скрыть
+				if (details && details.style.display !== 'none') {
+					details.style.display = 'none'
+					if (toggle) toggle.classList.remove('open')
+					return
+				}
+
+				// Если еще не подгружено — грузим
+				if (!details || !details.hasChildNodes()) {
+					await loadManagerOrders(managerId, 1, details)
+				}
+
+				// Показать блок
+				if (details) {
+					details.style.display = ''
+					if (toggle) toggle.classList.add('open')
+				}
+			})
+
+			document
+				.getElementById('load-data')
+				?.addEventListener('click', async () => {
+					const startInput = document.getElementById('start-date')
+					const endInput = document.getElementById('end-date')
+					const startDate = startInput?.value
+					const endDate = endInput?.value
+
+					const container = document.getElementById(
+						'salary-calculation-container',
+					)
+					if (!startDate || !endDate || !container) return
+
+					// Показываем лоадер
+					const stats = container.querySelector('.salary-calculation__stats')
+					if (stats) stats.innerHTML = '<div class="loader">Загрузка...</div>'
+
+					try {
+						const url = `/commerce/salary-calculation/?start_date=${startDate}&end_date=${endDate}`
+						const resp = await fetch(url, {
+							headers: { 'X-Requested-With': 'XMLHttpRequest' },
+						})
+						const html = await resp.text()
+						if (stats) {
+							stats.innerHTML = html
+							const ul = stats.querySelector('.debtors-office-list')
+							if (ul) ul.classList.add('salary-calculation__list')
+						}
+					} catch (e) {
+						if (stats)
+							stats.innerHTML = '<div class="error">Ошибка загрузки</div>'
+					}
+				})
 		} else {
 			console.error(
-				`No specific initialization logic defined for URL segment: ${urlName}`
+				`No specific initialization logic defined for URL segment: ${urlName}`,
 			)
 		}
 	} else {
 		console.error(
 			'Could not determine page context from URL pathname:',
-			pathname
+			pathname,
 		)
 	}
 
@@ -4347,6 +6490,250 @@ document.addEventListener('DOMContentLoaded', () => {
 				row.classList.remove('hidden-row')
 				row.style.display = ''
 			})
+		})
+	}
+
+	const renameOrderDocumentButton = document.getElementById(
+		'rename-order-document-button',
+	)
+
+	if (renameOrderDocumentButton) {
+		renameOrderDocumentButton.addEventListener('click', async () => {
+			let selectedRow =
+				document.querySelector('tr.table__row--selected') ||
+				document.querySelector('td.table__cell--selected')?.closest('tr')
+			if (!selectedRow) {
+				showError('Выберите файл в таблице для переименования')
+				return
+			}
+
+			const table = selectedRow.closest('table')
+			if (!table || !/^order-documents-/.test(table.id)) {
+				showError('Выберите файл заказа в списке документов')
+				return
+			}
+
+			const docId =
+				selectedRow.getAttribute('data-id') ||
+				selectedRow.querySelector('td')?.textContent?.trim()
+			if (!docId) {
+				showError('Не удалось определить ID файла')
+				return
+			}
+
+			let fileColIndex = -1
+			try {
+				const ths = Array.from(table.querySelectorAll('thead th'))
+				fileColIndex = ths.findIndex(
+					th => th && th.dataset && th.dataset.name === 'file_display',
+				)
+			} catch (e) {
+				fileColIndex = -1
+			}
+
+			const fileCell =
+				fileColIndex >= 0
+					? selectedRow.children[fileColIndex]
+					: selectedRow.querySelector('td')
+			if (!fileCell) {
+				showError('Не удалось определить ячейку с именем файла')
+				return
+			}
+
+			let currentName = ''
+			const existingLink = fileCell.querySelector('a')
+			if (existingLink) currentName = existingLink.textContent.trim()
+			else currentName = fileCell.textContent.trim()
+
+			const extMatch = currentName.match(/(\.[^.]*)$/)
+			const ext = extMatch ? extMatch[1] : ''
+			const nameOnly = currentName.replace(/\.[^/.]+$/, '')
+
+			const modal = new Modal()
+			const resp = await fetch('/components/commerce/file_name', {
+				headers: { 'X-Requested-With': 'XMLHttpRequest' },
+			})
+			const html = await resp.text()
+			await modal.open(html, 'Введите название файла')
+
+			const form = document.getElementById('file_name-form')
+			if (!form) {
+				showError('Форма не найдена')
+				return
+			}
+			const nameInput = form.querySelector('#name')
+			const commentInput = form.querySelector('#comment')
+			if (!nameInput) {
+				showError('Поле имени не найдено')
+				return
+			}
+			nameInput.value = nameOnly
+			nameInput.focus()
+
+			const commentColIndex = Array.from(
+				selectedRow.closest('table').querySelectorAll('thead th'),
+			).findIndex(th => th.dataset.name === 'comment')
+
+			commentInput.value =
+				commentColIndex !== -1
+					? selectedRow.children[commentColIndex]?.textContent.trim() || ''
+					: ''
+
+			form.onsubmit = async e => {
+				e.preventDefault()
+				let newNameRaw = nameInput.value.trim()
+				let newComment = commentInput.value.trim()
+
+				if (!newNameRaw) {
+					showError('Имя файла не может быть пустым')
+					return
+				}
+				const finalName = newNameRaw + ext
+
+				const l = createLoader()
+				document.body.appendChild(l)
+				try {
+					const renameResp = await fetch(
+						`${BASE_URL}documents/rename/${docId}/`,
+						{
+							method: 'POST',
+							headers: {
+								'Content-Type': 'application/x-www-form-urlencoded',
+								'X-CSRFToken': getCSRFToken(),
+								'X-Requested-With': 'XMLHttpRequest',
+							},
+							credentials: 'same-origin',
+							body: `name=${encodeURIComponent(finalName)}&comment=${encodeURIComponent(newComment)}`,
+						},
+					)
+					const payload = await renameResp.json()
+					if (!renameResp.ok || payload.status !== 'success') {
+						showError(
+							payload.message ||
+								payload.error ||
+								'Ошибка при переименовании файла',
+						)
+						return
+					}
+
+					const newDisplay = payload.name || finalName
+					const newUrl = payload.url || (existingLink ? existingLink.href : '')
+					if (fileCell) {
+						if (newUrl) {
+							fileCell.innerHTML = `<a href="${newUrl}" target="_blank" rel="noopener noreferrer" data-name="file_display">${newDisplay}</a>`
+						} else {
+							fileCell.textContent = newDisplay
+						}
+					}
+
+					const commentCell = selectedRow.children[commentColIndex]
+					if (commentCell) {
+						commentCell.textContent = payload.comment || newComment
+					}
+
+					showSuccess('Файл успешно переименован')
+					modal.close()
+				} catch (err) {
+					showError(err.message || 'Ошибка при переименовании файла')
+				} finally {
+					l.remove()
+				}
+			}
+
+			form.querySelector('.button--cancel')?.addEventListener('click', () => {
+				modal.close()
+			})
+		})
+	}
+
+	const deleteOrderDocumentButton = document.getElementById(
+		'delete-order-document-button',
+	)
+
+	if (deleteOrderDocumentButton) {
+		deleteOrderDocumentButton.addEventListener('click', async () => {
+			let selectedRow =
+				document.querySelector('tr.table__row--selected') ||
+				document.querySelector('td.table__cell--selected')?.closest('tr')
+			if (!selectedRow) {
+				showError('Выберите файл в таблице для удаления')
+				return
+			}
+
+			const table = selectedRow.closest('table')
+			if (!table || !/^order-documents-/.test(table.id)) {
+				showError('Выберите файл заказа в списке документов')
+				return
+			}
+
+			const docId =
+				selectedRow.getAttribute('data-id') ||
+				selectedRow.querySelector('td')?.textContent?.trim()
+			if (!docId) {
+				showError('Не удалось определить ID файла')
+				return
+			}
+
+			showQuestion(
+				'Вы действительно хотите удалить файл?',
+				'Удаление файла',
+				async () => {
+					const l = createLoader()
+					document.body.appendChild(l)
+					try {
+						const resp = await fetch(`${BASE_URL}documents/delete/${docId}/`, {
+							method: 'POST',
+							headers: {
+								'Content-Type': 'application/x-www-form-urlencoded',
+								'X-CSRFToken': getCSRFToken(),
+								'X-Requested-With': 'XMLHttpRequest',
+							},
+							credentials: 'same-origin',
+						})
+						const payload = await resp.json()
+						l.remove()
+						if (!resp.ok || payload.status !== 'success') {
+							showError(
+								payload.message || payload.error || 'Ошибка при удалении файла',
+							)
+							return
+						}
+
+						selectedRow.remove()
+
+						try {
+							const tbody = table.querySelector('tbody')
+							const remaining = tbody.querySelectorAll(
+								'tr:not(.table__row--summary):not(.table__row--empty)',
+							)
+							if (remaining.length === 0) {
+								tbody.innerHTML = `<tr class="table__row--empty"><td colspan="100%" style="text-align:center;padding:20px">Нет файлов</td></tr>`
+							}
+						} catch (e) {}
+
+						try {
+							const documentsContainer = document.getElementById(
+								'documents-container',
+							)
+							if (documentsContainer) {
+								const tidMatch = table.id.match(/^order-documents-(\d+)/)
+								const orderId = tidMatch
+									? tidMatch[1]
+									: documentsContainer.dataset.orderId
+								const viewType = documentsContainer.dataset.viewType || 'table'
+								if (viewType === 'cards' && orderId) {
+									await reloadOrderFiles(orderId, viewType, documentsContainer)
+								}
+							}
+						} catch (e) {}
+
+						showSuccess('Файл успешно удалён')
+					} catch (err) {
+						l.remove()
+						showError(err.message || 'Ошибка при удалении файла')
+					}
+				},
+			)
 		})
 	}
 })
@@ -4452,7 +6839,7 @@ document.addEventListener(
 
 		link.addEventListener('mouseleave', removePreview)
 	},
-	true
+	true,
 )
 
 document.addEventListener(
@@ -4560,5 +6947,5 @@ document.addEventListener(
 			document.addEventListener('mousedown', previewCloseHandler, true)
 		}, 0)
 	},
-	true
+	true,
 )

@@ -15,6 +15,8 @@ const CLIENTS = 'clients'
 const CONTACTS = 'contacts'
 const PRODUCTS = 'products'
 const CLIENTS_OBJECTS = 'client-objects'
+const USERS = 'users'
+
 const CURRENCY_SUFFIX = ' р.'
 
 const BASE_URL = '/commerce/'
@@ -108,6 +110,82 @@ const configs = {
 		editUrl: `${BASE_URL}${PRODUCTS}/edit/`,
 		deleteUrl: `${BASE_URL}${PRODUCTS}/delete/`,
 	},
+	users: {
+		containerId: `${USERS}-list-container`,
+		tableId: `${USERS}-list-table`,
+		formId: `${USERS}-form`,
+		getUrl: `/${USERS}/`,
+		addUrl: `/${USERS}/create/`,
+		editUrl: `/${USERS}/update/`,
+		deleteUrl: `/${USERS}/delete/`,
+		modalConfig: {
+			addModalUrl: `/components/users/add_user`,
+			editModalUrl: `/components/users/add_user`,
+			addModalTitle: 'Добавить пользователя',
+			editModalTitle: 'Изменить пользователя',
+		},
+		dataUrls: [{ id: 'user_type', url: `/${USERS}/types/` }],
+		editFunc: () => {
+			const form = document.getElementById('users-form')
+			if (!form) return
+
+			const is_active = form.querySelector('#is_active')
+			if (is_active) {
+				const modalFormGroup = is_active.closest('.modal-form__group')
+				if (modalFormGroup) {
+					modalFormGroup.hidden = false
+				}
+			}
+		},
+	},
+	user_types: {
+		containerId: `user-types-container`,
+		tableId: `user-types-table`,
+		formId: `user-types-form`,
+		getUrl: `/users/types/`,
+		addUrl: `/users/types/create/`,
+		editUrl: `/users/types/update/`,
+		deleteUrl: `/users/types/delete/`,
+		modalConfig: {
+			addModalUrl: `/components/users/add_user_type`,
+			editModalUrl: `/components/users/add_user_type`,
+			addModalTitle: 'Добавить тип пользователя',
+			editModalTitle: 'Изменить тип пользователя',
+		},
+		dataUrls: [{ id: 'permissions', url: `/users/permissions/` }],
+	},
+	order_work_statuses: {
+		containerId: 'order-work-statuses-container',
+		tableId: 'order-work-statuses-table',
+		formId: 'order-work-statuses-form',
+		getUrl: '/departments/work-status/',
+		addUrl: '/departments/work-status/create/',
+		editUrl: '/departments/work-status/update/',
+		deleteUrl: '/departments/work-status/delete/',
+		modalConfig: {
+			addModalUrl: '/components/departments/add_work_status',
+			editModalUrl: '/components/departments/add_work_status',
+			addModalTitle: 'Добавить статус работы',
+			editModalTitle: 'Редактировать статус работы',
+		},
+		dataUrls: [{ id: 'department', url: '/departments/list/' }],
+	},
+	filetypes: {
+		containerId: 'filetypes-container',
+		tableId: 'filetypes-table',
+		formId: 'filetypes-form',
+		getUrl: '/commerce/filetypes/',
+		addUrl: '/commerce/filetypes/add/',
+		editUrl: '/commerce/filetypes/edit/',
+		deleteUrl: '/commerce/filetypes/delete/',
+		modalConfig: {
+			addModalUrl: '/components/commerce/add_filetype',
+			editModalUrl: '/components/commerce/add_filetype',
+			addModalTitle: 'Добавить тип файла',
+			editModalTitle: 'Изменить тип файла',
+		},
+		dataUrls: [{ id: 'user_type', url: '/users/types/' }],
+	},
 }
 
 function addSwapButtonToModalHeader() {
@@ -146,6 +224,70 @@ function addSwapButtonToModalHeader() {
 
 		modalHeader.appendChild(swapButton)
 	}
+}
+
+/**
+ * Форматирует объект Date в строку DD.MM.YYYY.
+ * @param {Date} date
+ * @returns {string}
+ */
+const formatDate = date => {
+	const d = val => String(val).padStart(2, '0')
+	return `${d(date.getDate())}.${d(date.getMonth() + 1)}.${date.getFullYear()}`
+}
+
+/**
+ * Форматирует объект Date в ISO формат для сервера (YYYY-MM-DD).
+ * @param {Date} date
+ * @returns {string}
+ */
+const formatDateForServer = date => {
+	const d = val => String(val).padStart(2, '0')
+	return `${date.getFullYear()}-${d(date.getMonth() + 1)}-${d(date.getDate())}`
+}
+
+/**
+ * Инициализирует виджет выбора даты Flatpickr.
+ * @param {string} inputSelector
+ * @param {string} iconSelector
+ * @param {string} defaultDateStr
+ * @returns {Object|null} Экземпляр flatpickr.
+ */
+const initDatePicker = (inputSelector, iconSelector, defaultDateStr) => {
+	const inputElement = document.querySelector(inputSelector)
+	const iconElement = document.querySelector(iconSelector)
+
+	if (!inputElement || !iconElement) {
+		console.warn(
+			`Date picker elements not found: ${inputSelector}, ${iconSelector}`,
+		)
+		return null
+	}
+
+	let isIconClicked = false
+	iconElement.addEventListener('mousedown', () => {
+		isIconClicked = true
+	})
+
+	const instance = flatpickr(inputElement, {
+		dateFormat: 'd.m.Y',
+		clickOpens: false,
+		defaultDate: defaultDateStr,
+		allowInput: true,
+		locale: 'ru',
+		onClose: () => {
+			setTimeout(() => {
+				isIconClicked = false
+			}, 100)
+		},
+	})
+
+	iconElement.addEventListener('click', () => {
+		if (isIconClicked) instance.toggle()
+		isIconClicked = false
+	})
+
+	return instance
 }
 
 /**
@@ -920,32 +1062,29 @@ const initGenericPage = pageConfig => {
 
 const setupCurrencyInput = (inputId, decimalPlaces = 2) => {
 	const input = document.getElementById(inputId)
-	if (!input) {
-		console.error(`Input with id "${inputId}" not found`)
-		return null
-	}
+	if (!input) return null
 
-	if (input.autoNumeric) {
-		input.autoNumeric.remove()
-	}
+	if (input.autoNumeric) input.autoNumeric.remove()
 
-	const anElement = new AutoNumeric(input, {
-		allowDecimalPadding: decimalPlaces === 0 ? false : true,
+	const options = {
 		alwaysAllowDecimalCharacter: decimalPlaces > 0,
 		currencySymbol: CURRENCY_SUFFIX,
 		currencySymbolPlacement: 's',
 		decimalCharacter: ',',
 		decimalCharacterAlternative: '.',
-		decimalPlacesRawValue: decimalPlaces,
 		decimalPlaces: decimalPlaces,
+		decimalPlacesRawValue: decimalPlaces,
 		digitGroupSeparator: ' ',
 		emptyInputBehavior: 'null',
 		minimumValue: '0',
 		allowEmpty: true,
-	})
+	}
+	if (decimalPlaces > 0) {
+		options.allowDecimalPadding = true
+	}
 
+	const anElement = new AutoNumeric(input, options)
 	input.autoNumeric = anElement
-
 	return anElement
 }
 
@@ -1497,6 +1636,21 @@ const addMenuHandler = () => {
 				if (addViewerButton) addViewerButton.style.display = 'none'
 
 				showMenu(e.pageX, e.pageY)
+			}
+
+			const tbody = table ? table.querySelector('tbody') : null
+
+			if (urlName === 'enterprise_balance_report') {
+				if (tbody) {
+					e.preventDefault()
+					addButton.style.display = 'block'
+					showMenu(e.pageX, e.pageY)
+					return
+				} else {
+					e.preventDefault()
+					addButton.style.display = 'none'
+					showMenu(e.pageX, e.pageY)
+				}
 			}
 
 			const item = e.target.closest('.debtors-office-list__row-item')
@@ -2559,12 +2713,9 @@ const initWorksPage = () => {
 						card.className = 'department-card'
 						card.dataset.id = dw.id
 
-						const statusIndicator =
-							dw.status_name === 'Готово'
-								? `<span style="position:absolute;top:10px;right:10px;display:inline-block;width:14px;height:14px;background:#4caf50;border-radius:50%;border:2px solid #fff;" title="Готово${
-										dw.completed_at ? ' — ' + dw.completed_at : ''
-									}"></span>`
-								: ''
+						const statusIndicator = dw.is_completed
+							? `<span style="position:absolute;top:10px;right:10px;display:inline-block;width:14px;height:14px;background:#4caf50;border-radius:50%;border:2px solid #fff;" title="Готово${dw.completed_at ? ' — ' + dw.completed_at : ''}"></span>`
+							: ''
 
 						card.innerHTML = `
 							<button class="department-card__delete" title="Удалить отдел">&times;</button>
@@ -4083,6 +4234,22 @@ function initArchivePage() {
 	})
 }
 
+function getDragAfterElement(list, y) {
+	const items = [...list.querySelectorAll('.menu-item-row:not(.dragging)')]
+	return items.reduce(
+		(closest, child) => {
+			const box = child.getBoundingClientRect()
+			const offset = y - box.top - box.height / 2
+			if (offset < 0 && offset > closest.offset) {
+				return { offset: offset, element: child }
+			} else {
+				return closest
+			}
+		},
+		{ offset: -Infinity, element: null },
+	).element
+}
+
 const initDepartmentPage = departmentSlug => {
 	const tableId = 'department_orders-table'
 
@@ -5477,7 +5644,6 @@ const initDepartmentPage = departmentSlug => {
 		})
 	}
 
-	// TODO:
 	const closeEmergencyButton = document.getElementById('close-emergency-button')
 	if (closeEmergencyButton) {
 		closeEmergencyButton.addEventListener('click', async () => {
@@ -5543,6 +5709,305 @@ const initDepartmentPage = departmentSlug => {
 				},
 			)
 		})
+	}
+}
+
+function initEnterpriseBalanceReportPage() {
+	document.querySelectorAll('.debtors-office-list__row').forEach(row => {
+		row.addEventListener('click', async function (e) {
+			const li = row.closest('.debtors-office-list__item')
+			if (!li) return
+			const content = li.querySelector('.expand-content')
+			if (!content) return
+
+			const toggle = row.querySelector('.debtors-office-list__toggle')
+			if (!content.hasAttribute('data-loaded')) {
+				content.innerHTML = '<div class="loader">Загрузка...</div>'
+				const type = row.querySelector('.debtors-office-list__toggle')?.dataset
+					.type
+				if (!type) return
+				const resp = await fetch(
+					`/ledger/enterprise-balance-expand/?type=${type}`,
+					{
+						headers: { 'X-Requested-With': 'XMLHttpRequest' },
+					},
+				)
+				const data = await resp.json()
+				content.innerHTML = data.html
+				const tbody = content.querySelector('tbody')
+				if (tbody && tbody.children.length === 0) {
+					tbody.style.height = '50px'
+				}
+				content.setAttribute('data-loaded', '1')
+				content.style.display = ''
+				if (toggle) toggle.classList.add('open')
+				TableManager.init()
+
+				Object.keys(ENTERPRISE_BALANCE_MODEL_MAP).forEach(tableId => {
+					if (content.querySelector(`#${tableId}`)) {
+						setupEnterpriseBalanceTable(tableId)
+					}
+				})
+			} else {
+				const isOpen =
+					content.style.display === '' || content.style.display === 'block'
+				content.style.display = isOpen ? 'none' : ''
+				if (toggle) {
+					if (isOpen) {
+						toggle.classList.remove('open')
+					} else {
+						toggle.classList.add('open')
+					}
+				}
+			}
+		})
+	})
+}
+
+const ENTERPRISE_BALANCE_MODEL_MAP = {
+	'fixed-asset-table': 'fixedasset',
+	'inventory-item-table': 'inventoryitem',
+	'credit-table': 'credit',
+	'accounts-payable-table': 'accountspayable',
+	'short-term-liability-table': 'shorttermliability',
+	'bonus-table': 'bonus',
+}
+
+function setupEnterpriseBalanceTable(tableId) {
+	const modelKey = ENTERPRISE_BALANCE_MODEL_MAP[tableId]
+	const table = document.getElementById(tableId)
+	if (!table || !modelKey) return
+
+	const addBtn = document.querySelector('#add-button')
+	if (addBtn) {
+		addBtn.addEventListener('click', async () => {
+			const config = {
+				submitUrl: '/commerce/assets/items/add/',
+				getUrl: '/commerce/assets/items/',
+				tableId: tableId,
+				formId: 'assets-form',
+				modalConfig: {
+					url: '/components/commerce/add_assets',
+					title: 'Добавить элемент',
+					context: {},
+				},
+				onSuccess: async result => {
+					if (result.html) {
+						const tbody = table.querySelector('tbody')
+						if (tbody) {
+							TableManager.addTableRow(result, tableId)
+						}
+
+						if (result.totals) {
+							for (const [key, value] of Object.entries(result.totals)) {
+								const el = document.querySelector(`[data-total-key="${key}"]`)
+								if (el) el.textContent = value
+							}
+						}
+
+						showSuccess('Элемент успешно добавлен')
+					} else if (result.message) {
+						showError(result.message)
+					}
+				},
+			}
+			const formHandler = new DynamicFormHandler(config)
+			await formHandler.init()
+
+			const form = document.getElementById('assets-form')
+			if (form) {
+				const modelKeyInput = form.querySelector('input[name="model"]')
+				if (modelKeyInput) modelKeyInput.value = modelKey
+
+				setupCurrencyInput('amount', 0)
+			}
+		})
+	}
+
+	const editBtn = document.querySelector('#edit-button')
+	if (editBtn) {
+		editBtn.addEventListener('click', async () => {
+			const itemId = TableManager.getSelectedRowId(tableId)
+			if (!itemId) {
+				showError('Не удалось определить элемент')
+				return
+			}
+
+			const config = {
+				submitUrl: `/commerce/assets/items/edit/`,
+				getUrl: `/commerce/assets/items/${modelKey}/`,
+				tableId: tableId,
+				formId: 'assets-form',
+				modalConfig: {
+					url: '/components/commerce/add_assets',
+					title: 'Редактировать элемент',
+				},
+				onSuccess: async result => {
+					if (result.html) {
+						TableManager.updateTableRow(result, tableId)
+						if (result.totals) {
+							for (const [key, value] of Object.entries(result.totals)) {
+								const el = document.querySelector(`[data-total-key="${key}"]`)
+								if (el) el.textContent = value
+							}
+						}
+						showSuccess('Элемент успешно обновлён')
+					} else if (result.message) {
+						showError(result.message)
+					}
+				},
+			}
+
+			const formHandler = new DynamicFormHandler(config)
+			await formHandler.init(itemId)
+
+			const form = document.getElementById('assets-form')
+			if (form) {
+				const modelKeyInput = form.querySelector('input[name="model"]')
+				if (modelKeyInput) modelKeyInput.value = modelKey
+				setupCurrencyInput('amount', 0)
+			}
+		})
+	}
+
+	const deleteBtn = document.querySelector('#delete-button')
+	if (deleteBtn) {
+		deleteBtn.addEventListener('click', async () => {
+			TableManager.hideForm('assets-form', tableId)
+			const selectedRowId = TableManager.getSelectedRowId(tableId)
+			if (selectedRowId) {
+				showQuestion(
+					'Вы действительно хотите удалить элемент?',
+					'Удаление',
+					async () => {
+						const result = await TableManager.sendDeleteRequest(
+							selectedRowId,
+							'/commerce/assets/items/delete/',
+							tableId,
+						)
+
+						if (result && result.totals) {
+							for (const [key, value] of Object.entries(result.totals)) {
+								const el = document.querySelector(`[data-total-key="${key}"]`)
+								if (el) el.textContent = value
+							}
+						}
+						showSuccess('Элемент успешно удалён')
+					},
+				)
+			} else {
+				showError('Выберите строку для удаления!')
+			}
+		})
+	}
+}
+
+async function loadManagerOrders(managerId, page = 1, details = null) {
+	// Получаем даты из фильтров (например, input#salary-start-date и input#salary-end-date)
+	const startInput = document.getElementById('start-date')
+	const endInput = document.getElementById('end-date')
+	const startDate = startInput?.value
+	const endDate = endInput?.value
+
+	const url = `/commerce/manager-orders-table/${managerId}/?start_date=${startDate}&end_date=${endDate}&page=${page}`
+
+	if (!details) {
+		// ищем по DOM, если не передали
+		const row = document.querySelector(
+			`.debtors-office-list__row[data-manager-id="${managerId}"]`,
+		)
+		details = row?.parentElement.querySelector('.expand-content')
+	}
+	if (details) details.innerHTML = '<div class="loader"></div>'
+
+	try {
+		const response = await fetch(url, {
+			headers: { 'X-Requested-With': 'XMLHttpRequest' },
+		})
+		const data = await response.json()
+		if (details) {
+			details.innerHTML = data.html
+
+			if (data.pagination) {
+				// Удаляем старую пагинацию, если есть
+				let oldPagination = details.querySelector('.pagination-controls')
+				if (oldPagination) oldPagination.remove()
+
+				// Создаём блок пагинации (можно через шаблон или строкой)
+				const paginationHtml = `
+        <div class="pagination-controls">
+            <button class="pagination-button" data-page="first" title="Первая страница"${data.pagination.current_page === 1 ? ' disabled' : ''}>
+                <img src="/static/images/angle-double-left.svg" alt="First" class="icon">
+            </button>
+            <button class="pagination-button" data-page="prev" title="Предыдущая страница"${data.pagination.current_page === 1 ? ' disabled' : ''}>
+                <img src="/static/images/angle-left.svg" alt="Previous" class="icon">
+            </button>
+            <div class="pagination-line"></div>
+            <div class="pagination-input-container">
+                <span>Страница</span>
+                <input type="text" class="pagination-input" value="${data.pagination.current_page}" style="width:40px">
+                <span>из</span>
+                <span>${data.pagination.total_pages}</span>
+            </div>
+            <div class="pagination-line"></div>
+            <button class="pagination-button" data-page="next" title="Следующая страница"${data.pagination.current_page === data.pagination.total_pages ? ' disabled' : ''}>
+                <img src="/static/images/angle-right.svg" alt="Next" class="icon">
+            </button>
+            <button class="pagination-button" data-page="last" title="Последняя страница"${data.pagination.current_page === data.pagination.total_pages ? ' disabled' : ''}>
+                <img src="/static/images/angle-double-right.svg" alt="Last" class="icon">
+            </button>
+            <div class="pagination-line"></div>
+            <button class="pagination-button" data-page="refresh" title="Обновить">
+                <img src="/static/images/arrows-rotate.svg" alt="Refresh" class="icon">
+            </button>
+        </div>
+        `
+				details.insertAdjacentHTML('beforeend', paginationHtml)
+
+				// Навесить обработчики на кнопки пагинации
+				const pag = details.querySelector('.pagination-controls')
+				if (pag) {
+					pag.querySelectorAll('.pagination-button').forEach(btn => {
+						btn.addEventListener('click', e => {
+							const type = btn.getAttribute('data-page')
+							let page = data.pagination.current_page
+							if (type === 'first') page = 1
+							else if (type === 'prev') page = Math.max(1, page - 1)
+							else if (type === 'next')
+								page = Math.min(data.pagination.total_pages, page + 1)
+							else if (type === 'last') page = data.pagination.total_pages
+							else if (type === 'refresh') page = data.pagination.current_page
+							else return
+							loadManagerOrders(managerId, page, details)
+						})
+					})
+					// Обработка ввода номера страницы
+					const input = pag.querySelector('.pagination-input')
+					input?.addEventListener('change', () => {
+						let val = parseInt(input.value, 10)
+						if (isNaN(val) || val < 1) val = 1
+						if (val > data.pagination.total_pages)
+							val = data.pagination.total_pages
+						loadManagerOrders(managerId, val, details)
+					})
+				}
+			}
+		}
+
+		TableManager.initTable(`manager-orders-${managerId}`)
+
+		// Навесить обработчики пагинации для этого менеджера
+		if (details) {
+			details.querySelectorAll('.pagination-btn').forEach(btn => {
+				btn.addEventListener('click', e => {
+					const page = btn.getAttribute('data-page')
+					if (page) loadManagerOrders(managerId, page)
+				})
+			})
+		}
+	} catch (e) {
+		if (details)
+			details.innerHTML = '<div class="error">Ошибка загрузки заказов</div>'
 	}
 }
 
@@ -5641,6 +6106,359 @@ document.addEventListener('DOMContentLoaded', () => {
 		} else if (segments[0] === 'departments' && segments[1]) {
 			const departmentSlug = segments[1]
 			initDepartmentPage(departmentSlug)
+		} else if (pathname.includes('/users/list')) {
+			initGenericPage(configs['users'])
+		} else if (pathname.includes('/users/types')) {
+			initGenericPage(configs['user_types'])
+
+			const menuSettingsButton = document.getElementById('menu-settings-button')
+			if (menuSettingsButton) {
+				menuSettingsButton.addEventListener('click', async () => {
+					const selectedRow = document.querySelector(
+						'#user-types-table .table__row--selected',
+					)
+					if (!selectedRow) {
+						showError('Сначала выберите тип пользователя в таблице.')
+						return
+					}
+					const typeId = selectedRow.querySelector('td')?.textContent?.trim()
+					if (!typeId) {
+						showError('Не удалось определить тип пользователя.')
+						return
+					}
+
+					const modal = new Modal()
+					await modal.open(
+						'<div id="menu-settings-modal-body"></div>',
+						'Настройка пунктов меню',
+					)
+
+					const modalBody = document.getElementById('menu-settings-modal-body')
+					if (!modalBody) return
+
+					const resp = await fetch(`/users/types/${typeId}/menu_items/`, {
+						headers: { 'X-Requested-With': 'XMLHttpRequest' },
+					})
+					const data = await resp.json()
+
+					modalBody.innerHTML = `
+            <div id="menu-settings-categories">
+                ${data
+									.map(
+										cat => `
+                    <div class="menu-category-block" data-category-id="${cat.category_id}">
+                        <h4>${cat.category_name}</h4>
+                        <ul class="menu-items-list" data-category-id="${cat.category_id}">
+                            ${cat.items
+															.map(
+																item => `
+                                <li class="menu-item-row" draggable="true" data-id="${item.id}">
+                                    <input type="text" value="${item.name}" />
+                                    <button class="remove-menu-item" title="Удалить">✕</button>
+                                </li>
+                            `,
+															)
+															.join('')}
+                        </ul>
+                        <button class="add-menu-item" data-category-id="${cat.category_id}">Добавить пункт</button>
+                    </div>
+                `,
+									)
+									.join('')}
+            </div>
+            <div class="menu-settings-modal-footer">
+                <button id="save-menu-settings" class="button button--primary">Сохранить</button>
+                <button id="cancel-menu-settings" class="button button--cancel">Отмена</button>
+            </div>
+        `
+
+					const lists = modalBody.querySelectorAll('.menu-items-list')
+					lists.forEach(list => {
+						let draggedItem = null
+
+						list.addEventListener('dragstart', e => {
+							if (e.target.classList.contains('menu-item-row')) {
+								draggedItem = e.target
+								e.dataTransfer.effectAllowed = 'move'
+								e.dataTransfer.setData('text/plain', e.target.dataset.id)
+								e.dataTransfer.setData(
+									'source-category',
+									list.dataset.categoryId,
+								)
+								e.target.classList.add('dragging')
+							}
+						})
+
+						list.addEventListener('dragend', e => {
+							e.target.classList.remove('dragging')
+							draggedItem = null
+						})
+
+						list.addEventListener('dragover', e => {
+							e.preventDefault()
+							e.dataTransfer.dropEffect = 'move'
+
+							const afterElement = getDragAfterElement(list, e.clientY)
+							list
+								.querySelectorAll('.drag-over')
+								.forEach(el => el.classList.remove('drag-over'))
+							if (afterElement) afterElement.classList.add('drag-over')
+						})
+
+						list.addEventListener('dragleave', e => {
+							list
+								.querySelectorAll('.drag-over')
+								.forEach(el => el.classList.remove('drag-over'))
+						})
+
+						list.addEventListener('drop', e => {
+							e.preventDefault()
+							list
+								.querySelectorAll('.drag-over')
+								.forEach(el => el.classList.remove('drag-over'))
+							const id = e.dataTransfer.getData('text/plain')
+							const sourceCat = e.dataTransfer.getData('source-category')
+							const targetCat = list.dataset.categoryId
+							const dragged = modalBody.querySelector(
+								`.menu-item-row[data-id="${id}"]`,
+							)
+							if (!dragged) return
+
+							if (sourceCat !== targetCat) {
+								list.appendChild(dragged)
+								return
+							}
+
+							const afterElement = getDragAfterElement(list, e.clientY)
+							if (afterElement && afterElement !== dragged) {
+								list.insertBefore(dragged, afterElement)
+							} else {
+								list.appendChild(dragged)
+							}
+						})
+					})
+
+					modalBody.querySelectorAll('.add-menu-item').forEach(btn => {
+						btn.addEventListener('click', async () => {
+							if (btn.parentNode.querySelector('.menu-settings-select')) return
+
+							btn.style.display = 'none'
+
+							const categoryId = btn.dataset.categoryId
+							const availableResp = await fetch(
+								`/users/types/${typeId}/menu_items/available/`,
+								{ headers: { 'X-Requested-With': 'XMLHttpRequest' } },
+							)
+							const available = await availableResp.json()
+							if (!available.length) {
+								showError('Нет доступных пунктов меню для добавления.')
+								btn.style.display = ''
+								return
+							}
+
+							const select = document.createElement('select')
+							select.className = 'menu-settings-select'
+							available.forEach(item => {
+								const option = document.createElement('option')
+								option.value = item.id
+								option.textContent = item.title
+								select.appendChild(option)
+							})
+
+							const addBtn = document.createElement('button')
+							addBtn.textContent = 'Добавить'
+							addBtn.type = 'button'
+							addBtn.className = 'button button--primary'
+
+							const cancelBtn = document.createElement('button')
+							cancelBtn.textContent = 'Отмена'
+							cancelBtn.type = 'button'
+							cancelBtn.className = 'button button--cancel'
+
+							const buttonsWrapper = document.createElement('div')
+							buttonsWrapper.className = 'menu-settings-buttons-wrapper'
+							buttonsWrapper.appendChild(addBtn)
+							buttonsWrapper.appendChild(cancelBtn)
+
+							const wrapper = document.createElement('div')
+							wrapper.className = 'menu-settings-add-wrapper'
+							wrapper.appendChild(select)
+							wrapper.appendChild(buttonsWrapper)
+
+							addBtn.onclick = () => {
+								const selectedId = select.value
+								const selectedItem = available.find(i => i.id == selectedId)
+								const ul = modalBody.querySelector(
+									`.menu-items-list[data-category-id="${categoryId}"]`,
+								)
+								const li = document.createElement('li')
+								li.className = 'menu-item-row'
+								li.draggable = true
+								li.dataset.id = selectedItem.id
+								li.innerHTML = `<input type="text" value="${selectedItem.title}" />
+                <button class="remove-menu-item" title="Удалить">✕</button>`
+								ul.appendChild(li)
+								wrapper.remove()
+								btn.style.display = ''
+								li.querySelector('.remove-menu-item').addEventListener(
+									'click',
+									e => {
+										const li = e.target.closest('li')
+										if (li) li.remove()
+									},
+								)
+							}
+							cancelBtn.onclick = () => {
+								wrapper.remove()
+								btn.style.display = ''
+							}
+
+							btn.parentNode.insertBefore(wrapper, btn)
+						})
+					})
+
+					modalBody.querySelectorAll('.remove-menu-item').forEach(btn => {
+						btn.addEventListener('click', e => {
+							const li = btn.closest('li')
+							if (li) li.remove()
+						})
+					})
+
+					modalBody.querySelector('#save-menu-settings').onclick = async () => {
+						const categories = []
+						modalBody
+							.querySelectorAll('.menu-category-block')
+							.forEach(catBlock => {
+								const catId = catBlock.dataset.categoryId
+								const items = []
+								catBlock
+									.querySelectorAll('.menu-item-row')
+									.forEach((li, idx) => {
+										items.push({
+											id: li.dataset.id,
+											name: li.querySelector('input').value,
+											order: idx,
+										})
+									})
+								categories.push({
+									category_id: catId,
+									items: items,
+								})
+							})
+						const resp = await fetch(
+							`/users/types/${typeId}/menu_items/update/`,
+							{
+								method: 'POST',
+								headers: {
+									'Content-Type': 'application/json',
+									'X-CSRFToken': getCSRFToken(),
+								},
+								body: JSON.stringify(categories),
+							},
+						)
+						const result = await resp.json()
+						if (result.status === 'success') {
+							showSuccess('Пункты меню успешно сохранены')
+							modal.close()
+						} else {
+							showError(result.message || 'Ошибка сохранения')
+						}
+					}
+
+					modalBody.querySelector('#cancel-menu-settings').onclick = () => {
+						modal.close()
+					}
+				})
+			}
+		} else if (urlName === 'work_statuses_table') {
+			initGenericPage(configs['order_work_statuses'])
+		} else if (pathname.includes('/filetypes/table')) {
+			if (configs['filetypes']) {
+				initGenericPage(configs['filetypes'])
+			} else {
+				console.error('Config not found for generic page: filetypes')
+			}
+		} else if (urlName === 'enterprise_balance_report') {
+			initEnterpriseBalanceReportPage()
+		} else if (urlName === 'salary_calculation') {
+			// Настройка дат (последние 30 дней)
+			const today = new Date()
+			const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
+			const pickers = {
+				start: initDatePicker(
+					'#start-date',
+					'.date-filter__icon[data-target="start-date"]',
+					formatDate(firstDay),
+				),
+				end: initDatePicker(
+					'#end-date',
+					'.date-filter__icon[data-target="end-date"]',
+					formatDate(today),
+				),
+			}
+
+			document.addEventListener('click', async function (e) {
+				const row = e.target.closest(
+					'.debtors-office-list__row[data-manager-id]',
+				)
+				if (!row) return
+
+				const managerId = row.getAttribute('data-manager-id')
+				const details = row.parentElement.querySelector('.expand-content')
+				const toggle = row.querySelector('.debtors-office-list__toggle')
+
+				// Если уже открыт — просто скрыть
+				if (details && details.style.display !== 'none') {
+					details.style.display = 'none'
+					if (toggle) toggle.classList.remove('open')
+					return
+				}
+
+				// Если еще не подгружено — грузим
+				if (!details || !details.hasChildNodes()) {
+					await loadManagerOrders(managerId, 1, details)
+				}
+
+				// Показать блок
+				if (details) {
+					details.style.display = ''
+					if (toggle) toggle.classList.add('open')
+				}
+			})
+
+			document
+				.getElementById('load-data')
+				?.addEventListener('click', async () => {
+					const startInput = document.getElementById('start-date')
+					const endInput = document.getElementById('end-date')
+					const startDate = startInput?.value
+					const endDate = endInput?.value
+
+					const container = document.getElementById(
+						'salary-calculation-container',
+					)
+					if (!startDate || !endDate || !container) return
+
+					// Показываем лоадер
+					const stats = container.querySelector('.salary-calculation__stats')
+					if (stats) stats.innerHTML = '<div class="loader">Загрузка...</div>'
+
+					try {
+						const url = `/commerce/salary-calculation/?start_date=${startDate}&end_date=${endDate}`
+						const resp = await fetch(url, {
+							headers: { 'X-Requested-With': 'XMLHttpRequest' },
+						})
+						const html = await resp.text()
+						if (stats) {
+							stats.innerHTML = html
+							const ul = stats.querySelector('.debtors-office-list')
+							if (ul) ul.classList.add('salary-calculation__list')
+						}
+					} catch (e) {
+						if (stats)
+							stats.innerHTML = '<div class="error">Ошибка загрузки</div>'
+					}
+				})
 		} else {
 			console.error(
 				`No specific initialization logic defined for URL segment: ${urlName}`,

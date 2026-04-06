@@ -1,0 +1,31 @@
+{% load static %}
+{% load components %}
+{% add_style 'css/modal-form.css' %}
+<form class="modal-form" id="user-types-form" method="post">
+    <div class="modal-form__content">
+        {% csrf_token %}
+        
+		<div class="modal-form__group">
+			<label class="modal-form__label" for="username">Название роли</label>
+			<input class="modal-form__input"
+				type="text"
+				id="name"
+				name="name"
+				spellcheck="false"
+				autocapitalize="off"
+				autocorrect="off"
+				autocomplete="off"
+				placeholder="Введите название роли" />
+		</div>
+
+        <div class="modal-form__group">
+			<label class="modal-form__label" for="permissions">Права</label>
+            {% include "components/select.html" with id="permissions" placeholder="Выберите права" multiple="true" %}
+        </div>
+        
+        <div class="modal-form__buttons">
+            <button class="button modal-form__button" type="submit">Сохранить</button>
+            <button class="button modal-form__button button--cancel" type="button">Отменить</button>
+        </div>
+    </div>
+</form>

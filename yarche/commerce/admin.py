@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Client, Document, FileType, Order, OrderStatus, Product, ClientObject, Contact, Department, OrderWorkStatus, OrderDepartmentWork, OrderDepartmentWorkMessage, KanbanColumn, KanbanClientPlacement, ProductDepartment
+from .models import Client, Document, FileType, Order, OrderStatus, Product, ClientObject, Contact, Department, OrderWorkStatus, OrderDepartmentWork, OrderDepartmentWorkMessage, KanbanColumn, KanbanClientPlacement, ProductDepartment, FixedAsset, InventoryItem, Credit, AccountsPayable, ShortTermLiability, Bonus
 
 admin.site.register(Client)
 admin.site.register(Document)
@@ -16,3 +16,9 @@ admin.site.register(OrderDepartmentWorkMessage)
 admin.site.register(KanbanClientPlacement)
 admin.site.register(KanbanColumn)
 admin.site.register(ProductDepartment)
+admin.site.register(FixedAsset)
+admin.site.register(InventoryItem)
+admin.site.register(Credit)
+admin.site.register(AccountsPayable)
+admin.site.register(ShortTermLiability)
+admin.site.register(Bonus)

@@ -1,0 +1,40 @@
+{% load static %}
+{% load components %}
+{% add_style 'css/modal-form.css' %}
+<form class="modal-form" id="order-work-statuses-form" method="post">
+    <div class="modal-form__content">
+        {% csrf_token %}
+        
+		<div class="modal-form__group">
+			<label class="modal-form__label" for="name">Название</label>
+			<input class="modal-form__input"
+				type="text"
+				id="name"
+				name="name"
+				spellcheck="false"
+				autocapitalize="off"
+				autocorrect="off"
+				autocomplete="off"
+				placeholder="Введите название" />
+		</div>
+		
+
+        <div class="modal-form__group">
+			<label class="modal-form__label" for="department">Отдел</label>
+            {% include "components/select.html" with id="department" placeholder="Выберите отдел" %}
+        </div>
+
+		 <div class="modal-form__group modal-form__group--width-40" style="padding-bottom: 10px;">
+			{% include "components/checkbox.html" with value="false" id="is_initial" label="Начальный статус" %}
+		</div>
+
+		<div class="modal-form__group modal-form__group--width-40" style="padding-bottom: 10px;">
+			{% include "components/checkbox.html" with value="false" id="is_final" label="Конечный статус" %}
+		</div>
+        
+        <div class="modal-form__buttons">
+            <button class="button modal-form__button" type="submit">Сохранить</button>
+            <button class="button modal-form__button button--cancel" type="button">Отменить</button>
+        </div>
+    </div>
+</form>

@@ -11,16 +11,16 @@ from django.db import models
 from django.db.models import Q
 from types import SimpleNamespace
 from users.models import Notification
+from django.forms.models import model_to_dict
 
-
-# ...existing code...
 
 @login_required
 def department_orders(request, department_slug):
     department = get_object_or_404(Department, slug=department_slug)
     
     department_works = OrderDepartmentWork.objects.filter(
-        department=department
+        department=department,
+        completed_at__isnull=True 
     ).select_related(
         'order',
         'order__client',
@@ -75,7 +75,6 @@ def department_orders(request, department_slug):
     
     return render(request, "departments/department_orders.html", context)
 
-
 @login_required
 def department_users(request, department_slug):
     """
@@ -126,9 +125,7 @@ def department_users(request, department_slug):
 @login_required
 def department_statuses(request, department_slug):
     department = get_object_or_404(Department, slug=department_slug)
-    statuses = OrderWorkStatus.objects.filter(
-        models.Q(department=department) | models.Q(department__isnull=True)
-    ).values("id", "name")
+    statuses = OrderWorkStatus.objects.filter(department=department).values("id", "name")
     return JsonResponse(list(statuses), safe=False)
 
 @login_required
@@ -245,23 +242,23 @@ def department_work_update_status(request, order_id: int, department_slug: str):
     try:
         with transaction.atomic():
             from django.utils import timezone
-            
+
             if request.method in ["PUT", "PATCH"]:
                 data = json.loads(request.body)
             else:
                 data = request.POST.dict()
-            
+
             status_id = data.get("status") or data.get("status_id")
-            
+
             if not status_id:
                 return JsonResponse(
                     {"status": "error", "message": "Не указан статус"},
                     status=400,
                 )
-            
+
             order = get_object_or_404(Order, id=order_id)
             department = get_object_or_404(Department, slug=department_slug)
-            
+
             try:
                 new_status = get_object_or_404(OrderWorkStatus, id=int(status_id))
             except (ValueError, TypeError):
@@ -269,63 +266,40 @@ def department_work_update_status(request, order_id: int, department_slug: str):
                     {"status": "error", "message": "Неверный ID статуса"},
                     status=400,
                 )
-            
+
             department_work, created = OrderDepartmentWork.objects.get_or_create(
                 order=order,
                 department=department,
                 defaults={"status": new_status, "started_at": timezone.now()}
             )
-            
+
             if not department_work.started_at:
                 department_work.started_at = timezone.now()
-            
-            if not created:
-                old_status = department_work.status
-                department_work.status = new_status
-                
-                if new_status.name.lower() in ["готово", "завершено", "выполнено", "готов"]:
-                    if not department_work.completed_at:
-                        department_work.completed_at = timezone.now()
-                        department_work.save(update_fields=["status", "started_at", "completed_at"])
-                        message = f"Статус изменен на '{new_status}'. Работа завершена."
-                    else:
-                        department_work.save(update_fields=["status", "started_at"])
-                        message = f"Статус изменен на '{new_status}'"
-                else:
-                    if department_work.completed_at:
-                        department_work.completed_at = None
-                        department_work.save(update_fields=["status", "started_at", "completed_at"])
-                        message = f"Статус изменен с '{old_status}' на '{new_status}'. Дата завершения сброшена."
-                    else:
-                        department_work.save(update_fields=["status", "started_at"])
-                        message = f"Статус изменен с '{old_status}' на '{new_status}'" if old_status else f"Установлен статус '{new_status}'"
-            else:
-                if new_status.name.lower() in ["готово", "завершено", "выполнено", "готов"]:
+
+            old_status = department_work.status
+            department_work.status = new_status
+
+            if new_status.is_final:
+                if not department_work.completed_at:
                     department_work.completed_at = timezone.now()
                     department_work.save(update_fields=["status", "started_at", "completed_at"])
-                    message = f"Установлен статус '{new_status}'. Работа завершена."
+                    message = f"Статус изменен на '{new_status}'. Работа завершена."
                 else:
                     department_work.save(update_fields=["status", "started_at"])
-                    message = f"Установлен статус '{new_status}'"
-            
+                    message = f"Статус изменен на '{new_status}'"
+            else:
+                if department_work.completed_at:
+                    department_work.completed_at = None
+                    department_work.save(update_fields=["status", "started_at", "completed_at"])
+                    message = f"Статус изменен с '{old_status}' на '{new_status}'. Дата завершения сброшена."
+                else:
+                    department_work.save(update_fields=["status", "started_at"])
+                    message = f"Статус изменен с '{old_status}' на '{new_status}'" if old_status else f"Установлен статус '{new_status}'"
+
             department_work.refresh_from_db()
 
-            # notif_message = (
-            #     f"Статус отдела '{department.name}' по заказу №{order.id} изменён на '{new_status.name}'."
-            # )
-            # notif_url = f"/departments/{department.slug}/?order_id={order.id}"
-
-            # # if order.manager:
-            # #     Notification.objects.create(
-            # #         user=order.manager,
-            # #         message=notif_message,
-            # #         url=notif_url,
-            # #         type="Статус отдела",
-            # #         order=order,
-            # #     )
-            
             from types import SimpleNamespace
-            
+
             order_data = SimpleNamespace(
                 id=order.id,
                 client=order.client,
@@ -339,7 +313,7 @@ def department_work_update_status(request, order_id: int, department_slug: str):
                 department_completed=department_work.get_formatted_completed_at(),
                 legal_name=order.client.legal_name if order.client else None
             )
-            
+
             fields = [
                 {"name": "id", "verbose_name": "№ Заказа"},
                 {"name": "department_executor", "verbose_name": "Исполнитель", "is_relation": True},
@@ -351,9 +325,9 @@ def department_work_update_status(request, order_id: int, department_slug: str):
                 {"name": "department_started", "verbose_name": "Начало работы"},
                 {"name": "department_completed", "verbose_name": "Завершен"},
             ]
-            
+
             html = render_to_string("components/table_row.html", {"item": order_data, "fields": fields})
-            
+
             return JsonResponse(
                 {
                     "status": "success",
@@ -364,7 +338,7 @@ def department_work_update_status(request, order_id: int, department_slug: str):
                     "completed_at": department_work.get_formatted_completed_at(),
                 }
             )
-            
+
     except json.JSONDecodeError:
         return JsonResponse({"status": "error", "message": "Неверный формат JSON"}, status=400)
     except Exception as e:
@@ -918,15 +892,14 @@ def department_work_create(request):
             for department_id in department_ids:
                 department = get_object_or_404(Department, id=department_id)
                 status = OrderWorkStatus.objects.filter(
-                    name="Ожидает"
-                ).filter(
-                    Q(department=department) | Q(department__isnull=True)
+                    department=department,
+                    is_initial=True
                 ).first()
 
                 if not status:
                     errors.append({
                         "department": department_id,
-                        "message": f"Статус 'Ожидает' не найден для отдела '{department.name}'"
+                        "message": f"Для отдела '{department.name}' не настроен стартовый статус работы. Обратитесь к администратору."
                     })
                     continue
 
@@ -1030,3 +1003,137 @@ def department_work_detail_by_id(request, work_id):
         'order_id': work.order.id,
         'department_id': work.department.id,
     })
+
+@login_required
+@require_http_methods(["POST"])
+def order_work_status_create(request):
+    try:
+        with transaction.atomic():
+            department_id = request.POST.get("department")
+            name = (request.POST.get("name") or "").strip()
+            is_initial = request.POST.get("is_initial") in ["true", "on", "1"]
+            is_final = request.POST.get("is_final") in ["true", "on", "1"]
+
+            if not department_id:
+                return JsonResponse({"status": "error", "message": "Не указан отдел"}, status=400)
+            if not name:
+                return JsonResponse({"status": "error", "message": "Не указано название статуса"}, status=400)
+
+            department = get_object_or_404(Department, id=int(department_id))
+
+            if is_initial and OrderWorkStatus.objects.filter(department=department, is_initial=True).exists():
+                return JsonResponse({"status": "error", "message": "В отделе уже есть статус, назначаемый при создании работы"}, status=400)
+            if is_final and OrderWorkStatus.objects.filter(department=department, is_final=True).exists():
+                return JsonResponse({"status": "error", "message": "В отделе уже есть статус, назначаемый при закрытии работы"}, status=400)
+
+            status = OrderWorkStatus.objects.create(
+                name=name,
+                department=department,
+                is_initial=is_initial,
+                is_final=is_final,
+            )
+
+            fields = [
+                {"name": "id", "verbose_name": "ID"},
+                {"name": "department", "verbose_name": "Отдел"},
+                {"name": "name", "verbose_name": "Состояние"},
+                {"name": "is_initial", "verbose_name": "Новый заказ", "is_boolean": True},
+                {"name": "is_final", "verbose_name": "Закрыть", "is_boolean": True},
+            ]
+            context = {"item": status, "fields": fields}
+            html = render_to_string("components/table_row.html", context)
+
+            return JsonResponse({
+                "html": html,
+                "id": status.id,
+            })
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["PUT", "PATCH", "POST"])
+def order_work_status_update(request, pk: int):
+    try:
+        with transaction.atomic():
+            status = get_object_or_404(OrderWorkStatus, id=pk)
+            data = (
+                json.loads(request.body) if request.method in ["PUT", "PATCH"] else request.POST.dict()
+            )
+
+            updatable = ["name", "department", "is_initial", "is_final"]
+
+            for field in updatable:
+                if field in data:
+                    val = data[field]
+                    if field == "department" and val:
+                        try:
+                            val = get_object_or_404(Department, id=int(val))
+                        except Exception:
+                            return JsonResponse({"status": "error", "message": "Неверный ID отдела"}, status=400)
+                    elif field in ["is_initial", "is_final"]:
+                        val = str(val).lower() in ["true", "on", "1"]
+                    elif isinstance(val, str):
+                        val = val.strip()
+                        if val == "":
+                            val = None
+                    setattr(status, field, val)
+
+            department = status.department
+            if status.is_initial:
+                qs = OrderWorkStatus.objects.filter(department=department, is_initial=True).exclude(id=status.id)
+                if qs.exists():
+                    return JsonResponse({"status": "error", "message": "В отделе уже есть статус, назначаемый при создании работы"}, status=400)
+            if status.is_final:
+                qs = OrderWorkStatus.objects.filter(department=department, is_final=True).exclude(id=status.id)
+                if qs.exists():
+                    return JsonResponse({"status": "error", "message": "В отделе уже есть статус, назначаемый при закрытии работы"}, status=400)
+
+            if not status.name:
+                return JsonResponse({"status": "error", "message": "Требуется указать название статуса"}, status=400)
+
+            status.save()
+
+            fields = [
+                {"name": "id", "verbose_name": "ID"},
+                {"name": "department", "verbose_name": "Отдел"},
+                {"name": "name", "verbose_name": "Состояние"},
+                {"name": "is_initial", "verbose_name": "Новый заказ", "is_boolean": True},
+                {"name": "is_final", "verbose_name": "Закрыть", "is_boolean": True},
+            ]
+            context = {"item": status, "fields": fields}
+            html = render_to_string("components/table_row.html", context)
+
+            return JsonResponse({
+                "id": status.id,
+                "html": html,
+            })
+    except json.JSONDecodeError:
+        return JsonResponse({"status": "error", "message": "Неверный формат JSON"}, status=400)
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["POST"])
+def order_work_status_delete(request, pk: int):
+    try:
+        with transaction.atomic():
+            status = get_object_or_404(OrderWorkStatus, id=pk)
+            if OrderDepartmentWork.objects.filter(status=status).exists():
+                return JsonResponse(
+                    {"status": "error", "message": "Нельзя удалить статус, так как есть работы с этим статусом"},
+                    status=400,
+                )
+            status.delete()
+            return JsonResponse({"status": "success"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["GET"])
+def order_work_status_detail(request, pk: int):
+    status = get_object_or_404(OrderWorkStatus, id=pk)
+    data = model_to_dict(status)
+    if "department" in data and status.department:
+        data["department"] = status.department.id
+        data["department_name"] = status.department.name
+    return JsonResponse({"data": data})

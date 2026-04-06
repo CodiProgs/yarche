@@ -302,7 +302,9 @@ export class DynamicFormHandler {
 
 		const result = await response.json()
 
-		this.config.onSuccess?.(result)
+		if (this.config.onSuccess) {
+			this.config.onSuccess?.(result)
+		}
 
 		this.closeForm()
 		showSuccess()

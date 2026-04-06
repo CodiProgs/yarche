@@ -70,11 +70,20 @@ class OrderWorkStatus(models.Model):
     department = models.ForeignKey(
         'Department',
         on_delete=models.CASCADE,
-        verbose_name="Отдел (если статус уникален для отдела)",
+        verbose_name="Отдел",
         related_name="unique_statuses",
         blank=True,
         null=True,
-        help_text="Оставьте пустым для общих статусов"
+    )
+    is_initial = models.BooleanField(
+        verbose_name="Автоматический при добавлении отдела",
+        default=False,
+        help_text="Этот статус назначается автоматически при добавлении работы отдела"
+    )
+    is_final = models.BooleanField(
+        verbose_name="Статус закрытия работы отдела",
+        default=False,
+        help_text="Этот статус назначается при закрытии работы отдела"
     )
 
     def __str__(self):
@@ -373,4 +382,69 @@ class EmergencyIncident(models.Model):
         verbose_name = "Авария"
         verbose_name_plural = "Аварии"
         ordering = ['-started_at']
-        
+
+class FixedAsset(models.Model):
+    name = models.CharField(max_length=255, verbose_name="Название основного средства")
+    amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Сумма")
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Основное средство"
+        verbose_name_plural = "Основные средства"
+
+class InventoryItem(models.Model):
+    name = models.CharField(max_length=255, verbose_name="Название товара")
+    amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Сумма")
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Товарный остаток"
+        verbose_name_plural = "Товарные остатки"
+
+class Credit(models.Model):
+    name = models.CharField(max_length=255, verbose_name="Название кредита")
+    amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Сумма")
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Кредит"
+        verbose_name_plural = "Кредиты"
+
+class AccountsPayable(models.Model):
+    name = models.CharField(max_length=255, verbose_name="Название задолженности")
+    amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Сумма")
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Кредиторская задолженность"
+        verbose_name_plural = "Кредиторские задолженности"
+    
+class ShortTermLiability(models.Model):
+    name = models.CharField(max_length=255, verbose_name="Название обязательства")
+    amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Сумма")
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Краткосрочное обязательство"
+        verbose_name_plural = "Краткосрочные обязательства"
+
+class Bonus(models.Model):
+    name = models.CharField(max_length=255, verbose_name="Название бонуса")
+    amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Сумма")
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Бонус"
+        verbose_name_plural = "Бонусы"

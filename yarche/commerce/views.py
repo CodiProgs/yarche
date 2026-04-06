@@ -11,6 +11,9 @@ from django.db.models import (
     Subquery,
     ExpressionWrapper,
 )
+import locale
+import re
+from django.apps import apps
 from django.db import transaction
 from django.core.paginator import Paginator
 from django.db.models.functions import Coalesce
@@ -22,7 +25,7 @@ from ledger.models import Transaction, BankAccount
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.http import require_http_methods, require_POST
 import json
-from users.models import User, Notification
+from users.models import User, Notification, UserType
 import os
 from django.utils.timezone import localtime
 from django.utils.text import get_valid_filename
@@ -30,6 +33,10 @@ from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
+
+locale.setlocale(locale.LC_ALL, "ru_RU.UTF-8")
+CURRENCY_SUFFIX = " р."
+DEFAULT_VALUE = f"0{CURRENCY_SUFFIX}"
 
 # region Helpers
 def get_base_order_queryset():
@@ -135,21 +142,35 @@ def render_client_table(clients):
         "components/table.html", {"data": clients, "fields": fields}
     )
 
+def format_currency(amount: float) -> str:
+    """
+    Format amount as currency string.
+    """
+    rounded_amount = round(amount)
+    sum_str = locale.format_string("%.0f", rounded_amount, grouping=True)
+    return sum_str.replace('\xa0', ' ') + CURRENCY_SUFFIX
+
+
 
 # endregion
 
 # region Views
-def entity_list(request, model_class):
-    entities = model_class.objects.all().values("id", "name")
+def entity_list(request, model_class, queryset=None):
+    if queryset is None:
+        queryset = model_class.objects.all()
+    entities = queryset.values("id", "name")
     return JsonResponse(list(entities), safe=False)
-
 
 def product_list(request):
     return entity_list(request, Product)
 
 def document_types(request):
-    return entity_list(request, FileType)
-
+    user_type = getattr(request.user, 'user_type', None)
+    if user_type is not None:
+        queryset = FileType.objects.filter(user_type=user_type)
+    else:
+        queryset = FileType.objects.none()
+    return entity_list(request, FileType, queryset=queryset)
 
 def client_list(request):
     return entity_list(request, Client)
@@ -1550,6 +1571,7 @@ def order_detail(request, pk: int):
         item = model_to_dict(dw)
         item['department_name'] = dw.department.name if dw.department else ''
         item['status_name'] = dw.status.name if dw.status else ''
+        item['is_completed'] = bool(dw.status and getattr(dw.status, "is_final", False))  # добавлено
         if hasattr(dw, 'completed_at') and dw.completed_at:
             item['completed_at'] = localtime(dw.completed_at).strftime("%d-%m-%Y %H:%M")
         department_works.append(item)
@@ -1564,7 +1586,6 @@ def order_detail(request, pk: int):
         "data": data,
         "department_works": department_works
     })
-
 
 @login_required
 @require_http_methods(["POST"])
@@ -2068,8 +2089,6 @@ def create_emergency(request):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
-
-
 @login_required
 @require_POST
 def resolve_emergency(request):
@@ -2189,3 +2208,477 @@ def emergency_detail(request, pk: int):
         data["resolved_at"] = localtime(data["resolved_at"]).strftime("%Y-%m-%d %H:%M")
 
     return JsonResponse({"data": data})
+
+@login_required
+def order_work_statuses_table(request):
+    fields = [
+        {"name": "id", "verbose_name": "ID"},
+        {"name": "department", "verbose_name": "Отдел"},
+        {"name": "name", "verbose_name": "Состояние"},
+        {"name": "is_initial", "verbose_name": "Новый заказ", "is_boolean": True},
+        {"name": "is_final", "verbose_name": "Закрыть", "is_boolean": True},
+    ]
+    data = OrderWorkStatus.objects.select_related('department').all().order_by('department__name', 'id')
+    return render(request, "commerce/order_work_statuses_table.html", {
+        "fields": fields,
+        "data": data,
+    })
+
+def filetype_table(request):
+    filetypes = FileType.objects.select_related('user_type').all()
+    fields = [
+        {"name": "id", "verbose_name": "ID"},
+        {"name": "user_type_name", "verbose_name": "Тип пользователя"},
+        {"name": "name", "verbose_name": "Название"},
+    ]
+    
+    for ft in filetypes:
+        ft.user_type_name = ft.user_type.name if ft.user_type else ""
+    ids = [ft.id for ft in filetypes]
+    return render(request, "commerce/filetype_table.html", {
+        "fields": fields,
+        "data": filetypes,
+        "ids": ids,
+    })
+
+from django.template.loader import render_to_string
+
+@login_required
+@require_POST
+def filetype_create(request):
+    try:
+        name = (request.POST.get("name") or "").strip()
+        user_type_id = request.POST.get("user_type")
+        if not name:
+            return JsonResponse({"status": "error", "message": "Требуется указать название типа файла"}, status=400)
+        if not user_type_id:
+            return JsonResponse({"status": "error", "message": "Требуется указать тип пользователя"}, status=400)
+        user_type = get_object_or_404(UserType, id=user_type_id)
+        filetype = FileType.objects.create(name=name, user_type=user_type)
+
+        # поля как в filetype_table
+        fields = [
+            {"name": "id", "verbose_name": "ID"},
+            {"name": "user_type_name", "verbose_name": "Тип пользователя"},
+            {"name": "name", "verbose_name": "Название"},
+        ]
+        filetype.user_type_name = filetype.user_type.name if filetype.user_type else ""
+
+        html = render_to_string(
+            "components/table_row.html",
+            {"item": filetype, "fields": fields}
+        )
+
+        return JsonResponse({
+            "status": "success",
+            "id": filetype.id,
+            "html": html,
+        })
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["POST", "PUT", "PATCH"])
+def filetype_edit(request, pk):
+    try:
+        filetype = get_object_or_404(FileType, id=pk)
+        name = (request.POST.get("name") or "").strip()
+        user_type_id = request.POST.get("user_type")
+        if name:
+            filetype.name = name
+        if user_type_id:
+            user_type = get_object_or_404(UserType, id=user_type_id)
+            filetype.user_type = user_type
+        filetype.save()
+
+        fields = [
+            {"name": "id", "verbose_name": "ID"},
+            {"name": "user_type_name", "verbose_name": "Тип пользователя"},
+            {"name": "name", "verbose_name": "Название"},
+        ]
+        filetype.user_type_name = filetype.user_type.name if filetype.user_type else ""
+
+        html = render_to_string(
+            "components/table_row.html",
+            {"item": filetype, "fields": fields}
+        )
+
+        return JsonResponse({
+            "status": "success",
+            "id": filetype.id,
+            "html": html,
+        })
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+    
+@require_POST
+def filetype_delete(request, pk):
+    try:
+        filetype = get_object_or_404(FileType, id=pk)
+        filetype.delete()
+        return JsonResponse({"status": "success"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["GET"])
+def filetype_detail(request, pk: int):
+    filetype = get_object_or_404(FileType, id=pk)
+    data = model_to_dict(filetype)
+
+    return JsonResponse({"data": data})
+
+
+MODEL_MAP = {
+    'fixedasset': 'FixedAsset',
+    'inventoryitem': 'InventoryItem',
+    'credit': 'Credit',
+    'accountspayable': 'AccountsPayable',
+    'shorttermliability': 'ShortTermLiability',
+    'bonus': 'Bonus',
+}
+
+def get_enterprise_balance_totals():
+    from ledger.models import BankAccount
+    from commerce.models import (
+        FixedAsset, InventoryItem, Credit, AccountsPayable, ShortTermLiability, Bonus, Order
+    )
+    from django.db.models import Sum
+    from .views import format_currency  # если функция format_currency в этом же модуле
+
+    # Активы
+    fixed_assets_sum = FixedAsset.objects.aggregate(total=Sum("amount"))["total"] or 0
+    inventory_sum = InventoryItem.objects.aggregate(total=Sum("amount"))["total"] or 0
+    receivables_sum = (
+        Order.objects.aggregate(
+            total=models.Sum(models.F("amount") - models.F("paid_amount"))
+        )["total"] or 0
+    )
+    bank_sum = BankAccount.objects.aggregate(total=Sum("balance"))["total"] or 0
+
+    # Пассивы
+    credit_sum = Credit.objects.aggregate(total=Sum("amount"))["total"] or 0
+    payable_sum = AccountsPayable.objects.aggregate(total=Sum("amount"))["total"] or 0
+    short_term_sum = ShortTermLiability.objects.aggregate(total=Sum("amount"))["total"] or 0
+    bonus_sum = Bonus.objects.aggregate(total=Sum("amount"))["total"] or 0
+
+    non_current_assets = fixed_assets_sum
+    current_assets = inventory_sum + receivables_sum + bank_sum
+    assets = non_current_assets + current_assets
+    liabilities = credit_sum + payable_sum + short_term_sum + bonus_sum
+    capital = assets - liabilities
+
+    return {
+        "assets": format_currency(assets),
+        "non_current_assets": format_currency(non_current_assets),
+        "current_assets": format_currency(current_assets),
+        "fixed_assets": format_currency(fixed_assets_sum),
+        "inventory": format_currency(inventory_sum),
+        "receivables": format_currency(receivables_sum),
+        "bank": format_currency(bank_sum),
+        "liabilities": format_currency(liabilities),
+        "credit": format_currency(credit_sum),
+        "payable": format_currency(payable_sum),
+        "short_term": format_currency(short_term_sum),
+        "bonus": format_currency(bonus_sum),
+        "capital": format_currency(capital),
+    }
+
+
+@require_POST
+def asset_item_create(request):
+    model_key = (request.POST.get('model') or '').lower()
+    name = (request.POST.get('name') or '').strip()
+    amount_raw = request.POST.get('amount')
+    if amount_raw:
+        amount_clean = re.sub(r'[^\d.,-]', '', amount_raw)
+        amount_clean = amount_clean.replace(',', '.')
+        try:
+            amount = float(amount_clean)
+        except ValueError:
+            return JsonResponse({"status": "error", "message": "Некорректная сумма"}, status=400)
+    else:
+        return JsonResponse({"status": "error", "message": "Требуется указать сумму"}, status=400)
+
+    if not model_key or model_key not in MODEL_MAP:
+        return JsonResponse({"status": "error", "message": "Некорректная модель"}, status=400)
+    if not name:
+        return JsonResponse({"status": "error", "message": "Требуется указать название"}, status=400)
+    if not amount:
+        return JsonResponse({"status": "error", "message": "Требуется указать сумму"}, status=400)
+
+    try:
+        amount = float(amount)
+    except ValueError:
+        return JsonResponse({"status": "error", "message": "Некорректная сумма"}, status=400)
+
+    model_class = apps.get_model('commerce', MODEL_MAP[model_key])
+    try:
+        with transaction.atomic():
+            obj = model_class.objects.create(name=name, amount=amount)
+            fields = [
+                {"name": "id", "verbose_name": "ID"},
+                {"name": "name", "verbose_name": "Название"},
+                {"name": "amount", "verbose_name": "Сумма", "is_number": True},
+            ]
+            context = {"item": obj, "fields": fields}
+            obj.amount = format_currency(obj.amount)
+
+            totals = get_enterprise_balance_totals()
+            return JsonResponse(    
+                {
+                    "html": render_to_string("components/table_row.html", context),
+                    "id": obj.id,
+                    "totals": totals,
+                }
+            )
+
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["PUT", "PATCH", "POST"])
+def asset_item_update(request, pk: int):
+    try:
+        data = json.loads(request.body) if request.method in ["PUT", "PATCH"] else request.POST.dict()
+        model_key = (data.get('model') or '').lower()
+        if model_key not in MODEL_MAP:
+            return JsonResponse({"status": "error", "message": "Некорректная модель"}, status=400)
+        model_class = apps.get_model('commerce', MODEL_MAP[model_key])
+        obj = get_object_or_404(model_class, id=pk)
+
+        if "name" in data:
+            name = data["name"]
+            if isinstance(name, str):
+                name = name.strip()
+            else:
+                name = str(name).strip()
+            if not name:
+                return JsonResponse({"status": "error", "message": "Требуется указать название"}, status=400)
+            obj.name = name
+
+        if "amount" in data:
+            amount_raw = data["amount"]
+            amount_clean = re.sub(r'[^\d.,-]', '', str(amount_raw))
+            amount_clean = amount_clean.replace(',', '.')
+            try:
+                obj.amount = float(amount_clean)
+            except (ValueError, TypeError):
+                return JsonResponse({"status": "error", "message": "Некорректная сумма"}, status=400)
+
+        obj.save()
+
+        fields = [
+            {"name": "id", "verbose_name": "ID"},
+            {"name": "name", "verbose_name": "Название"},
+            {"name": "amount", "verbose_name": "Сумма", "is_number": True},
+        ]
+        context = {"item": obj, "fields": fields}
+        obj.amount = format_currency(obj.amount)
+
+        totals = get_enterprise_balance_totals()
+
+        return JsonResponse({
+            "id": obj.id,
+            "html": render_to_string("components/table_row.html", context),
+            "totals": totals,
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({"status": "error", "message": "Неверный формат JSON"}, status=400)
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["POST"])
+def asset_item_delete(request, pk: int, model_key: str):
+    try:
+        if model_key not in MODEL_MAP:
+            return JsonResponse({"status": "error", "message": "Некорректная модель"}, status=400)
+        model_class = apps.get_model('commerce', MODEL_MAP[model_key])
+        obj = get_object_or_404(model_class, id=pk)
+        obj.delete()
+        totals = get_enterprise_balance_totals()  
+        return JsonResponse({"status": "success", "totals": totals})  
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["GET"])
+def asset_item_detail(request, pk: int, model_key: str):
+    if model_key not in MODEL_MAP:
+        return JsonResponse({"status": "error", "message": "Некорректная модель"}, status=400)
+    model_class = apps.get_model('commerce', MODEL_MAP[model_key])
+    obj = get_object_or_404(model_class, id=pk)
+    data = model_to_dict(obj)
+    return JsonResponse({"data": data})
+
+import datetime
+
+from django.utils import timezone
+from django.contrib.auth import get_user_model
+from commerce.models import Order
+from django.db.models import Sum, Q
+from django.shortcuts import render
+from users.models import UserType
+from django.http import HttpResponse
+def parse_date_flexible(date_str):
+    for fmt in ("%Y-%m-%d", "%d.%m.%Y"):
+        try:
+            return timezone.make_aware(datetime.datetime.strptime(date_str, fmt))
+        except Exception:
+            continue
+    return None
+
+@login_required
+def salary_calculation(request):
+    # Получаем даты из GET-параметров
+    start_date_str = request.GET.get("start_date")
+    end_date_str = request.GET.get("end_date")
+    now = timezone.now()
+
+    if start_date_str:
+        first_day = parse_date_flexible(start_date_str)
+        if not first_day:
+            first_day = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        first_day = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    if end_date_str:
+        last_day = parse_date_flexible(end_date_str)
+        if last_day:
+            last_day = last_day.replace(hour=23, minute=59, second=59, microsecond=999999)
+        else:
+            last_day = now
+    else:
+        last_day = now
+
+    User = get_user_model()
+    manager_type = UserType.objects.filter(name="Менеджер по работе с клиентами").first()
+    if manager_type:
+        managers = User.objects.filter(user_type=manager_type)
+    else:
+        managers = User.objects.none()
+
+    orders = (
+        Order.objects.filter(
+            archived_at__gte=first_day,
+            archived_at__lte=last_day,
+            manager__in=managers,
+        )
+        .values("manager")
+        .annotate(total_paid=Sum("paid_amount"))
+    )
+    paid_by_manager = {o["manager"]: o["total_paid"] or 0 for o in orders}
+
+    data = []
+    for manager in managers:
+        total = paid_by_manager.get(manager.id, 0)
+        data.append({
+            "id": manager.id,
+            "name": manager.last_name or "",
+            "total": format_currency(total),
+            "expandable": True,
+            "type": "manager",
+        })
+
+    context = {
+        "data": data,
+        "first_day": first_day,
+        "last_day": last_day,
+    }
+
+    # Если AJAX — возвращаем только список менеджеров (ul)
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        html = ""
+        for manager in data:
+            html += f'''
+            <li class="debtors-office-list__item">
+                <div class="debtors-office-list__row" data-manager-id="{manager["id"]}" data-type="{manager["type"]}">
+                    <span class="debtors-office-list__toggle">+</span>
+                    <span class="debtors-office-list__title">{manager["name"]}</span>
+                    <span class="debtors-office-list__amount" data-total-key="manager_{manager["id"]}">{manager["total"]}</span>
+                </div>
+                <div class="expand-content" style="display:none"></div>
+            </li>
+            '''
+        return HttpResponse(f'<ul class="debtors-office-list">{html}</ul>')
+    # Иначе — всю страницу
+    return render(request, "commerce/salary_calculation.html", context)
+
+
+@login_required
+def manager_orders_table(request, manager_id):
+    # Получаем даты из GET-параметров
+    start_date_str = request.GET.get("start_date")
+    end_date_str = request.GET.get("end_date")
+    page_number = request.GET.get("page", 1)
+
+    now = timezone.now()
+    # По умолчанию — с первого числа месяца по сегодня
+    if start_date_str:
+        first_day = parse_date_flexible(start_date_str)
+        if not first_day:
+            first_day = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        first_day = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    if end_date_str:
+        last_day = parse_date_flexible(end_date_str)
+        if last_day:
+            last_day = last_day.replace(hour=23, minute=59, second=59, microsecond=999999)
+        else:
+            last_day = now
+    else:
+        last_day = now
+
+    orders_qs = (
+        Order.objects
+        .filter(
+            manager_id=manager_id,
+            archived_at__gte=first_day,
+            archived_at__lte=last_day,
+        )
+        .select_related("client", "product")
+        .order_by("-created")
+    )
+
+    paginator = Paginator(orders_qs, 25)
+    page_obj = paginator.get_page(page_number)
+
+    fields = [
+        {"name": "id", "verbose_name": "ID"},
+        {"name": "client", "verbose_name": "Клиент", "is_relation": True},
+        {"name": "legal_name", "verbose_name": "Юр. ин-ф"},
+        {"name": "product", "verbose_name": "Продукция", "is_relation": True},
+        {"name": "amount", "verbose_name": "Сумма заказа", "is_amount": True},
+        {"name": "paid_amount", "verbose_name": "Оплачено", "is_amount": True},
+        {"name": "created", "verbose_name": "Создан", "is_date": True},
+        {"name": "required_documents", "verbose_name": "Документы", "is_boolean": True},
+        {"name": "comment", "verbose_name": "Комментарий"},
+        {"name": "additional_info", "verbose_name": "Доп. инф-я"},
+        {"name": "archived_at", "verbose_name": "Архив", "is_date": True},
+    ]
+
+    # Добавим поле legal_name для каждого заказа (если client есть)
+    for o in page_obj.object_list:
+        o.legal_name = o.client.legal_name if getattr(o, "client", None) else ""
+
+    html = render_to_string(
+        "components/table.html",
+        {
+            "fields": fields,
+            "data": page_obj.object_list,
+            "id": f"manager-orders-{manager_id}",
+            "pagination": {
+                "total_pages": paginator.num_pages,
+                "current_page": page_obj.number,
+            },
+        }
+    )
+    return JsonResponse({
+        "html": html,
+        "pagination": {
+            "total_pages": paginator.num_pages,
+            "current_page": page_obj.number,
+        }
+    })

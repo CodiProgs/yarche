@@ -131,4 +131,6 @@ urlpatterns = [
         views.enterprise_economy_report,
         name="enterprise_economy_report",
     ),
+	path("enterprise_balance_report/", views.enterprise_balance_report, name="enterprise_balance_report"),
+	path('enterprise-balance-expand/', views.enterprise_balance_expand, name='enterprise_balance_expand'),
 ]

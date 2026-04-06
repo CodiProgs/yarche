@@ -312,34 +312,6 @@ div.flatpickr-months {
 	background-color: var(--color-background-window);
 }
 
-#income-button {
-	color: #218838;
-}
-
-#expense-button {
-	color: #ff0033;
-}
-
-#transfer-button {
-	color: #004085;
-}
-
-#order-payment-button {
-	color: #9c27b0;
-}
-
-#deposit-button {
-	color: #3f51b5;
-}
-
-#ls-payment-button {
-	color: #3f51b5;
-}
-
-#close-shift-button {
-	color: #795548;
-}
-
 @media (max-width: 1024px) {
 	.current-shift-left {
 		width: 40%;

@@ -19,7 +19,7 @@ from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_http_methods
 
 from commerce.models import Client, Order
-from users.models import Notification
+from users.models import Notification, User
 from yarche.utils import get_model_fields
 
 from .models import BankAccount, BankAccountType, Transaction, TransactionCategory
@@ -1209,10 +1209,7 @@ def current_shift(request):
     """
     user = request.user
     accounts = BankAccount.objects.all().order_by("type")
-    transactions = Transaction.objects.filter(completed_date__isnull=True)
-
-    if not check_permission(user, "view_all_shift_transactions"):
-        transactions = transactions.filter(created_by=user)
+    transactions = Transaction.objects.filter(completed_date__isnull=True, created_by=user)
 
     accounts_data = prepare_accounts_data(accounts, transactions)
 
@@ -1239,7 +1236,6 @@ def current_shift(request):
         "transaction_ids": [tr.id for tr in transactions],
     }
     return render(request, "ledger/current_shift.html", context)
-
 
 def prepare_accounts_data(accounts, transactions):
     """
@@ -1690,9 +1686,7 @@ def close_shift(request):
                     status=403,
                 )
 
-            transactions = Transaction.objects.filter(completed_date__isnull=True)
-            if not check_permission(user, "view_all_shift_transactions"):
-                transactions = transactions.filter(created_by=user)
+            transactions = Transaction.objects.filter(completed_date__isnull=True, created_by=user)
 
             if not transactions.exists():
                 return JsonResponse(
@@ -1753,80 +1747,6 @@ def close_shift(request):
             return JsonResponse({"html": render_updated_accounts_table()})
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
-
-
-@login_required
-def cash_report_table(request):
-    """
-    Render cash report table.
-    """
-    year = int(request.GET.get("year", timezone.now().year))
-    months = [
-        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
-        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
-    ]
-
-    fields = [{"name": "category", "verbose_name": "Категория"}]
-    for i, mname in enumerate(months, start=1):
-        fields.append({"name": f"m{i}", "verbose_name": mname, "is_number": True, "is_currency": True})
-    fields.append({"name": "total", "verbose_name": "Итого", "is_number": True, "is_currency": True})
-
-    incomes = list(TransactionCategory.objects.filter(type="income").order_by("name"))
-    expenses = list(TransactionCategory.objects.filter(type="expense").order_by("name"))
-    categories = incomes + expenses
-
-    rows = []
-    monthly_totals = [0] * 12
-    grand_total = 0
-
-    for cat in categories:
-        month_values = []
-        row_total = 0
-        for m in range(1, 13):
-            s = (
-                Transaction.objects.filter(
-                    category=cat,
-                    report_date__year=year,
-                    report_date__month=m,
-                    completed_date__isnull=False
-                )
-                .aggregate(total=Sum("amount"))["total"]
-                or 0
-            )
-            val = float(s)
-            month_values.append(val)
-            row_total += val
-            monthly_totals[m - 1] += val
-        grand_total += row_total
-
-        row = {"category": cat.name}
-        for idx, v in enumerate(month_values, start=1):
-            row[f"m{idx}"] = format_currency(v)
-        row["total"] = format_currency(row_total)
-        rows.append(SimpleNamespace(**row))
-
-    total_row = {"category": "Итого"}
-    for idx, v in enumerate(monthly_totals, start=1):
-        total_row[f"m{idx}"] = format_currency(v)
-    total_row["total"] = format_currency(grand_total)
-    rows.append(SimpleNamespace(**total_row))
-
-    table_html = render_to_string(
-        "components/table.html",
-        {
-            "fields": fields,
-            "data": rows,
-            "id": "cash-report-table",
-        },
-    )
-
-    context = {
-        "year": year,
-        "table_html": table_html,
-        "fields": fields,
-        "data": rows,
-    }
-    return render(request, "ledger/cash_report.html", context)
 
 
 @login_required
@@ -1924,3 +1844,323 @@ def enterprise_economy_report(request):
         "data": rows,
     }
     return render(request, "ledger/enterprise_economy_report.html", context)
+
+from commerce.models import (
+    FixedAsset, InventoryItem, Credit, AccountsPayable, ShortTermLiability, Bonus, Order
+)
+from django.db import models
+
+@login_required
+def cash_report_table(request):
+    """
+    Страница: суммы по категориям сделок по месяцам за год.
+    """
+    year = int(request.GET.get("year", timezone.now().year))
+    months = [
+        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+    ]
+
+    # Формируем поля таблицы
+    fields = [{"name": "category", "verbose_name": "Категория"}]
+    for i, mname in enumerate(months, start=1):
+        fields.append({"name": f"m{i}", "verbose_name": mname, "is_number": True, "is_currency": True})
+    fields.append({"name": "total", "verbose_name": "Итого", "is_number": True, "is_currency": True})
+
+    categories = TransactionCategory.objects.order_by("name")
+    rows = []
+
+    for cat in categories:
+        row = {"category": cat.name}
+        total = 0
+        for m in range(1, 13):
+            s = (
+                Transaction.objects.filter(
+                    category=cat,
+                    report_date__year=year,
+                    report_date__month=m,
+                    completed_date__isnull=False
+                )
+                .aggregate(total=Sum("amount"))["total"]
+                or 0
+            )
+            row[f"m{m}"] = format_currency(s)
+            total += s
+        row["total"] = format_currency(total)
+        rows.append(SimpleNamespace(**row))
+
+    total_row = {"category": "Итого"}
+    for m in range(1, 13):
+        total_row[f"m{m}"] = format_currency(sum(
+            float(getattr(row, f"m{m}").replace(" р.", "").replace(" ", "")) for row in rows
+        ))
+    total_row["total"] = format_currency(sum(
+        float(row.total.replace(" р.", "").replace(" ", "")) for row in rows
+    ))
+    rows.append(SimpleNamespace(**total_row))
+
+    context = {
+        "fields": fields,
+        "data": rows,
+        "year": year,
+        "months": months,
+        "id": "cash-report-table",
+        "is_grouped": {"cash-report-table": False},
+    }
+    return render(request, "ledger/cash_report.html", context)
+
+
+@login_required
+def enterprise_balance_report(request):
+    # Активы
+    fixed_assets_sum = FixedAsset.objects.aggregate(total=Sum("amount"))["total"] or 0
+    inventory_sum = InventoryItem.objects.aggregate(total=Sum("amount"))["total"] or 0
+    receivables_sum = (
+        Order.objects.aggregate(
+            total=Sum(models.F("amount") - models.F("paid_amount"))
+        )["total"] or 0
+    )
+    bank_sum = BankAccount.objects.aggregate(total=Sum("balance"))["total"] or 0
+
+    # Пассивы
+    credit_sum = Credit.objects.aggregate(total=Sum("amount"))["total"] or 0
+    payable_sum = AccountsPayable.objects.aggregate(total=Sum("amount"))["total"] or 0
+    short_term_sum = ShortTermLiability.objects.aggregate(total=Sum("amount"))["total"] or 0
+    bonus_sum = Bonus.objects.aggregate(total=Sum("amount"))["total"] or 0
+
+    # Группировка
+    non_current_assets = fixed_assets_sum
+    current_assets = inventory_sum + receivables_sum + bank_sum
+    assets = non_current_assets + current_assets
+
+    liabilities = credit_sum + payable_sum + short_term_sum + bonus_sum
+    capital = assets - liabilities
+
+    # Структура для шаблона
+    # Внутри enterprise_balance_report
+    data = [
+        {
+            "name": "Активы",
+            "key": "assets",
+            "total": assets,
+            "children": [
+                {
+                    "name": "Внеоборотные активы",
+                    "key": "non_current_assets",
+                    "total": non_current_assets,
+                    "children": [
+                        {
+                            "name": "Основные средства",
+                            "key": "fixed_assets",
+                            "total": fixed_assets_sum,
+                            "expandable": True,
+                            "type": "fixed_asset",
+                        },
+                    ],
+                },
+                {
+                    "name": "Оборотные активы",
+                    "key": "current_assets",
+                    "total": current_assets,
+                    "children": [
+                        {
+                            "name": "Товарные остатки",
+                            "key": "inventory",
+                            "total": inventory_sum,
+                            "expandable": True,
+                            "type": "inventory_item",
+                        },
+                        {
+                            "name": "Дебиторская задолженность",
+                            "key": "receivables",
+                            "total": receivables_sum,
+                            "expandable": False,
+                        },
+                        {
+                            "name": "Денежные средства",
+                            "key": "cash",
+                            "total": bank_sum,
+                            "expandable": True,
+                            "type": "cash",
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            "name": "Пассивы",
+            "key": "liabilities",
+            "total": liabilities,
+            "children": [
+                {
+                    "name": "Обязательства",
+                    "key": "liabilities_group",
+                    "total": liabilities,
+                    "children": [
+                        {
+                            "name": "Кредит",
+                            "key": "credit",
+                            "total": credit_sum,
+                            "expandable": True,
+                            "type": "credit",
+                        },
+                        {
+                            "name": "Кредиторская задолженность",
+                            "key": "payable",
+                            "total": payable_sum,
+                            "expandable": True,
+                            "type": "accounts_payable",
+                        },
+                        {
+                            "name": "Краткосрочные обязательства",
+                            "key": "short_term",
+                            "total": short_term_sum,
+                            "expandable": True,
+                            "type": "short_term_liability",
+                        },
+                        {
+                            "name": "Бонусы",
+                            "key": "bonus",
+                            "total": bonus_sum,
+                            "expandable": True,
+                            "type": "bonus",
+                        },
+                    ],
+                },
+                {
+                    "name": "Капитал",
+                    "key": "capital",
+                    "total": capital,
+                    "children": [],
+                },
+            ],
+        },
+    ]
+    
+    # Форматирование сумм для вывода
+    def format_node(node):
+        node["total"] = format_currency(node["total"])
+        if "children" in node:
+            node["children"] = [format_node(child) for child in node["children"]]
+        return node
+
+    data = [format_node(node) for node in data]
+
+    return render(request, "ledger/enterprise_balance_report.html", {"data": data})
+
+from django.http import JsonResponse
+from django.template.loader import render_to_string
+from django.db.models import Sum
+from commerce.models import (
+    FixedAsset, InventoryItem, Credit, AccountsPayable, ShortTermLiability, Bonus
+)
+from ledger.models import BankAccount
+
+def enterprise_balance_expand(request):
+    item_type = request.GET.get('type')
+
+    if item_type == 'fixed_asset':
+        items = FixedAsset.objects.all()
+        for obj in items:
+            obj.amount = format_currency(obj.amount)
+        fields = [
+            {"name": "id", "verbose_name": "ID"},
+            {"name": "name", "verbose_name": "Название"},
+            {"name": "amount", "verbose_name": "Сумма", "is_number": True, "is_currency": True},
+        ]
+        html = render_to_string('components/table.html', {
+            'fields': fields,
+            'data': items,
+            'id': 'fixed-asset-table',
+        })
+    elif item_type == 'inventory_item':
+        items = InventoryItem.objects.all()
+        for obj in items:
+            obj.amount = format_currency(obj.amount)
+        fields = [
+            {"name": "id", "verbose_name": "ID"},
+            {"name": "name", "verbose_name": "Название"},
+            {"name": "amount", "verbose_name": "Сумма", "is_number": True, "is_currency": True},
+        ]
+        html = render_to_string('components/table.html', {
+            'fields': fields,
+            'data': items,
+            'id': 'inventory-item-table',
+        })
+    elif item_type == 'credit':
+        items = Credit.objects.all()
+        for obj in items:
+            obj.amount = format_currency(obj.amount)
+        fields = [
+            {"name": "id", "verbose_name": "ID"},
+            {"name": "name", "verbose_name": "Название"},
+            {"name": "amount", "verbose_name": "Сумма", "is_number": True, "is_currency": True},
+        ]
+        html = render_to_string('components/table.html', {
+            'fields': fields,
+            'data': items,
+            'id': 'credit-table',
+        })
+    elif item_type == 'accounts_payable':
+        items = AccountsPayable.objects.all()
+        for obj in items:
+            obj.amount = format_currency(obj.amount)
+        fields = [
+            {"name": "id", "verbose_name": "ID"},
+            {"name": "name", "verbose_name": "Название"},
+            {"name": "amount", "verbose_name": "Сумма", "is_number": True, "is_currency": True},
+        ]
+        html = render_to_string('components/table.html', {
+            'fields': fields,
+            'data': items,
+            'id': 'accounts-payable-table',
+        })
+    elif item_type == 'short_term_liability':
+        items = ShortTermLiability.objects.all()
+        for obj in items:
+            obj.amount = format_currency(obj.amount)
+        fields = [
+            {"name": "id", "verbose_name": "ID"},
+            {"name": "name", "verbose_name": "Название"},
+            {"name": "amount", "verbose_name": "Сумма", "is_number": True, "is_currency": True},
+        ]
+        html = render_to_string('components/table.html', {
+            'fields': fields,
+            'data': items,
+            'id': 'short-term-liability-table',
+        })
+    elif item_type == 'bonus':
+        items = Bonus.objects.all()
+        for obj in items:
+            obj.amount = format_currency(obj.amount)
+        fields = [
+            {"name": "id", "verbose_name": "ID"},
+            {"name": "name", "verbose_name": "Название"},
+            {"name": "amount", "verbose_name": "Сумма", "is_number": True, "is_currency": True},
+        ]
+        html = render_to_string('components/table.html', {
+            'fields': fields,
+            'data': items,
+            'id': 'bonus-table',
+        })
+    elif item_type == 'cash':
+        total = BankAccount.objects.aggregate(total=Sum('balance'))['total'] or 0
+        
+        try:
+            total_formatted = format_currency(total)
+        except ImportError:
+            total_formatted = str(total)
+        html = f'''
+            <ul class="debtors-office-list">
+                <li class="debtors-office-list__item">
+                    <div class="debtors-office-list__row">
+                        <span class="debtors-office-list__title">Счета, Карта и Сейф</span>
+                        <span class="debtors-office-list__amount">{total_formatted}</span>
+                    </div>
+                </li>
+            </ul>
+        '''
+    else:
+        html = ''
+
+    return JsonResponse({'html': html})

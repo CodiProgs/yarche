@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Детали лога #{{ log.id }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            background-color: #f3f4f6;
+            color: #222;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 24px 0;
+        }
+        .container {
+            max-width: 60%;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+            padding: 32px 32px 24px 32px;
+        }
+        h1 {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 24px;
+        }
+        .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px 32px;
+            margin-bottom: 32px;
+        }
+        .details-label {
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 2px;
+        }
+        .details-value {
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            word-break: break-word;
+        }
+        .section {
+            margin-bottom: 28px;
+        }
+        .section-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 1.1rem;
+        }
+        pre {
+            background: #f3f4f6;
+            padding: 14px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 14px;
+        }
+        .error-title {
+            color: #b91c1c;
+        }
+        .error-message {
+            color: #b91c1c;
+            font-size: 15px;
+        }
+        .actions {
+            display: flex;
+            gap: 16px;
+            margin-top: 16px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            border-radius: 6px;
+            border: none;
+            font-size: 15px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.15s;
+        }
+        .btn-back {
+            background: #e5e7eb;
+            color: #222;
+        }
+        .btn-back:hover {
+            background: #d1d5db;
+        }
+        .btn-restore {
+            background: #059669;
+            color: #fff;
+        }
+        .btn-restore:hover {
+            background: #047857;
+        }
+        @media (max-width: 1024px) {
+            .container {
+                max-width: 90%;
+                padding: 24px 20px 16px 20px;
+            }
+        }
+        @media (max-width: 700px) {
+            .container {
+                padding: 16px 8px 12px 8px;
+            }
+            .details-grid {
+                grid-template-columns: 1fr;
+                gap: 12px 0;
+            }
+            h1 {
+                font-size: 1.2rem;
+            }
+            .btn, .btn-back, .btn-restore {
+                font-size: 14px;
+                padding: 8px 12px;
+            }
+            pre {
+                font-size: 13px;
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 Лог #{{ log.id }}</h1>
+        <div class="details-grid">
+            <div>
+                <div class="details-label">Дата</div>
+                <div class="details-value">{{ log.created_at|date:"d.m.Y H:i" }}</div>
+            </div>
+            <div>
+                <div class="details-label">Пользователь</div>
+                <div class="details-value">{{ log.user.username }}</div>
+            </div>
+            <div>
+                <div class="details-label">Действие</div>
+                <div class="details-value">{{ log.get_action_display }}</div>
+            </div>
+            <div>
+                <div class="details-label">Модель</div>
+                <div class="details-value">{{ log.model_name }}</div>
+            </div>
+            <div>
+                <div class="details-label">Объект</div>
+                <div class="details-value">{{ log.object_repr }}</div>
+            </div>
+            <div>
+                <div class="details-label">Запрос</div>
+                <div class="details-value">{{ log.query_text }}</div>
+            </div>
+        </div>
+        {% if log.data_before %}
+        <div class="section">
+            <div class="section-title">📊 Данные до изменения:</div>
+            <pre>{{ log.data_before|pprint }}</pre>
+        </div>
+        {% endif %}
+        {% if log.data_after %}
+        <div class="section">
+            <div class="section-title">📊 Данные после изменения:</div>
+            <pre>{{ log.data_after|pprint }}</pre>
+        </div>
+        {% endif %}
+        {% if log.error_message %}
+        <div class="section">
+            <div class="section-title error-title">❌ Ошибка:</div>
+            <div class="error-message">{{ log.error_message }}</div>
+        </div>
+        {% endif %}
+        <div class="actions">
+            <a href="{% url 'chat_logs' %}" class="btn btn-back">← Назад к логам</a>
+            {% if log.can_restore and not log.restored %}
+            <button onclick="restoreLog({{ log.id }})" class="btn btn-restore">🔄 Восстановить</button>
+            {% endif %}
+        </div>
+    </div>
+    <script>
+    function restoreLog(logId) {
+        if (!confirm('Восстановить этот объект?')) return;
+        fetch(`/chat/logs/${logId}/restore/`, {
+            method: 'POST',
+            headers: {'X-CSRFToken': getCookie('csrftoken')}
+        })
+        .then(r => r.json())
+        .then(data => {
+            alert(data.message);
+            if (data.status === 'success') location.reload();
+        });
+    }
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    </script>
+</body>
+</html>

@@ -30,7 +30,7 @@ export default class SelectHandler {
 					const dropdown = select.querySelector('.select__dropdown')
 					if (dropdown) {
 						dropdown.replaceChildren(
-							...this.createSelectOptions(data, multiple)
+							...this.createSelectOptions(data, multiple),
 						)
 						this.attachOptionHandlers(select, multiple)
 					}
@@ -218,7 +218,7 @@ export default class SelectHandler {
 						: input.getAttribute('placeholder') || ''
 					text.classList.toggle(
 						'select__placeholder',
-						selectedValues.length === 0
+						selectedValues.length === 0,
 					)
 					select.classList.toggle('has-value', selectedValues.length > 0)
 				})
@@ -253,7 +253,7 @@ export default class SelectHandler {
 		if (!val) return
 
 		const option = select.querySelector(
-			`.select__option[data-value="${CSS.escape(val)}"]`
+			`.select__option[data-value="${CSS.escape(val)}"]`,
 		)
 		if (!option) return
 

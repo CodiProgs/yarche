@@ -2,10 +2,12 @@ from django.db import models
 from users.models import User
 from urllib.parse import urlparse, unquote
 import os
+from users.models import UserType
 
 
 class FileType(models.Model):
     name = models.CharField(verbose_name="Тип файла", max_length=255)
+    user_type = models.ForeignKey(UserType, on_delete=models.CASCADE, verbose_name="Тип пользователя", null=True, blank=True)
 
     def __str__(self):
         return self.name

@@ -17,6 +17,9 @@ urlpatterns = [
     path("users/", include("users.urls")),
     path("departments/", include("departments.urls")),
     path("menu/", include("menu.urls")),
+    
+    path("chat/", include("chat.urls")),
+
     path(
         "login/",
         views.CustomLoginView.as_view(),

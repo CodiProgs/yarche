@@ -506,7 +506,7 @@ textarea::placeholder {
 	margin: 0;
 	display: grid;
 	grid-template-columns: repeat(5, minmax(0px, 1fr));
-	padding-right: 40px;
+	padding-right: 80px;
 }
 
 .nav-item {
@@ -546,10 +546,11 @@ textarea::placeholder {
 	font-weight: 500;
 }
 
-.nav-item.notification-item {
+.notification-items {
 	position: absolute;
 	right: 5px;
-	border-left: 1px solid #e1e6eb;
+	display: flex;
+	align-items: center;
 }
 
 .nav-item.notification-item a {
@@ -733,7 +734,6 @@ textarea::placeholder {
 	border: 1px solid var(--color-border-window, #e1e6eb);
 	max-width: 610px;
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
-	margin-bottom: 8px;
 }
 .debtors-office-list__item {
 	border-bottom: 1px solid var(--color-border-window, #e1e6eb);
@@ -1355,7 +1355,7 @@ textarea::placeholder {
 		padding: 12px 20px;
 	}
 
-	.nav-list .nav-item:last-child {
+	.notification-items .nav-item {
 		border-bottom: none;
 	}
 
@@ -2150,4 +2150,229 @@ body.nav-menu-open {
 
 .button--primary {
 	border-color: #1976d2;
+}
+
+#menu-settings-modal-body {
+	width: 80vw;
+}
+
+/* Контейнер всех категорий */
+#menu-settings-categories {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 32px;
+	align-items: flex-start;
+	padding: 32px 16px;
+}
+
+/* Блок категории */
+.menu-category-block {
+	min-width: 240px;
+	background: #fafbfc;
+	border: 1px solid #e5e7eb;
+	border-radius: 6px;
+	padding: 16px 12px 12px 12px;
+	box-sizing: border-box;
+}
+
+.menu-category-block h4 {
+	margin: 0 0 10px 0;
+	font-size: 16px;
+	font-weight: 600;
+	color: #222;
+}
+
+/* Список пунктов меню */
+.menu-items-list {
+	min-height: 40px;
+	border: 1px solid #e5e7eb;
+	border-radius: 4px;
+	padding: 6px 0;
+	margin-bottom: 10px;
+	background: #fff;
+	list-style: none;
+}
+
+.menu-item-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 8px;
+	margin-bottom: 4px;
+	background: #f5f6fa;
+	border-radius: 3px;
+	cursor: grab;
+	transition: background 0.15s;
+}
+
+.menu-item-row:last-child {
+	margin-bottom: 0;
+}
+
+.menu-item-row.dragging {
+	opacity: 0.5;
+	background: #e0e7ef;
+}
+
+.menu-item-row input[type='text'] {
+	flex: 1 1 120px;
+	min-width: 0;
+	font-size: 14px;
+	padding: 2px 6px;
+	border: 1px solid #d1d5db;
+	border-radius: 3px;
+	background: #fff;
+}
+
+.menu-item-row .remove-menu-item {
+	background: none;
+	border: none;
+	color: #b91c1c;
+	font-size: 16px;
+	cursor: pointer;
+	padding: 0 4px;
+	border-radius: 3px;
+	transition: background 0.15s;
+}
+
+.menu-item-row .remove-menu-item:hover {
+	background: #fee2e2;
+}
+
+.add-menu-item {
+	display: inline-block;
+	margin-top: 2px;
+	font-size: 13px;
+	color: #2563eb;
+	background: none;
+	border: none;
+	cursor: pointer;
+	padding: 2px 8px;
+	border-radius: 3px;
+	transition: background 0.15s;
+}
+
+.add-menu-item:hover {
+	background: #e0e7ef;
+}
+
+.menu-settings-select {
+	width: 100%;
+	margin-bottom: 6px;
+	font-size: 14px;
+	padding: 2px 6px;
+	border: 1px solid #d1d5db;
+	border-radius: 3px;
+	background: #fff;
+}
+
+.menu-settings-buttons-wrapper {
+	display: flex;
+	gap: 12px;
+	justify-content: space-between;
+	margin-top: 6px;
+}
+
+.menu-settings-buttons-wrapper .button {
+	width: 100%;
+	font-size: 14px;
+}
+
+.menu-settings-modal-footer {
+	text-align: right;
+	display: flex;
+	gap: 12px;
+	justify-content: flex-end;
+	padding: 12px 16px;
+}
+
+@media (max-width: 700px) {
+	#menu-settings-categories {
+		flex-direction: column;
+		gap: 16px;
+	}
+	.menu-category-block {
+		min-width: 0;
+		width: 100%;
+		padding: 12px 6px 8px 6px;
+	}
+	.menu-category-block h4 {
+		font-size: 15px;
+	}
+	.menu-items-list {
+		padding: 4px 0;
+	}
+	.menu-item-row input[type='text'] {
+		font-size: 13px;
+	}
+	.menu-settings-modal-footer {
+		flex-direction: column;
+		gap: 8px;
+	}
+}
+
+/* --- Мобильная адаптация --- */
+@media (max-width: 1024px) {
+	#menu-settings-modal-body {
+		width: 98vw;
+		max-width: 98vw;
+	}
+	#menu-settings-categories {
+		grid-template-columns: repeat(2, 1fr);
+		gap: 18px;
+		padding: 18px 6px;
+	}
+}
+
+@media (max-width: 700px) {
+	#menu-settings-modal-body {
+		max-width: 100vw;
+		padding: 0;
+	}
+	#menu-settings-categories {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+}
+
+.debtors-header--main .debtors-office-list__header,
+.debtors-office-list__header--main {
+	font-size: 14px;
+	font-weight: bold;
+}
+
+.debtors-header.debtors-header--main {
+	border-bottom: 1px solid var(--color-border-window);
+}
+
+.debtors-header.debtors-header--main .debtors-total {
+	font-size: 14px;
+}
+
+.debtors-header.debtors-header--main:not(:first-child) {
+	margin-top: 16px;
+}
+
+.salary-calculation__stats {
+	padding: 10px;
+	border-bottom: none;
+	min-height: auto;
+	max-height: none;
+	flex: auto;
+}
+
+.salary-calculation__list {
+	max-width: 80%;
+}
+
+#salary-calculation-container {
+	display: flex;
+	flex-direction: column;
+}
+
+.expand-content {
+	min-height: 200px;
+	height: 200px;
+	max-height: 500px;
 }

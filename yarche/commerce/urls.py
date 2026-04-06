@@ -61,4 +61,21 @@ urlpatterns = [
 	path("emergencies/list/<int:order_department_work_id>/", views.emergency_list, name="emergency_list"),
 	path("emergencies/update/<int:pk>/", views.emergency_update, name="emergency_update"),
 	path("emergencies/<int:pk>/", views.emergency_detail, name="emergency_detail"),
+
+	path("orders/work_statuses_table/", views.order_work_statuses_table, name="order_work_statuses_table"),
+
+	path("filetypes/table/", views.filetype_table, name="filetype_table"),
+	path("filetypes/add/", views.filetype_create, name="filetype_add"),
+	path("filetypes/edit/<int:pk>/", views.filetype_edit, name="filetype_edit"),
+	path("filetypes/delete/<int:pk>/", views.filetype_delete, name="filetype_delete"),
+	path("filetypes/<int:pk>/", views.filetype_detail, name="filetype_detail"),
+
+	path("assets/items/add/", views.asset_item_create, name="asset_item_add"),
+	path("assets/items/edit/<int:pk>/", views.asset_item_update, name="asset_item_edit"),
+	path("assets/items/delete/<str:model_key>/<int:pk>/", views.asset_item_delete, name="asset_item_delete"),
+	path("assets/items/<str:model_key>/<int:pk>/", views.asset_item_detail, name="asset_item_detail"),
+
+	path("salary-calculation/", views.salary_calculation, name="salary_calculation"),
+	path("manager-orders-table/<int:manager_id>/", views.manager_orders_table, name="manager_orders_table"),
 ]
+

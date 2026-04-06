@@ -40,4 +40,8 @@ urlpatterns = [
 
     path('orders/<int:order_id>/departments/', views.order_departments_list, name='order_departments_list'),
 
+    path('work-status/create/', views.order_work_status_create, name='order_work_status_create'),
+    path('work-status/update/<int:pk>/', views.order_work_status_update, name='order_work_status_update'),
+    path('work-status/delete/<int:pk>/', views.order_work_status_delete, name='order_work_status_delete'),
+    path('work-status/<int:pk>/', views.order_work_status_detail, name='order_work_status_detail'),
 ]

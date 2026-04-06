@@ -1,0 +1,64 @@
+{% extends "layout.html" %}
+{% load static %}
+{% block extra_styles %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'ledger/css/transactions.css' %}">
+    <link rel="stylesheet" href="{% static 'css/flatpickr.css' %}">
+    <link rel="stylesheet" href="{% static 'css/material-plugins.min.css' %}">
+{% endblock extra_styles %}
+{% block content %}
+    <div class="page-table-container" id="salary-calculation-container">
+        <div class="date-filter">
+            <div class="date-filter__inputs">
+                <div class="date-filter__input-container">
+                    <div class="date-filter__label">Начало</div>
+                    <div class="date-filter__wrapper">
+                        <input type="text"
+                               id="start-date"
+                               name="start-date"
+                               class="date-filter__input">
+                        <img src="{% static 'images/calendar.svg' %}"
+                             class="date-filter__icon"
+                             data-target="start-date"
+                             >
+                    </div>
+                </div>
+                <div class="date-filter__input-container">
+                    <div class="date-filter__label">Окончание</div>
+                    <div class="date-filter__wrapper">
+                        <input type="text" id="end-date" name="end-date" class="date-filter__input">
+                        <img src="{% static 'images/calendar.svg' %}"
+                             class="date-filter__icon"
+                             data-target="end-date"
+                             >
+                    </div>
+                </div>
+            </div>
+            <div class="date-filter__buttons">
+                <button id="load-data" class="button">Загрузить</button>
+            </div>
+        </div>
+		<div class="stats-container salary-calculation__stats">
+			<ul class="debtors-office-list salary-calculation__list">
+				{% for manager in data %}
+					<li class="debtors-office-list__item">
+						<div class="debtors-office-list__row"
+							data-manager-id="{{ manager.id }}"
+							data-type="{{ manager.type }}">
+							<span class="debtors-office-list__toggle">+</span>
+							<span class="debtors-office-list__title">{{ manager.name }}</span>
+							<span class="debtors-office-list__amount" data-total-key="manager_{{ manager.id }}">{{ manager.total }}</span>
+						</div>
+						<div class="expand-content" style="display:none"></div>
+					</li>
+				{% endfor %}
+			</ul>
+		</div>
+    </div>
+{% endblock content %}
+{% block extra_scripts %}
+    {{ block.super }}
+    <script src="{% static 'commerce/js/commerce.js' %}" type="module"></script>
+	<script src="{% static 'js/flatpickr.js' %}" defer></script>
+    <script src="{% static 'js/flatpickr-ru.js' %}" defer></script>
+{% endblock extra_scripts %}

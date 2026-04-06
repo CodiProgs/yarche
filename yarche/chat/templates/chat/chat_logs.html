@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📋 Логи действий чата</title>
+    <style>
+        html, body {
+            font-size: 16px;
+        }
+        body {
+            background-color: #f3f4f6;
+            color: #222;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 24px 0;
+        }
+        .container {
+            max-width: 80%;
+            width: 100%;
+            margin: 0 auto;
+            padding: 0 12px;
+        }
+        h1 {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 24px;
+        }
+        .back-link {
+            color: #2563eb;
+            text-decoration: none;
+            margin-bottom: 16px;
+            display: inline-block;
+            font-size: 1rem;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        table.logs-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 900px;
+            font-size: 15px;
+        }
+        th, td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #e5e7eb;
+            text-align: left;
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+        th {
+            background: #f9fafb;
+            color: #555;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        .log-restored {
+            background: #e6fbe6;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 6px;
+            vertical-align: middle;
+        }
+        .badge-create { background: #d1fae5; color: #065f46; }
+        .badge-update { background: #dbeafe; color: #1e40af; }
+        .badge-delete { background: #fee2e2; color: #991b1b; }
+        .badge-query  { background: #f3f4f6; color: #374151; }
+        .badge-restored { background: #d1fae5; color: #065f46; }
+        .badge-canrestore { background: #fef9c3; color: #92400e; }
+        .badge-none { background: #f3f4f6; color: #374151; }
+        .actions-col {
+            min-width: 140px;
+            max-width: 220px;
+            white-space: nowrap;
+        }
+        .action-link {
+            color: #2563eb;
+            text-decoration: none;
+            margin-right: 10px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .action-link:hover {
+            text-decoration: underline;
+        }
+        .restore-btn {
+            color: #059669;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0;
+        }
+        .restore-btn:hover {
+            text-decoration: underline;
+        }
+        .truncate {
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        @media (max-width: 1200px) {
+            .container { max-width: 95%; }
+        }
+        @media (max-width: 900px) {
+            .container { padding: 0 2px; }
+            table.logs-table { font-size: 13px; min-width: 700px; }
+            .truncate { max-width: 100px; }
+            .actions-col { min-width: 100px; }
+        }
+        @media (max-width: 600px) {
+            h1 { font-size: 1.2rem; }
+            .container { padding: 0 1px; }
+            table.logs-table { font-size: 14px !important; min-width: 500px; }
+            th, td { padding: 8px 4px; font-size: 14px !important; }
+            .actions-col { min-width: 80px; }
+        }
+        /* Скроллбар */
+        ::-webkit-scrollbar { height: 8px; width: 8px; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+        ::-webkit-scrollbar-track { background: #f3f4f6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 Логи действий чат-бота</h1>
+        <a href="{% url 'smart_chat' %}" class="back-link">← Вернуться к чату</a>
+        <div class="table-responsive">
+            <table class="logs-table">
+                <thead>
+                    <tr>
+                        <th>Дата</th>
+                        <th>Действие</th>
+                        <th>Объект</th>
+                        <th>Модель</th>
+                        <th>Запрос</th>
+                        <th>Статус</th>
+                        <th class="actions-col">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr class="{% if log.restored %}log-restored{% endif %}">
+                        <td>{{ log.created_at|date:"d.m.Y H:i" }}</td>
+                        <td>
+                            {% if log.action == 'create' %}
+                                <span class="badge badge-create">Создание</span>
+                            {% elif log.action == 'update' %}
+                                <span class="badge badge-update">Обновление</span>
+                            {% elif log.action == 'delete' %}
+                                <span class="badge badge-delete">Удаление</span>
+                            {% else %}
+                                <span class="badge badge-query">Запрос</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.object_repr }}</td>
+                        <td>{{ log.model_name }}</td>
+                        <td class="truncate">{{ log.query_text }}</td>
+                        <td>
+                            {% if log.restored %}
+                                <span class="badge badge-restored">✅ Восстановлено</span>
+                            {% elif log.can_restore %}
+                                <span class="badge badge-canrestore">⚠️ Можно восстановить</span>
+                            {% else %}
+                                <span class="badge badge-none">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="actions-col">
+                            <a href="{% url 'log_detail' log.id %}" class="action-link">Детали</a>
+                            {% if log.can_restore and not log.restored %}
+                                <button onclick="restoreLog({{ log.id }})" class="restore-btn">🔄 Восстановить</button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+    function restoreLog(logId) {
+        if (!confirm('Вы уверены что хотите восстановить этот объект?')) return;
+        fetch(`/chat/logs/${logId}/restore/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(r => r.json())
+        .then(data => {
+            alert(data.message);
+            if (data.status === 'success') location.reload();
+        });
+    }
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    </script>
+</body>
+</html>

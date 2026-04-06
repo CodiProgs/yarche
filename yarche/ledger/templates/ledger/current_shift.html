@@ -51,6 +51,6 @@
 {% block extra_scripts %}
     {{ block.super }}
     <script src="{% static 'ledger/js/ledger2.js' %}" type="module"></script>
-    <script src="https://cdn.jsdelivr.net/npm/autonumeric@4.8.1/dist/autoNumeric.min.js"></script>
+    <script src="{% static 'js/autonumeric.js' %}" defer></script>
     {{ transaction_ids|json_script:"transaction-ids-data" }}
 {% endblock extra_scripts %}
