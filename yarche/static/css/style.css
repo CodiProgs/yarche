@@ -2392,3 +2392,15 @@ body.nav-menu-open {
 	height: 200px;
 	max-height: 500px;
 }
+
+#statsChart {
+	height: 250px !important;
+	max-height: 250px;
+}
+
+@media (max-width: 425px) {
+	#statsChart {
+		height: 180px !important;
+		max-height: 180px;
+	}
+}
