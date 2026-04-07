@@ -965,6 +965,16 @@ textarea::placeholder {
 	max-width: 100%;
 }
 
+@media (max-width: 1024px) {
+	#debtors-container .debtors-data,
+	#debtors-container .stats-container {
+		width: 100%;
+		max-width: 100%;
+		padding: 10px;
+		/* max-height: 50%; */
+	}
+}
+
 @media (max-width: 768px) {
 	#debtors-container.page-table-container {
 		flex-direction: column;
@@ -975,7 +985,7 @@ textarea::placeholder {
 		width: 100%;
 		max-width: 100%;
 		padding: 10px;
-		max-height: 50%;
+		/* max-height: 50%; */
 	}
 
 	#debtors-container .debtors-data {
@@ -1374,24 +1384,30 @@ textarea::placeholder {
 		box-sizing: border-box;
 		position: absolute;
 		bottom: 0;
+		right: 0;
 		background: white;
 		z-index: 5;
 		border-top: 1px solid var(--color-border-window);
 	}
 
-	.pagination-controls > #first-page {
+	.pagination-controls > #first-page,
+	.pagination-controls > [data-page='first'] {
 		order: 1;
 	}
-	.pagination-controls > #prev-page {
+	.pagination-controls > #prev-page,
+	.pagination-controls > [data-page='prev'] {
 		order: 2;
 	}
-	.pagination-controls > #refresh {
+	.pagination-controls > #refresh,
+	.pagination-controls > [data-page='refresh'] {
 		order: 3;
 	}
-	.pagination-controls > #next-page {
+	.pagination-controls > #next-page,
+	.pagination-controls > [data-page='next'] {
 		order: 4;
 	}
-	.pagination-controls > #last-page {
+	.pagination-controls > #last-page,
+	.pagination-controls > [data-page='last'] {
 		order: 5;
 	}
 

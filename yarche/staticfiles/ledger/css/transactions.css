@@ -333,6 +333,16 @@ div.flatpickr-months {
 @media (max-width: 768px) {
 	.current-shift-content {
 		gap: 1rem;
+		flex-direction: column-reverse;
+	}
+
+	.current-shift-left {
+		height: auto;
+		width: 100%;
+	}
+
+	.current-shift-left .resize-handle {
+		display: none;
 	}
 
 	.date-filter__input {

@@ -1,3 +1,5 @@
+import Chart from '/static/js/chart.js'
+import ChartDataLabels from '/static/js/chartjs-plugin-datalabels.js'
 import { DynamicFormHandler } from '/static/js/dynamicFormHandler.js'
 import { Modal } from '/static/js/modal.js'
 import SelectHandler from '/static/js/selectHandler.js'
@@ -5761,6 +5763,85 @@ function initEnterpriseBalanceReportPage() {
 				}
 			}
 		})
+	})
+	drawCapitalProfitabilityChart()
+}
+
+async function drawCapitalProfitabilityChart() {
+	const ctx = document.getElementById('statsChart').getContext('2d')
+	const response = await fetch('/ledger/capital-by-month/')
+	const data = await response.json()
+
+	// Пример структуры: { months: ['Янв', 'Фев', ...], profitability: [2.1, 3.5, ...] }
+	const labels = data.months
+	const values = data.capitals
+
+	// Найти красивый максимум для оси Y
+	function getNiceMax(value) {
+		if (value <= 10) return 10
+		if (value <= 100) return Math.ceil(value / 10) * 10
+		if (value <= 1000) return Math.ceil(value / 100) * 100
+		return Math.ceil(value / 1000) * 1000
+	}
+	const yMax = getNiceMax(Math.max(...values) * 1.1)
+
+	// Удаляем старый график, если есть
+	if (window.capitalProfitabilityChart) {
+		window.capitalProfitabilityChart.destroy()
+	}
+
+	window.capitalProfitabilityChart = new Chart(ctx, {
+		type: 'bar',
+		data: {
+			labels: labels,
+			datasets: [
+				{
+					label: '',
+					data: values,
+					backgroundColor: 'rgba(54, 162, 235, 0.5)',
+					borderColor: 'rgba(54, 162, 235, 1)',
+					borderWidth: 1,
+					borderRadius: 6,
+					maxBarThickness: 32,
+				},
+			],
+		},
+		options: {
+			layout: { padding: { top: 24 } },
+			scales: {
+				x: {
+					ticks: {
+						font: { size: 10 },
+						maxRotation: 45,
+						minRotation: 0,
+						autoSkip: true,
+						autoSkipPadding: 2,
+					},
+				},
+				y: {
+					beginAtZero: true,
+					max: yMax,
+					ticks: {
+						font: { size: 12 },
+						color: '#222',
+						callback: v => v.toLocaleString('ru-RU'),
+					},
+					grid: { color: '#eee' },
+				},
+			},
+			plugins: {
+				legend: { display: false },
+				tooltip: { enabled: false },
+				datalabels: {
+					anchor: 'end',
+					align: 'end',
+					font: { size: 10, weight: 'bold' },
+					color: '#1976d2',
+					formatter: value => value, // просто число, без %
+				},
+			},
+		},
+		plugins: [ChartDataLabels],
 	})
 }
 
