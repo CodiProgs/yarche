@@ -2175,13 +2175,28 @@ from .models import MonthlyCapital
 @login_required
 def capital_by_month(request):
     year = int(request.GET.get("year", timezone.now().year))
+
+    # Месяцы в именительном падеже
+    MONTHS_RU = [
+        "январь", "февраль", "март", "апрель",
+        "май", "июнь", "июль", "август",
+        "сентябрь", "октябрь", "ноябрь", "декабрь"
+    ]
+
     capitals = []
     months = []
+
     for month in range(1, 13):
         percent = get_monthly_capital_percent(year, month)
         capitals.append(percent)
-        months.append(datetime(year, month, 1).strftime('%B'))
-    return JsonResponse({"months": months, "capitals": capitals})
+
+        # Берём месяц из списка вместо strftime
+        months.append(MONTHS_RU[month - 1])
+
+    return JsonResponse({
+        "months": months,
+        "capitals": capitals
+    })
 
 def get_monthly_capital_percent(year, month):
     # Даты начала и конца месяца
