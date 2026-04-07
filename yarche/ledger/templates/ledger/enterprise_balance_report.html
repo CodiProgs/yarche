@@ -36,8 +36,8 @@
 {% endblock content %}
 {% block extra_scripts %}
     {{ block.super }}
-    <script src="{% static 'commerce/js/commerce.js' %}" type="module"></script>
     <script src="{% static 'js/autonumeric.js' %}" defer></script>
     <script src="{% static 'js/chart.js' %}" type="module" defer></script>
     <script src="{% static 'js/chartjs-plugin-datalabels.js' %}" type="module" defer></script>
-{% endblock extra_scripts %}
+    <script src="{% static 'commerce/js/commerce.js' %}" type="module"></script>
+    {% endblock extra_scripts %}
