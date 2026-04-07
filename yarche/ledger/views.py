@@ -1892,7 +1892,11 @@ def cash_report_table(request):
     total_row = {"category": "Итого"}
     for m in range(1, 13):
         total_row[f"m{m}"] = format_currency(sum(
-            float(getattr(row, f"m{m}").replace(" р.", "").replace(" ", "")) for row in rows
+            float(getattr(row, f"m{m}")
+                .replace(" р.", "")
+                .replace(" ", "")
+                .replace("\u202f", "") 
+            ) for row in rows
         ))
     total_row["total"] = format_currency(sum(
         float(row.total.replace(" р.", "").replace(" ", "")) for row in rows

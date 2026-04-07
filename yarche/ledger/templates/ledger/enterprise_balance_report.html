@@ -20,13 +20,24 @@
         <div id="balance-container">
             {% include "ledger/enterprise_balance_node.html" with nodes=data %}
         </div>
+
+        <h2 class="debtors-office-list__header debtors-office__header debtors-office__header--top">Рентабельность капитала</h2>
+        <div class="charts-container">
+            <div class="chart-stats">
+                <canvas id="statsChart"></canvas>
+            </div>
+            <div class="chart-profit">
+                <canvas id="profitChart"></canvas>
+            </div>
+        </div>
     </div>
+    
 </div>
 {% endblock content %}
 {% block extra_scripts %}
     {{ block.super }}
     <script src="{% static 'commerce/js/commerce.js' %}" type="module"></script>
     <script src="{% static 'js/autonumeric.js' %}" defer></script>
-    {% comment %} <script src="{% static 'main/js/chart.js' %}" type="module" defer></script> {% endcomment %}
-    {% comment %} <script src="{% static 'main/js/chartjs-plugin-datalabels.js' %}" type="module" defer></script> {% endcomment %}
+    <script src="{% static 'js/chart.js' %}" type="module" defer></script>
+    <script src="{% static 'js/chartjs-plugin-datalabels.js' %}" type="module" defer></script>
 {% endblock extra_scripts %}

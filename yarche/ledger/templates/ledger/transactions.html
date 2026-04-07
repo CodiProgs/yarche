@@ -106,5 +106,6 @@
     <script src="{% static 'js/flatpickr.js' %}" defer></script>
     <script src="{% static 'js/flatpickr-ru.js' %}" defer></script>
     <script src="{% static 'js/autonumeric.js' %}" defer></script>
+    
     {{ transaction_ids|json_script:"transaction-ids-data" }}
 {% endblock extra_scripts %}
