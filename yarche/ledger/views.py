@@ -1870,6 +1870,10 @@ def cash_report_table(request):
     categories = TransactionCategory.objects.order_by("name")
     rows = []
 
+    # Словари для накопления сырых чисел (без форматирования)
+    monthly_totals = {m: 0 for m in range(1, 13)}
+    grand_total = 0
+
     for cat in categories:
         row = {"category": cat.name}
         total = 0
@@ -1886,21 +1890,16 @@ def cash_report_table(request):
             )
             row[f"m{m}"] = format_currency(s)
             total += s
+            monthly_totals[m] += s  # Накапливаем итог по колонке месяца
         row["total"] = format_currency(total)
+        grand_total += total  # Накапливаем общий итог
         rows.append(SimpleNamespace(**row))
 
+    # Формируем строку "Итого" из уже посчитанных чисел (никакого парсинга строк!)
     total_row = {"category": "Итого"}
     for m in range(1, 13):
-        total_row[f"m{m}"] = format_currency(sum(
-            float(getattr(row, f"m{m}")
-                .replace(" р.", "")
-                .replace(" ", "")
-                .replace("\u202f", "") 
-            ) for row in rows
-        ))
-    total_row["total"] = format_currency(sum(
-        float(row.total.replace(" р.", "").replace(" ", "")) for row in rows
-    ))
+        total_row[f"m{m}"] = format_currency(monthly_totals[m])
+    total_row["total"] = format_currency(grand_total)
     rows.append(SimpleNamespace(**total_row))
 
     context = {
@@ -1912,7 +1911,6 @@ def cash_report_table(request):
         "is_grouped": {"cash-report-table": False},
     }
     return render(request, "ledger/cash_report.html", context)
-
 
 @login_required
 def enterprise_balance_report(request):
