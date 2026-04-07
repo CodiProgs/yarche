@@ -1,5 +1,3 @@
-import Chart from '/static/js/chart.js'
-import ChartDataLabels from '/static/js/chartjs-plugin-datalabels.js'
 import { DynamicFormHandler } from '/static/js/dynamicFormHandler.js'
 import { Modal } from '/static/js/modal.js'
 import SelectHandler from '/static/js/selectHandler.js'
