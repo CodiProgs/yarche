@@ -1618,20 +1618,28 @@ body.nav-menu-open {
 	position: relative;
 	min-width: 140px;
 	max-width: 140px;
-	height: 140px;
 	background: #fff;
 	border-radius: 6px;
 	box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 	display: flex;
 	flex-direction: column;
-	align-items: center;
-	justify-content: center;
 	scroll-snap-align: center;
 	transition: box-shadow 0.2s;
+	overflow: hidden;
 }
 
 .department-card:hover {
 	box-shadow: 0 4px 24px rgba(0, 0, 0, 0.16);
+}
+
+.department-card__body {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	flex-grow: 1;
+	min-height: 140px;
 }
 
 .department-card__img {
@@ -1711,6 +1719,103 @@ body.nav-menu-open {
 	border-radius: 12px;
 	font-size: 0.75rem;
 	font-weight: 600;
+}
+
+.department-card__actions {
+	position: absolute;
+	top: 36px;
+	left: 0;
+	right: 0;
+	display: flex;
+	gap: 4px;
+	padding: 0 4px;
+	justify-content: center;
+	opacity: 0;
+	transition: opacity 0.2s;
+}
+
+.department-card:hover .department-card__actions {
+	opacity: 1;
+}
+
+.department-card__action-btn {
+	background: #fff;
+	border: 1px solid #d1d5db;
+	border-radius: 3px;
+	padding: 4px 4px;
+	font-size: 0.65rem;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.2s;
+	white-space: nowrap;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+}
+
+.department-card__action-btn img {
+	width: 14px;
+	height: 14px;
+	object-fit: contain;
+}
+
+.department-card__action-btn--start {
+	color: #059669;
+	border-color: #059669;
+}
+
+.department-card__action-btn--start:hover {
+	background: #ecfdf5;
+}
+
+.department-card__action-btn--stop {
+	color: #dc2626;
+	border-color: #dc2626;
+}
+
+.department-card__action-btn--stop:hover {
+	background: #fef2f2;
+}
+
+.department-card__details {
+	display: block;
+	background: #f9fafb;
+	border: 1px solid #e5e7eb;
+	border-top: none;
+	border-radius: 0 0 6px 6px;
+	padding: 8px;
+	font-size: 0.75rem;
+	margin-top: -6px;
+}
+
+.department-card__info {
+	margin-bottom: 4px;
+	color: #374151;
+	padding: 2px 0;
+	display: flex;
+	gap: 4px;
+}
+
+.department-card__info:last-child {
+	margin-bottom: 0;
+}
+
+.info-label {
+	font-weight: 600;
+	color: #1f2937;
+	min-width: 60px;
+}
+
+.info-value {
+	color: #4b5563;
+	flex-grow: 1;
+}
+
+.department-card__info strong {
+	font-weight: 600;
+	color: #1f2937;
 }
 
 .department-card__edit {

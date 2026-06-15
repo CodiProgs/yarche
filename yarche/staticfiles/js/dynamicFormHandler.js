@@ -129,36 +129,30 @@ export class DynamicFormHandler {
 			showError(error.message || 'Failed to load required data')
 		}
 	}
+						console.log(`[DynamicFormHandler] loadSelectOptions called with:`, url)
+						if (Array.isArray(url)) {
+							console.log(`[DynamicFormHandler] url is array, using data directly`)
+							SelectHandler.updateSelectOptions(selectParent, url)
+						} else if (typeof url === 'string') {
+							console.log(`[DynamicFormHandler] url is string, fetching from:`, url)
+							try {
+								const response = await fetch(url, {
+									headers: { 'X-Requested-With': 'XMLHttpRequest' },
+								})
 
-	fillFormFields(data) {
-		const form = document.getElementById(this.config.formId)
-
-		if (!form) return
-
-		for (const [fieldName, value] of Object.entries(data)) {
-			const element = form.querySelector(`[name="${fieldName}"], #${fieldName}`)
-
-			if (!element) continue
-
-			const processedValue =
-				fieldName === 'amount' ? Math.round(Math.abs(parseFloat(value))) : value
-			this.setFieldValue(element, processedValue)
-
-			element.dispatchEvent(new Event('change', { bubbles: true }))
-		}
-	}
-
-	setFieldValue(element, value) {
-		if (element.type === 'checkbox') {
-			element.checked = Boolean(value)
-		} else if (element.classList.contains('select__input')) {
-			this.setSelectValue(element, value)
-		} else {
-			if (element.id === 'report_date' && value) {
-				const dateParts = value.split('-')
-				if (dateParts.length === 3) {
-					value = `${dateParts[0]}-${dateParts[1]}`
-				}
+								if (response.ok) {
+									const data = await response.json()
+									console.log(`[DynamicFormHandler] Received data from ${url}:`, data)
+									SelectHandler.updateSelectOptions(selectParent, data)
+								} else {
+									console.error(`[DynamicFormHandler] Failed to load from ${url}:`, response.status)
+									throw new Error(`Failed to load select data: ${response.status}`)
+								}
+							} catch (err) {
+								console.error(`[DynamicFormHandler] Error loading select data:`, err)
+								throw err
+							}
+						}
 			}
 
 			if (element.type === 'date' && value) {

@@ -12,19 +12,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-!-6%7^-jv5o212#!^n)e9p8n$p*(htyxt^+u^l=5l0()=*kvq&"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# DEBUG = True
-DEBUG = False
+DEBUG = True
+# DEBUG = False
 
 # ALLOWED_HOSTS = [
 #     "CodiProgs.mysql.pythonanywhere-services.com",
 #     "CodiProgs.pythonanywhere.com",
 # ]
 
-ALLOWED_HOSTS = [
-    "Yarche.mysql.pythonanywhere-services.com",
-    "Yarche.pythonanywhere.com",
-]
-# ALLOWED_HOSTS = ["*"]
+# ALLOWED_HOSTS = [
+#     "Yarche.mysql.pythonanywhere-services.com",
+#     "Yarche.pythonanywhere.com",
+# ]
+ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
@@ -82,34 +82,34 @@ WSGI_APPLICATION = "yarche.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.mysql",
-#         "NAME": "yarche2",
-#         "USER": "root",
-#         "PASSWORD": "root",
-#         "HOST": "localhost",
-#         "PORT": "3306",
-#         "OPTIONS": {
-#             "charset": "utf8mb4",
-#             "init_command": "SET foreign_key_checks = 0;",
-#         },
-#     }
-# }
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": "Yarche$tables2",
-        "USER": "Yarche",
-        "PASSWORD": "zPD1XNMlrK",
-        "HOST": "Yarche.mysql.pythonanywhere-services.com",
+        "NAME": "yarche2",
+        "USER": "root",
+        "PASSWORD": "root",
+        "HOST": "localhost",
         "PORT": "3306",
         "OPTIONS": {
-            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
             "charset": "utf8mb4",
+            "init_command": "SET foreign_key_checks = 0;",
         },
     }
 }
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.mysql",
+#         "NAME": "Yarche$tables2",
+#         "USER": "Yarche",
+#         "PASSWORD": "zPD1XNMlrK",
+#         "HOST": "Yarche.mysql.pythonanywhere-services.com",
+#         "PORT": "3306",
+#         "OPTIONS": {
+#             "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+#             "charset": "utf8mb4",
+#         },
+#     }
+# }
 
 
 
@@ -189,3 +189,12 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "uploads")
 #                   - Шаблоны писем и автоматическая отправка Клиенту при срабатывании триггера (заказ готов)?
 #                  - прогноз даты готовности (на основе анализа загруженности участков)?
 
+
+
+# IMPORTANT: бухгалтер мог зайти в заказы и поставить галочку документов
+# IMPORTANT: нужно сделать чтобы в календаре заметки показывались не в виде списка
+
+
+# 1. поменять кнопку с завершить работу на остановить
+# 2. при нажатии на кнопку остновки ошибка Не найден статус для действия "stop"
+# 3. при правом клике по карточке работе в отделе нет кнопки смены статуса в контекстном меню

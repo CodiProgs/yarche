@@ -1,9 +1,18 @@
 <div class="order-documents">
     <form id="upload-form" method="post" enctype="multipart/form-data">
         {% csrf_token %}
-        <div class="modal-form__group modal-form__group--horizontal">
-            {% include "components/select.html" with id="file_type" placeholder="Выберите тип файла" %}
-            <button id="upload-btn" type="button" class="button">Загрузить файл</button>
+        {% comment %} <div class="modal-form__group modal-form__group--horizontal">
+            <button id="order-files-btn" type="button" class="button">Файлы заказа</button>
+            <button id="measurements-files-btn" type="button" class="button">Замеры</button>
+        </div> {% endcomment %}
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div class="modal-form__group order-files-tabs" role="tablist" aria-label="Фильтр файлов заказа" style="margin-bottom: 0;"> <button id="order-files-btn" type="button" class="button order-files-tab is-active" role="tab" aria-selected="true" > Файлы заказа </button> <button id="measurements-files-btn" type="button" class="button order-files-tab" role="tab" aria-selected="false" > Замеры </button> </div>
+
+            <div class="modal-form__group modal-form__group--horizontal" style="margin-bottom: 0;">
+                {% comment %} {% include "components/select.html" with id="file_type" placeholder="Выберите тип файла" %} {% endcomment %}
+                <button id="upload-btn" type="button" class="button" style="height: 32px;">Загрузить файл</button>
+            </div>
         </div>
 
         <input type="file" id="upload-file-input" name="file" style="display:none" />
@@ -13,6 +22,6 @@
         </div>
     </form>
 
-    <div id="documents-container">
-    </div>
+    {% comment %} <div id="documents-container">
+    </div> {% endcomment %}
 </div>

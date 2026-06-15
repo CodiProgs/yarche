@@ -1,6 +1,7 @@
 from django.db import models
 from django.http import JsonResponse
 from django.forms.models import model_to_dict
+from django.core.exceptions import FieldError
 from django.db.models import (
     F,
     Q,
@@ -10,17 +11,22 @@ from django.db.models import (
     OuterRef,
     Subquery,
     ExpressionWrapper,
+    Value,
+    Func,
 )
 import locale
+import datetime
 import re
+import io
+import zipfile
 from django.apps import apps
 from django.db import transaction
 from django.core.paginator import Paginator
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, Cast
 from django.template.loader import render_to_string
 from yarche.utils import get_model_fields
 from django.contrib.auth.decorators import login_required
-from .models import Product, Client, Order, OrderStatus, Contact, FileType, Document, ClientObject, OrderDepartmentWork, KanbanClientPlacement, KanbanColumn, OrderWorkStatus, EmergencyIncident, Department
+from .models import Product, Client, Order, OrderStatus, Contact, FileType, Document, ClientObject, OrderDepartmentWork, KanbanClientPlacement, KanbanColumn, OrderWorkStatus, EmergencyIncident, Department, ManagerNote
 from ledger.models import Transaction, BankAccount
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.http import require_http_methods, require_POST
@@ -29,10 +35,12 @@ from users.models import User, Notification, UserType
 import os
 from django.utils.timezone import localtime
 from django.utils.text import get_valid_filename
-from django.utils.dateparse import parse_datetime
+from django.utils.dateparse import parse_datetime, parse_date
 from django.utils import timezone
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
+from xml.sax.saxutils import escape
+from commerce.note_notifications import create_due_notification_for_note
 
 locale.setlocale(locale.LC_ALL, "ru_RU.UTF-8")
 CURRENCY_SUFFIX = " р."
@@ -112,6 +120,214 @@ def get_client_balance_data(request):
 
     return deposits, payments, first_deposits, bank_accounts
 
+
+def parse_filters_from_request(request):
+    raw_filters = request.GET.get("filters")
+    if not raw_filters:
+        return {}
+
+    try:
+        parsed = json.loads(raw_filters)
+        return parsed if isinstance(parsed, dict) else {}
+    except (TypeError, ValueError):
+        return {}
+
+
+def parse_date_filter_value(value):
+    value = (str(value or "")).strip()
+    if not value:
+        return None
+
+    parsed = parse_date(value)
+    if parsed:
+        return parsed
+
+    for fmt in ("%d.%m.%Y", "%d-%m-%Y", "%d/%m/%Y"):
+        try:
+            return datetime.datetime.strptime(value, fmt).date()
+        except (ValueError, TypeError):
+            continue
+
+    return None
+
+
+def build_date_filter_q(field_name, value, is_date_field=False):
+    value = (str(value or "")).strip()
+    if not value:
+        return None
+
+    parsed_date = parse_date_filter_value(value)
+    if parsed_date:
+        if is_date_field:
+            return Q(**{field_name: parsed_date})
+        return Q(**{f"{field_name}__date": parsed_date})
+
+    normalized = value.replace(",", ".")
+
+    iso_match = re.search(r"(\d{4})-(\d{1,2})-(\d{1,2})", normalized)
+    if iso_match:
+        year, month, day = map(int, iso_match.groups())
+        if 1 <= day <= 31 and 1 <= month <= 12 and year >= 1900:
+            return Q(
+                **{
+                    f"{field_name}__day": day,
+                    f"{field_name}__month": month,
+                    f"{field_name}__year": year,
+                }
+            )
+
+    dmy_match = re.search(r"(\d{1,2})[./-](\d{1,2})(?:[./-](\d{2,4}))?", normalized)
+    if dmy_match:
+        day = int(dmy_match.group(1))
+        month = int(dmy_match.group(2))
+        year_part = dmy_match.group(3)
+
+        if year_part:
+            year = int(year_part)
+            if year < 100:
+                year += 2000
+            if 1 <= day <= 31 and 1 <= month <= 12 and year >= 1900:
+                return Q(
+                    **{
+                        f"{field_name}__day": day,
+                        f"{field_name}__month": month,
+                        f"{field_name}__year": year,
+                    }
+                )
+            return None
+
+        if 1 <= day <= 31 and 1 <= month <= 12:
+            return Q(**{f"{field_name}__day": day, f"{field_name}__month": month})
+
+    day_only_match = re.fullmatch(r"\s*(\d{1,2})\s*", normalized)
+    if day_only_match:
+        day = int(day_only_match.group(1))
+        if 1 <= day <= 31:
+            return Q(**{f"{field_name}__day": day})
+
+    return None
+
+
+def apply_clients_filters(queryset, filters):
+    if not filters:
+        return queryset
+
+    annotated_qs = queryset.annotate(
+        id_text=Cast("id", models.CharField()),
+    )
+
+    q = Q()
+    for key, raw_value in filters.items():
+        value = (str(raw_value or "")).strip()
+        if not value:
+            continue
+
+        if key == "id":
+            q &= Q(id_text__icontains=value)
+        elif key == "name":
+            q &= Q(name__icontains=value)
+        elif key == "legal_name":
+            q &= Q(legal_name__icontains=value)
+        elif key == "bank_account_name":
+            q &= Q(bank_account_name__icontains=value)
+
+    return annotated_qs.filter(q)
+
+
+def apply_orders_filters(queryset, filters):
+    if not filters:
+        return queryset
+
+    annotated_qs = queryset.annotate(
+        id_text=Cast("id", models.CharField()),
+        amount_text=Cast("amount", models.CharField()),
+        paid_amount_text=Cast("paid_amount", models.CharField()),
+        created_filter_date=Cast("created", models.DateField()),
+        deadline_filter_date=Cast("deadline", models.DateField()),
+        archived_at_filter_date=Cast("archived_at", models.DateField()),
+        created_date_str=Func("created_filter_date", Value("%d.%m.%Y"), function="DATE_FORMAT", output_field=models.CharField()),
+        deadline_date_str=Func("deadline_filter_date", Value("%d.%m.%Y"), function="DATE_FORMAT", output_field=models.CharField()),
+        archived_at_date_str=Func("archived_at_filter_date", Value("%d.%m.%Y"), function="DATE_FORMAT", output_field=models.CharField()),
+        paid_percent_value=Case(
+            When(
+                amount__gt=0,
+                then=ExpressionWrapper(
+                    F("paid_amount") * Value(100.0) / F("amount"),
+                    output_field=models.FloatField(),
+                ),
+            ),
+            default=Value(0.0),
+            output_field=models.FloatField(),
+        ),
+        paid_percent_text=Cast("paid_percent_value", models.CharField()),
+    )
+
+    q = Q()
+    for key, raw_value in filters.items():
+        value = (str(raw_value or "")).strip()
+        if not value:
+            continue
+
+        if key == "id":
+            q &= Q(id_text__icontains=value)
+            continue
+
+        if key == "status":
+            q &= Q(status__name__icontains=value)
+            continue
+
+        if key == "manager":
+            q &= (
+                Q(manager__first_name__icontains=value)
+                | Q(manager__last_name__icontains=value)
+                | Q(manager__username__icontains=value)
+            )
+            continue
+
+        if key == "client":
+            q &= Q(client__name__icontains=value)
+            continue
+
+        if key == "legal_name":
+            q &= Q(client__legal_name__icontains=value)
+            continue
+
+        if key == "product":
+            q &= Q(product__name__icontains=value)
+            continue
+
+        if key in {"amount", "paid_amount", "paid_percent"}:
+            normalized = (
+                value.replace("р.", "")
+                .replace("%", "")
+                .replace(" ", "")
+                .replace(",", ".")
+            )
+            if key == "amount":
+                q &= Q(amount_text__icontains=normalized)
+            elif key == "paid_amount":
+                q &= Q(paid_amount_text__icontains=normalized)
+            else:
+                q &= Q(paid_percent_text__icontains=normalized)
+            continue
+
+        if key in {"created", "deadline", "archived_at"}:
+            date_str_field_map = {
+                "created": "created_date_str",
+                "deadline": "deadline_date_str",
+                "archived_at": "archived_at_date_str",
+            }
+            q &= Q(**{f"{date_str_field_map[key]}__icontains": value})
+            continue
+
+        if key == "additional_info":
+            q &= Q(additional_info__icontains=value)
+
+    try:
+        return annotated_qs.filter(q).distinct()
+    except FieldError:
+        return queryset
+
 def render_client_table(clients):
     excluded_fields = [
         "id",
@@ -151,6 +367,110 @@ def format_currency(amount: float) -> str:
     return sum_str.replace('\xa0', ' ') + CURRENCY_SUFFIX
 
 
+def _xlsx_col_name(index: int) -> str:
+    letters = ""
+    while index > 0:
+        index, rem = divmod(index - 1, 26)
+        letters = chr(65 + rem) + letters
+    return letters
+
+
+def _build_xlsx_from_tabular_text(text: str) -> bytes:
+    normalized = (text or "").replace("\r\n", "\n").replace("\r", "\n")
+    rows = [line.split("\t") for line in normalized.split("\n")]
+
+    while rows and all(not str(cell).strip() for cell in rows[-1]):
+        rows.pop()
+    if not rows:
+        rows = [[""]]
+
+    shared = []
+    shared_map = {}
+
+    def sst_index(value: str) -> int:
+        if value not in shared_map:
+            shared_map[value] = len(shared)
+            shared.append(value)
+        return shared_map[value]
+
+    sheet_rows_xml = []
+    for r_idx, row in enumerate(rows, start=1):
+        cells_xml = []
+        for c_idx, raw_value in enumerate(row, start=1):
+            value = "" if raw_value is None else str(raw_value)
+            ref = f"{_xlsx_col_name(c_idx)}{r_idx}"
+            idx = sst_index(value)
+            cells_xml.append(f'<c r="{ref}" t="s"><v>{idx}</v></c>')
+        sheet_rows_xml.append(f'<row r="{r_idx}">{"".join(cells_xml)}</row>')
+
+    last_col = _xlsx_col_name(max((len(r) for r in rows), default=1))
+    dimension = f"A1:{last_col}{len(rows)}"
+
+    shared_items_xml = "".join(
+        f"<si><t>{escape(item)}</t></si>" for item in shared
+    )
+
+    content_types = """<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>
+<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">
+  <Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>
+  <Default Extension=\"xml\" ContentType=\"application/xml\"/>
+  <Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/>
+  <Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>
+  <Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/>
+  <Override PartName=\"/xl/sharedStrings.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml\"/>
+</Types>"""
+
+    rels_root = """<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>
+<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">
+  <Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/>
+</Relationships>"""
+
+    workbook = """<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>
+<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">
+  <sheets>
+    <sheet name=\"Sheet1\" sheetId=\"1\" r:id=\"rId1\"/>
+  </sheets>
+</workbook>"""
+
+    workbook_rels = """<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>
+<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">
+  <Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/>
+  <Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/>
+  <Relationship Id=\"rId3\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings\" Target=\"sharedStrings.xml\"/>
+</Relationships>"""
+
+    sheet = f"""<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>
+<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">
+  <dimension ref=\"{dimension}\"/>
+  <sheetData>{''.join(sheet_rows_xml)}</sheetData>
+</worksheet>"""
+
+    shared_strings = f"""<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>
+<sst xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" count=\"{len(shared)}\" uniqueCount=\"{len(shared)}\">{shared_items_xml}</sst>"""
+
+    styles = """<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>
+<styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">
+  <fonts count=\"1\"><font><sz val=\"11\"/><name val=\"Calibri\"/></font></fonts>
+  <fills count=\"1\"><fill><patternFill patternType=\"none\"/></fill></fills>
+  <borders count=\"1\"><border/></borders>
+  <cellStyleXfs count=\"1\"><xf/></cellStyleXfs>
+  <cellXfs count=\"1\"><xf xfId=\"0\"/></cellXfs>
+  <cellStyles count=\"1\"><cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/></cellStyles>
+</styleSheet>"""
+
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("[Content_Types].xml", content_types)
+        zf.writestr("_rels/.rels", rels_root)
+        zf.writestr("xl/workbook.xml", workbook)
+        zf.writestr("xl/_rels/workbook.xml.rels", workbook_rels)
+        zf.writestr("xl/worksheets/sheet1.xml", sheet)
+        zf.writestr("xl/sharedStrings.xml", shared_strings)
+        zf.writestr("xl/styles.xml", styles)
+
+    return output.getvalue()
+
+
 
 # endregion
 
@@ -174,6 +494,17 @@ def document_types(request):
 
 def client_list(request):
     return entity_list(request, Client)
+
+def client_objects_list(request):
+	client_id = request.GET.get("client_id")
+	if not client_id:
+		return JsonResponse(list(ClientObject.objects.values("id", "name")), safe=False)
+	try:
+		client = Client.objects.get(id=client_id)
+		objects = client.client_objects.values("id", "name")
+		return JsonResponse(list(objects), safe=False)
+	except Client.DoesNotExist:
+		return JsonResponse([], safe=False)
 
 def order_debt(request, pk):
     try:
@@ -290,10 +621,32 @@ def client_balances(request):
 def works(request):
     clients = Client.objects.prefetch_related('client_objects').all()
     products = Product.objects.all()
+    
+    # Получаем уникальные пары (client_id, product_id) для заказов без объектов
+    orders_without_objects = Order.objects.filter(
+        client_object__isnull=True,
+        archived_at__isnull=True,
+    ).select_related('product').order_by('client_id', 'product_id')
+    
+    # Создаём словарь: {client_id: [{'product_id': ..., 'product_name': ...}, ...]}
+    products_without_object_by_client = {}
+    processed_pairs = set()  # Отслеживаем обработанные пары
+    
+    for order in orders_without_objects:
+        pair = (order.client_id, order.product_id)
+        if pair not in processed_pairs:
+            processed_pairs.add(pair)
+            if order.client_id not in products_without_object_by_client:
+                products_without_object_by_client[order.client_id] = []
+            products_without_object_by_client[order.client_id].append({
+                'product_id': order.product_id,
+                'product_name': order.product.name,
+            })
 
     context = {
         "clients": clients,
         "products": products,
+        "products_without_object_by_client": products_without_object_by_client,
     }
 
     return render(request, "commerce/works.html", context)
@@ -308,6 +661,7 @@ def product_orders(request):
         product_id=product_id,
         client_id=client_id,
         client_object_id=object_id,
+        archived_at__isnull=True,
     ).filter(
         Q(manager=request.user) | Q(viewers=request.user)
     ).order_by("-created")
@@ -343,22 +697,143 @@ def product_orders(request):
     return JsonResponse({"html": html, "order_ids": [o.id for o in orders], "table_id": table_id })
 
 @login_required
-def orders(request):
+def all_orders_without_object(request):
+    """Загружает ВСЕ заказы без объектов для конкретного клиента"""
+    client_id = request.GET.get("client_id")
+    
+    orders = Order.objects.filter(
+        client_id=client_id,
+        client_object_id__isnull=True,
+        archived_at__isnull=True,
+    ).select_related('product').order_by("-created")
+    
+    fields = [
+        {"name": "id", "verbose_name": "Заказ"},
+        {"name": "status", "verbose_name": "Статус", "is_relation": True},
+        {"name": "created", "verbose_name": "Создан", "is_date": True},
+        {"name": "deadline", "verbose_name": "Срок сдачи", "is_date": True},
+        {"name": "required_documents", "verbose_name": "Док-ты", "is_boolean": True},
+        {"name": "unit_price", "verbose_name": "Стоимость", "is_amount": True},
+        {"name": "quantity", "verbose_name": "Количество"},
+        {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+        {"name": "paid_amount", "verbose_name": "Погашено", "is_amount": True},
+        {"name": "comment", "verbose_name": "Комментарий"},
+        {"name": "additional_info", "verbose_name": "Доп. инф-я"},
+    ]
+    
+    table_id = f"all-orders-no-object-{client_id}"
+    
+    html = render_to_string(
+        "components/table.html",
+        {
+            "fields": fields,
+            "data": orders,
+            "id": table_id,
+        },
+    )
+    
+    if not orders:
+        html = '<div class="info debtors-office-list__row">Нет заказов без объектов</div>'
 
-    orders = Order.objects.all()
+    return JsonResponse({"html": html, "order_ids": [o.id for o in orders], "table_id": table_id })
+
+@login_required
+def product_orders_without_object(request):
+    product_id = request.GET.get("product_id")
+    client_id = request.GET.get("client_id")
+    
+    orders = Order.objects.filter(
+        product_id=product_id,
+        client_id=client_id,
+        client_object_id__isnull=True,
+        archived_at__isnull=True,
+    ).order_by("-created")
+    
+    fields = [
+        {"name": "id", "verbose_name": "Заказ"},
+        {"name": "status", "verbose_name": "Статус", "is_relation": True},
+        {"name": "created", "verbose_name": "Создан", "is_date": True},
+        {"name": "deadline", "verbose_name": "Срок сдачи", "is_date": True},
+        {"name": "required_documents", "verbose_name": "Док-ты", "is_boolean": True},
+        {"name": "unit_price", "verbose_name": "Стоимость", "is_amount": True},
+        {"name": "quantity", "verbose_name": "Количество"},
+        {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+        {"name": "paid_amount", "verbose_name": "Погашено", "is_amount": True},
+        {"name": "comment", "verbose_name": "Комментарий"},
+        {"name": "additional_info", "verbose_name": "Доп. инф-я"},
+    ]
+    
+    table_id = f"orders-no-object-{product_id}-{client_id}"
+    
+    html = render_to_string(
+        "components/table.html",
+        {
+            "fields": fields,
+            "data": orders,
+            "id": table_id,
+        },
+    )
+    
+    if not orders:
+        html = '<div class="info debtors-office-list__row" border-left-width: 16px;>Нет заказов</div>'
+
+    return JsonResponse({"html": html, "order_ids": [o.id for o in orders], "table_id": table_id })
+
+@login_required
+def orders(request):
+    orders_qs = Order.objects.all().order_by("-created")
+    paginator = Paginator(orders_qs, 25)
+    page_obj = paginator.get_page(1)
 
     fields = get_order_fields()
-    data = prepare_orders_data(orders)
+    data = prepare_orders_data(page_obj.object_list)
 
     context = {
         "fields": fields,
         "data": data,
+        "pagination": {
+            "total_pages": paginator.num_pages,
+            "current_page": page_obj.number,
+        },
     }
     return render(request, "commerce/orders.html", context)
+
+
+@login_required
+def orders_paginate(request):
+    orders_qs = Order.objects.all().order_by("-created")
+    filters = parse_filters_from_request(request)
+    orders_qs = apply_orders_filters(orders_qs, filters)
+
+    page_number = request.GET.get("page", 1)
+    paginator = Paginator(orders_qs, 25)
+    page_obj = paginator.get_page(page_number)
+
+    fields = get_order_fields()
+    page_items = prepare_orders_data(page_obj.object_list)
+    order_ids = [o.id for o in page_items]
+
+    html = "".join(
+        render_to_string("components/table_row.html", {"item": order, "fields": fields})
+        for order in page_items
+    )
+
+    return JsonResponse(
+        {
+            "html": html,
+            "context": {
+                "total_pages": paginator.num_pages,
+                "current_page": page_obj.number,
+                "order_ids": order_ids,
+            },
+        }
+    )
 
 def get_order_fields():
     excluded = [
         "client_object",
+        "unit_price",
+        "quantity",
         "amount",
         "created",
         "deadline",
@@ -367,7 +842,7 @@ def get_order_fields():
         "comment",
         "archived_at",
         "viewers",
-        "required_documents"
+        "required_documents",
     ]
     field_order = [
         "id",
@@ -427,7 +902,9 @@ def order_statuses(request):
 
 @login_required
 def clients_paginate(request):
-    clients_qs = Client.objects.all()
+    clients_qs = Client.objects.all().order_by("id")
+    filters = parse_filters_from_request(request)
+    clients_qs = apply_clients_filters(clients_qs, filters)
 
     fields = [
         {"name": "id", "verbose_name": "ID"},
@@ -436,7 +913,7 @@ def clients_paginate(request):
     ]
 
     page_number = request.GET.get("page", 1)
-    paginator = Paginator(list(clients_qs), 25)
+    paginator = Paginator(clients_qs, 25)
     page_obj = paginator.get_page(page_number)
 
     client_ids = [c.id for c in page_obj.object_list]
@@ -956,12 +1433,64 @@ def orders_archive(request):
     }
     return render(request, "commerce/orders_archive.html", context)
 
+
+@login_required
+def orders_archive_paginate(request):
+    orders_qs = Order.objects.filter(archived_at__isnull=False).order_by("-archived_at")
+    filters = parse_filters_from_request(request)
+    orders_qs = apply_orders_filters(orders_qs, filters)
+
+    page_number = request.GET.get("page", 1)
+    paginator = Paginator(orders_qs, 25)
+    page_obj = paginator.get_page(page_number)
+
+    data = []
+    for o in page_obj.object_list:
+        o.legal_name = o.client.legal_name if o.client else None
+        data.append(o)
+
+    fields = [
+        {"name": "id", "verbose_name": "Заказ"},
+        {"name": "archived_at", "verbose_name": "Архив", "is_date": True},
+        {"name": "manager", "verbose_name": "Менеджер", "is_relation": True},
+        {"name": "client", "verbose_name": "Клиент", "is_relation": True},
+        {"name": "legal_name", "verbose_name": "Фирма"},
+        {"name": "product", "verbose_name": "Продукция", "is_relation": True},
+        {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+        {"name": "created", "verbose_name": "Создан", "is_date": True},
+        {"name": "additional_info", "verbose_name": "Доп. инф-я"},
+    ]
+
+    html = "".join(
+        render_to_string("components/table_row.html", {"item": order, "fields": fields})
+        for order in data
+    )
+
+    return JsonResponse(
+        {
+            "html": html,
+            "context": {
+                "total_pages": paginator.num_pages,
+                "current_page": page_obj.number,
+                "order_ids": [o.id for o in data],
+            },
+        }
+    )
+
 @login_required
 @require_http_methods(["GET"])
 def order_documents_table(request, pk: int):
     order = get_object_or_404(Order, id=pk)
 
     docs_qs = Document.objects.filter(order=order)
+
+    only_measurements = (request.GET.get("only_measurements") or "").strip().lower()
+    if only_measurements in {"1", "true", "yes", "замеры"}:
+        docs_qs = docs_qs.filter(file_type__name__iexact="Замеры")
+    else:
+        docs_qs = docs_qs.filter(
+            Q(file_type__isnull=True) | ~Q(file_type__name__iexact="Замеры")
+        )
 
     docs = list(docs_qs.order_by("uploaded_at"))
 
@@ -1027,6 +1556,65 @@ def order_documents_table(request, pk: int):
         urls.append(file_url)
     return JsonResponse({"html": html, "urls": urls, "ids": [d.id for d in docs], "table_id": f"order-documents-{order.id}"})
 
+
+@login_required
+@require_http_methods(["GET"])
+def document_detail_by_name(request):
+    raw_name = (request.GET.get("name") or "").strip()
+    filename = os.path.basename(raw_name)
+
+    if not filename:
+        return JsonResponse(
+            {"status": "error", "message": "Не указано имя файла"},
+            status=400,
+        )
+
+    doc = (
+        Document.objects.select_related("file_type", "user", "order")
+        .filter(name=filename)
+        .first()
+    )
+    if not doc:
+        return JsonResponse(
+            {"status": "error", "message": "Документ не найден"},
+            status=404,
+        )
+
+    file_url = getattr(doc, "url", None) or getattr(getattr(doc, "file", None), "url", None) or ""
+    if file_url:
+        try:
+            file_url = request.build_absolute_uri(file_url)
+        except Exception:
+            pass
+
+    uploaded_at = ""
+    try:
+        uploaded_at = (
+            localtime(doc.uploaded_at).strftime("%d.%m.%Y %H:%M")
+            if getattr(doc, "uploaded_at", None)
+            else ""
+        )
+    except Exception:
+        uploaded_at = str(doc.uploaded_at) if getattr(doc, "uploaded_at", None) else ""
+
+    return JsonResponse(
+        {
+            "status": "success",
+            "data": {
+                "id": doc.id,
+                "name": doc.name,
+                "url": file_url,
+                "size": doc.size,
+                "uploaded_at": uploaded_at,
+                "comment": doc.comment or "",
+                "order_id": doc.order_id,
+                "file_type": doc.file_type.name if doc.file_type else "",
+                "user": doc.user.username if doc.user else "",
+            },
+        }
+    )
+
+
 @login_required
 @require_http_methods(["POST"])
 def document_upload(request):
@@ -1049,6 +1637,30 @@ def document_upload(request):
                 return JsonResponse({"status": "error", "message": "Не указан file_type"}, status=400)
 
             try:
+                uploaded_name = str(getattr(uploaded_file, "name", "") or "")
+                if uploaded_name.lower().endswith(".xlsx"):
+                    raw_bytes = uploaded_file.read()
+                    try:
+                        uploaded_file.seek(0)
+                    except Exception:
+                        pass
+
+                    is_valid_xlsx = False
+                    if raw_bytes:
+                        try:
+                            is_valid_xlsx = zipfile.is_zipfile(io.BytesIO(raw_bytes))
+                        except Exception:
+                            is_valid_xlsx = False
+
+                    if raw_bytes and not is_valid_xlsx:
+                        table_text = raw_bytes.decode("utf-8-sig", errors="ignore")
+                        if table_text.strip():
+                            xlsx_bytes = _build_xlsx_from_tabular_text(table_text)
+                            uploaded_file = ContentFile(xlsx_bytes, name=uploaded_name)
+            except Exception:
+                pass
+
+            try:
                 order = get_object_or_404(Order, id=int(order_id))
             except (ValueError, TypeError):
                 return JsonResponse({"status": "error", "message": "Неверный id заказа"}, status=400)
@@ -1066,9 +1678,19 @@ def document_upload(request):
                 if desired_name:
                     uploaded_file.name = desired_name
 
-            final_name = desired_name if desired_name else uploaded_file.name
-            if Document.objects.filter(order=order, name=final_name).exists():
-                return JsonResponse({"status": "error", "message": "Файл с таким именем уже существует в заказе"}, status=400)
+            final_name = os.path.basename(desired_name if desired_name else uploaded_file.name)
+            if not final_name:
+                return JsonResponse({"status": "error", "message": "Некорректное имя файла"}, status=400)
+
+            # Все документы лежат в одной директории uploads, поэтому имя должно быть уникальным глобально.
+            if Document.objects.filter(name=final_name).exists():
+                return JsonResponse({"status": "error", "message": "Файл с таким именем уже существует"}, status=400)
+
+            storage_path = f"uploads/{final_name}"
+            if default_storage.exists(storage_path):
+                return JsonResponse({"status": "error", "message": "Файл с таким именем уже существует"}, status=400)
+
+            uploaded_file.name = final_name
 
             doc = Document(user=request.user, order=order, file_type=file_type, comment=comment)
 
@@ -1461,7 +2083,12 @@ def order_create(request):
             ]
             
             object_id = client_object.id if client_object else "noobject"
-            table_id = f"product-orders-{product_id}-{client_id}-{object_id}"
+            
+            # Правильно определяем table_id в зависимости от наличия объекта клиента
+            if client_object:
+                table_id = f"product-orders-{product_id}-{client_id}-{object_id}"
+            else:
+                table_id = f"orders-no-object-{product_id}-{client_id}"
             
             html = render_to_string(
                 "components/table_row.html",
@@ -1504,6 +2131,25 @@ def order_update(request, pk: int):
                 "additional_info",
                 "required_documents",
             ]
+
+            client_object_value = data.get("client_object")
+            if client_object_value is None:
+                client_object_value = data.get("client_object_id")
+
+            if client_object_value is not None:
+                client_object_value = str(client_object_value).strip()
+                if client_object_value == "":
+                    order.client_object = None
+                else:
+                    try:
+                        order.client_object = get_object_or_404(
+                            ClientObject, id=int(client_object_value)
+                        )
+                    except (ValueError, TypeError):
+                        return JsonResponse(
+                            {"status": "error", "message": "Неверный ID объекта клиента"},
+                            status=400,
+                        )
 
             for field in updatable:
                 if field in data:
@@ -1556,6 +2202,11 @@ def order_update(request, pk: int):
                     "status": "success",
                     "id": order.id,
                     "html": html,
+                    "table_id": (
+                        f"product-orders-{order.product_id}-{order.client_id}-{order.client_object_id}"
+                        if order.client_object_id
+                        else f"orders-no-object-{order.product_id}-{order.client_id}"
+                    ),
                 }
             )
     except json.JSONDecodeError:
@@ -1567,13 +2218,35 @@ def order_update(request, pk: int):
 def order_detail(request, pk: int):
     order = get_object_or_404(Order, id=pk)
     department_works = []
-    for dw in OrderDepartmentWork.objects.filter(order=order).select_related('department', 'status').order_by('id'):
+    for dw in OrderDepartmentWork.objects.filter(order=order).select_related('department', 'status', 'executor').order_by('id'):
         item = model_to_dict(dw)
         item['department_name'] = dw.department.name if dw.department else ''
+        item['department_slug'] = dw.department.slug if dw.department else ''
         item['status_name'] = dw.status.name if dw.status else ''
-        item['is_completed'] = bool(dw.status and getattr(dw.status, "is_final", False))  # добавлено
+        item['is_completed'] = bool(dw.status and getattr(dw.status, "is_final", False))
+        item['is_in_progress'] = bool(dw.started_at and not dw.completed_at)
+        item['executor_name'] = ''
+        
+        # Добавляем фамилию исполнителя
+        if dw.executor:
+            executor_last_name = getattr(dw.executor, 'last_name', '')
+            executor_first_name = getattr(dw.executor, 'first_name', '')
+            if executor_last_name:
+                item['executor_name'] = executor_last_name
+            elif executor_first_name:
+                item['executor_name'] = executor_first_name
+        
+        # Форматируем даты
+        if hasattr(dw, 'started_at') and dw.started_at:
+            item['started_at'] = localtime(dw.started_at).strftime("%d.%m.%Y %H:%M")
+        else:
+            item['started_at'] = None
+            
         if hasattr(dw, 'completed_at') and dw.completed_at:
-            item['completed_at'] = localtime(dw.completed_at).strftime("%d-%m-%Y %H:%M")
+            item['completed_at'] = localtime(dw.completed_at).strftime("%d.%m.%Y %H:%M")
+        else:
+            item['completed_at'] = None
+            
         department_works.append(item)
     data = model_to_dict(order)
     if "viewers" in data:
@@ -1597,6 +2270,112 @@ def order_delete(request, pk: int):
             return JsonResponse({"status": "success"})
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+@login_required
+@require_http_methods(["POST", "PUT", "PATCH"])
+def order_update_status(request, pk: int):
+    try:
+        with transaction.atomic():
+            order = get_object_or_404(Order, id=pk)
+
+            user_type_name = (
+                getattr(getattr(request.user, "user_type", None), "name", "") or ""
+            ).strip().lower()
+            is_admin = user_type_name == "администратор"
+            is_manager = user_type_name == "менеджер по работе с клиентами"
+
+            if not is_admin:
+                if not is_manager or order.manager_id != request.user.id:
+                    return JsonResponse(
+                        {
+                            "status": "error",
+                            "message": "Недостаточно прав для изменения статуса этого заказа",
+                        },
+                        status=403,
+                    )
+
+            data = (
+                json.loads(request.body)
+                if request.method in ["PUT", "PATCH"]
+                else request.POST.dict()
+            )
+
+            status_id = data.get("status") or data.get("status_id")
+            if not status_id:
+                return JsonResponse(
+                    {"status": "error", "message": "Не указан статус заказа"},
+                    status=400,
+                )
+
+            try:
+                status = get_object_or_404(OrderStatus, id=int(status_id))
+            except (ValueError, TypeError):
+                return JsonResponse(
+                    {"status": "error", "message": "Неверный ID статуса заказа"},
+                    status=400,
+                )
+
+            old_status = order.status
+            order.status = status
+
+            update_fields = ["status"]
+            if status.name.strip().lower() == "готово":
+                if not order.archived_at:
+                    order.archived_at = timezone.now()
+                    update_fields.append("archived_at")
+            else:
+                if order.archived_at:
+                    order.archived_at = None
+                    update_fields.append("archived_at")
+
+            order.save(update_fields=update_fields)
+
+            fields = [
+                {"name": "id", "verbose_name": "Заказ"},
+                {"name": "status", "verbose_name": "Статус", "is_relation": True},
+                {"name": "created", "verbose_name": "Создан", "is_date": True},
+                {"name": "deadline", "verbose_name": "Срок сдачи", "is_date": True},
+                {"name": "required_documents", "verbose_name": "Док-ты", "is_boolean": True},
+                {"name": "unit_price", "verbose_name": "Стоимость", "is_amount": True},
+                {"name": "quantity", "verbose_name": "Количество"},
+                {"name": "amount", "verbose_name": "Сумма", "is_amount": True},
+                {"name": "paid_amount", "verbose_name": "Погашено", "is_amount": True},
+                {"name": "comment", "verbose_name": "Комментарий"},
+                {"name": "additional_info", "verbose_name": "Доп. инф-я"},
+            ]
+
+            html = render_to_string(
+                "components/table_row.html",
+                {
+                    "item": order,
+                    "fields": fields,
+                },
+            )
+
+            return JsonResponse(
+                {
+                    "status": "success",
+                    "id": order.id,
+                    "html": html,
+                    "archived": order.archived_at is not None,
+                    "message": (
+                        f"Статус изменен с '{old_status}' на '{status}'"
+                        if old_status
+                        else f"Установлен статус '{status}'"
+                    ),
+                }
+            )
+
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {"status": "error", "message": "Неверный формат JSON"},
+            status=400,
+        )
+    except Exception as e:
+        return JsonResponse(
+            {"status": "error", "message": str(e)},
+            status=400,
+        )
 
 @login_required
 @require_http_methods(["GET"])
@@ -1868,6 +2647,14 @@ def order_files_cards(request, order_id: int):
         order = get_object_or_404(Order, id=order_id)
         
         files = Document.objects.filter(order=order).select_related('file_type', 'user')
+
+        only_measurements = (request.GET.get("only_measurements") or "").strip().lower()
+        if only_measurements in {"1", "true", "yes", "замеры"}:
+            files = files.filter(file_type__name__iexact="Замеры")
+        else:
+            files = files.filter(
+                Q(file_type__isnull=True) | ~Q(file_type__name__iexact="Замеры")
+            )
         
         images = []
         others = []
@@ -1933,6 +2720,9 @@ def document_rename(request, pk: int):
         orig_ext = os.path.splitext(old_display)[1] or os.path.splitext(old_file_name or "")[1]
         if orig_ext and not os.path.splitext(new_filename)[1]:
             new_filename = new_filename + orig_ext
+
+        if Document.objects.filter(name=new_filename).exclude(id=doc.id).exists():
+            return JsonResponse({"status": "error", "message": "Файл с таким именем уже существует"}, status=400)
 
         if doc.file and old_file_name:
             dirpath = os.path.dirname(old_file_name)
@@ -2512,8 +3302,6 @@ def asset_item_detail(request, pk: int, model_key: str):
     data = model_to_dict(obj)
     return JsonResponse({"data": data})
 
-import datetime
-
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from commerce.models import Order
@@ -2682,3 +3470,114 @@ def manager_orders_table(request, manager_id):
             "current_page": page_obj.number,
         }
     })
+
+
+@login_required
+def notes_calendar(request):
+    return render(request, "commerce/notes_calendar.html")
+
+
+def _parse_note_date(date_str):
+    try:
+        return datetime.date.fromisoformat(date_str)
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_note_time(time_str):
+    if isinstance(time_str, str):
+        time_str = time_str.strip()
+    if not time_str:
+        return None
+    try:
+        return datetime.time.fromisoformat(time_str)
+    except (ValueError, TypeError):
+        return None
+
+
+def _serialize_note(note):
+    return {
+        "id": note.id,
+        "date": note.date.isoformat(),
+        "time": note.scheduled_time.strftime("%H:%M") if note.scheduled_time else "",
+        "text": note.text,
+    }
+
+
+@login_required
+@require_http_methods(["GET"])
+def notes_list(request):
+    year = request.GET.get("year")
+    month = request.GET.get("month")
+    qs = ManagerNote.objects.filter(user=request.user)
+    if year and month:
+        qs = qs.filter(date__year=year, date__month=month)
+    data = [_serialize_note(n) for n in qs]
+    return JsonResponse({"notes": data})
+
+
+@login_required
+@require_POST
+def note_create(request):
+    body = json.loads(request.body)
+    date_str = body.get("date")
+    time_str = body.get("time")
+    text = body.get("text", "").strip()
+    if not date_str or not text:
+        return JsonResponse({"error": "date и text обязательны"}, status=400)
+
+    date = _parse_note_date(date_str)
+    if not date:
+        return JsonResponse({"error": "Неверный формат даты"}, status=400)
+
+    scheduled_time = _parse_note_time(time_str)
+    if time_str is not None and scheduled_time is None:
+        return JsonResponse({"error": "Неверный формат времени"}, status=400)
+
+    note = ManagerNote.objects.create(
+        user=request.user,
+        date=date,
+        scheduled_time=scheduled_time,
+        text=text,
+    )
+    create_due_notification_for_note(note)
+    return JsonResponse(_serialize_note(note), status=201)
+
+
+@login_required
+@require_http_methods(["PATCH"])
+def note_update(request, pk):
+    note = get_object_or_404(ManagerNote, pk=pk, user=request.user)
+    body = json.loads(request.body)
+    text = body.get("text", "").strip()
+    if not text:
+        return JsonResponse({"error": "text обязателен"}, status=400)
+
+    time_changed = False
+    if "time" in body:
+        scheduled_time = _parse_note_time(body.get("time"))
+        if body.get("time") is not None and scheduled_time is None:
+            return JsonResponse({"error": "Неверный формат времени"}, status=400)
+        time_changed = note.scheduled_time != scheduled_time
+        note.scheduled_time = scheduled_time
+        if time_changed:
+            note.notified_at = None
+
+    note.text = text
+    update_fields = ["text", "updated_at"]
+    if "time" in body:
+        update_fields.append("scheduled_time")
+        if time_changed:
+            update_fields.append("notified_at")
+    note.save(update_fields=update_fields)
+    create_due_notification_for_note(note)
+    return JsonResponse(_serialize_note(note))
+
+
+@login_required
+@require_http_methods(["DELETE"])
+def note_delete(request, pk):
+    note = get_object_or_404(ManagerNote, pk=pk, user=request.user)
+    note.delete()
+    return JsonResponse({"ok": True})
+

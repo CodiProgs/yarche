@@ -24,3 +24,4 @@ class ProductDepartment(models.Model):
         unique_together = ('product', 'department')
         verbose_name = "Отдел продукции"
         verbose_name_plural = "Отделы продукции"
+        # добавляет отделы работы для заказа автоматом

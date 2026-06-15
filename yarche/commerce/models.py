@@ -1,1 +1,1 @@
-from models import Client, Document, FileType, Order, OrderStatus, Product, ClientObject, Contact, Department, OrderDepartmentWork, OrderWorkStatus, OrderDepartmentWorkMessage, ProductDepartment, EmergencyIncident, InventoryItem, Credit, ShortTermLiability, Bonus
+from models import Client, Document, FileType, Order, OrderStatus, Product, ClientObject, Contact, Department, OrderDepartmentWork, OrderWorkStatus, OrderDepartmentWorkMessage, ProductDepartment, EmergencyIncident, InventoryItem, Credit, ShortTermLiability, Bonus, ManagerNote

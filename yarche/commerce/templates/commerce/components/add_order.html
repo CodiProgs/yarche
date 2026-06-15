@@ -4,15 +4,6 @@
 <form class="modal-form" id="orders-form" method="post">
     <div class="modal-form__content">
         {% csrf_token %}
-        <input class="modal-form__input"
-            type="text"
-            id="client_object"
-            spellcheck="false"
-            autocapitalize="off"
-            autocorrect="off"
-            autocomplete="off"
-            hidden
-            name="client_object">
         <div class="modal-form__group" hidden>
 			<label class="modal-form__label" for="client">Клиент</label>
             {% include "components/select.html" with id="client" placeholder="Выберите клиента" %}
@@ -20,6 +11,10 @@
         <div class="modal-form__group" hidden>
 			<label class="modal-form__label" for="product">Продукция</label>
             {% include "components/select.html" with id="product" placeholder="Выберите продукцию" %}
+        </div>
+        <div class="modal-form__group">
+			<label class="modal-form__label" for="client_object">Объект клиента</label>
+            {% include "components/select.html" with id="client_object" placeholder="Выберите объект (опционально)" %}
         </div>
         <div class="modal-form__row" style="align-items: flex-end;">
             <div class="modal-form__group modal-form__group--width-40">

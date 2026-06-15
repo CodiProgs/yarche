@@ -3,6 +3,48 @@
 {% block content %}
     <div class="page-table-container" id="orders_archive-container">
         {% include "components/table.html" with id="orders_archive-table" fields=fields data=data %}
+        <div class="pagination-controls">
+                <button class="pagination-button"
+                        id="first-page"
+                        title="Первая страница"
+                        disabled>
+                    <img src="{% static 'images/angle-double-left.svg' %}" alt="First" class="icon">
+                </button>
+                <button class="pagination-button"
+                        id="prev-page"
+                        title="Предыдущая страница"
+                        disabled>
+                    <img src="{% static 'images/angle-left.svg' %}" alt="Previous" class="icon">
+                </button>
+                <div class="pagination-line"></div>
+                <div class="pagination-input-container">
+                    <span>Страница</span>
+                    <input type="text"
+                        id="current-page"
+                        class="pagination-input"
+                        value="0"
+                        disabled>
+                    <span>из</span>
+                    <span id="total-pages">0</span>
+                </div>
+                <div class="pagination-line"></div>
+                <button class="pagination-button"
+                        id="next-page"
+                        title="Следующая страница"
+                        disabled>
+                    <img src="{% static 'images/angle-right.svg' %}" alt="Next" class="icon">
+                </button>
+                <button class="pagination-button"
+                        id="last-page"
+                        title="Последняя страница"
+                        disabled>
+                    <img src="{% static 'images/angle-double-right.svg' %}" alt="Last" class="icon">
+                </button>
+                <div class="pagination-line"></div>
+                <button class="pagination-button" id="refresh" title="Обновить">
+                    <img src="{% static 'images/arrows-rotate.svg' %}" alt="Refresh" class="icon">
+                </button>
+            </div>
         <div id="context-menu"
             class="dropdown-menu"
             data-is-admin="{% if request.user.user_type and request.user.user_type.name == 'Администратор' %}true{% else %}false{% endif %}">
@@ -12,12 +54,27 @@
             <a class="dropdown-item context-action"
                id="refresh-button"
                data-action="refresh">Обновить с сервера</a>
+            
+            <a class="dropdown-item context-action"
+                id="update_status-button"
+                data-action="update_status"
+                style="display: none;">Сменить статус сделки</a>
+            <a class="dropdown-item context-action"
+                id="print-doc-button"
+                style="display: none;"
+                data-action="print">Распечатать</a>
+            <a class="dropdown-item context-action"
+                id="download-doc-button"
+                style="display: none;"
+                data-action="download">Скачать</a>
+            <div class="dropdown-divider"></div>
             <a class="dropdown-item context-action"
                id="hide-button"
                data-action="hide">Скрыть</a>
             <a class="dropdown-item context-action"
                id="show-all-button"
                data-action="show-all">Показать все</a>
+            
         </div>
     </div>
 {% endblock content %}
@@ -25,3 +82,4 @@
     {{ block.super }}
     <script src="{% static 'commerce/js/commerce.js' %}" type="module"></script>
 {% endblock extra_scripts %}
+

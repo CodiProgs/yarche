@@ -23,7 +23,7 @@ class Document(models.Model):
     name = models.CharField(max_length=255, verbose_name="Имя файла", default='', blank=True)
     file = models.FileField(upload_to="uploads/", verbose_name="Файл", null=True, blank=True)
     size = models.BigIntegerField(verbose_name="Размер файла (в байтах)", null=True, blank=True)
-    url = models.URLField(verbose_name="URL файла", blank=True)
+    url = models.CharField(verbose_name="URL файла", max_length=1024, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата загрузки")
     comment = models.TextField(verbose_name="Комментарий", blank=True, null=True)
 

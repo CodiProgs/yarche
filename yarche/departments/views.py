@@ -129,6 +129,13 @@ def department_statuses(request, department_slug):
     return JsonResponse(list(statuses), safe=False)
 
 @login_required
+def department_statuses_by_id(request, department_id: int):
+    """Получает все статусы для отдела по его ID"""
+    department = get_object_or_404(Department, id=department_id)
+    statuses = OrderWorkStatus.objects.filter(department=department).values("id", "name", "is_initial", "is_final")
+    return JsonResponse({"status": "success", "statuses": list(statuses)})
+
+@login_required
 @require_http_methods(["POST", "PUT", "PATCH"])
 def department_work_assign_executor(request, order_id: int, department_slug: str):
     """Назначает или меняет исполнителя для работы отдела по заказу"""
@@ -270,31 +277,29 @@ def department_work_update_status(request, order_id: int, department_slug: str):
             department_work, created = OrderDepartmentWork.objects.get_or_create(
                 order=order,
                 department=department,
-                defaults={"status": new_status, "started_at": timezone.now()}
+                defaults={"status": new_status, "started_at": timezone.now() if new_status.is_initial else None}
             )
-
-            if not department_work.started_at:
-                department_work.started_at = timezone.now()
 
             old_status = department_work.status
             department_work.status = new_status
 
+            # Управляем started_at на основе is_initial флага
+            if new_status.is_initial:
+                if not department_work.started_at:
+                    department_work.started_at = timezone.now()
+            
+            # Управляем completed_at на основе is_final флага
             if new_status.is_final:
                 if not department_work.completed_at:
                     department_work.completed_at = timezone.now()
-                    department_work.save(update_fields=["status", "started_at", "completed_at"])
-                    message = f"Статус изменен на '{new_status}'. Работа завершена."
-                else:
-                    department_work.save(update_fields=["status", "started_at"])
-                    message = f"Статус изменен на '{new_status}'"
+                department_work.save(update_fields=["status", "started_at", "completed_at"])
+                message = f"Статус изменен на '{new_status}'. Работа завершена."
             else:
+                # Если это не финальный статус, очищаем completed_at
                 if department_work.completed_at:
                     department_work.completed_at = None
-                    department_work.save(update_fields=["status", "started_at", "completed_at"])
-                    message = f"Статус изменен с '{old_status}' на '{new_status}'. Дата завершения сброшена."
-                else:
-                    department_work.save(update_fields=["status", "started_at"])
-                    message = f"Статус изменен с '{old_status}' на '{new_status}'" if old_status else f"Установлен статус '{new_status}'"
+                department_work.save(update_fields=["status", "started_at", "completed_at"])
+                message = f"Статус изменен с '{old_status}' на '{new_status}'" if old_status else f"Установлен статус '{new_status}'"
 
             department_work.refresh_from_db()
 

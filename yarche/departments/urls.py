@@ -15,6 +15,7 @@ urlpatterns = [
     
     path('users/<slug:department_slug>/', views.department_users, name='department_users'),
     path('statuses/<slug:department_slug>/', views.department_statuses, name='department_statuses'),
+    path('statuses/by-id/<int:department_id>/', views.department_statuses_by_id, name='department_statuses_by_id'),
 	path('list/', views.departments_list, name='departments_list'),
     path('<slug:department_slug>/orders/assign-executor/<int:order_id>/', 
          views.department_work_assign_executor, 

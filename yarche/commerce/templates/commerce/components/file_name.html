@@ -4,6 +4,10 @@
 <form class="modal-form" id="file_name-form" method="post">
     <div class="modal-form__content">
         {% csrf_token %}
+        <div class="modal-form__group" style="display: none;" id="file_type_group">
+            <label class="modal-form__label" for="file_type">Тип файла</label>
+			{% include "components/select.html" with id="file_type" placeholder="Выберите тип файла" %}
+		</div>
         <div class="modal-form__group">
             <label class="modal-form__label" for="name">Название файла</label>
             <input class="modal-form__input"

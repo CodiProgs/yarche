@@ -103,6 +103,8 @@ class Order(models.Model):
         on_delete=models.PROTECT,
         verbose_name="Статус заказа",
         related_name="orders",
+        blank=True,
+        null=True,
     )
     manager = models.ForeignKey(
         User,
@@ -222,6 +224,11 @@ class OrderDepartmentWork(models.Model):
         null=True,
         help_text="Когда работа была завершена в отделе"
     )
+    is_active = models.BooleanField(
+        verbose_name="Активна",
+        default=False,
+        help_text="Активна ли работа отдела по заказу (переключается кнопками старт/стоп)",
+    )
     status = models.ForeignKey(
         OrderWorkStatus,
         on_delete=models.PROTECT,
@@ -230,6 +237,7 @@ class OrderDepartmentWork(models.Model):
         blank=True,
         null=True,
     )
+
 
     def __str__(self):
         return f"Заказ {self.order.id} - {self.department.name}"

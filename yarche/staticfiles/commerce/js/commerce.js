@@ -2696,6 +2696,7 @@ const initWorksPage = () => {
 						{ name: 'Раскрой', img: 'raskroy.png' },
 						{ name: 'Сборка', img: 'sborka.png' },
 						{ name: 'Сварка', img: 'svarka.png' },
+						{ name: 'Замер', img: 'zamer.png' },
 					]
 
 					let addCard = carousel.querySelector('.department-card--add')
@@ -2707,8 +2708,12 @@ const initWorksPage = () => {
 					}
 
 					departmentWorks.forEach(dw => {
-						const dep = departments.find(d => d.name === dw.department_name)
-						if (!dep) return
+						const dep = departments.find(
+							d => d.name === dw.department_name,
+						) || {
+							name: dw.department_name || 'Отдел',
+							img: 'dizayn.png',
+						}
 						const card = document.createElement('div')
 						card.className = 'department-card'
 						card.dataset.id = dw.id

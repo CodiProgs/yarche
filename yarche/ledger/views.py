@@ -901,6 +901,10 @@ def closed_transaction_update(request, pk: int):
 
             table = request.GET.get('table', 'transactions')
             if table == 'all':
+                if updated_tr:
+                    updated_tr.type = updated_tr.get_type_display()
+                if related_tr:
+                    related_tr.type = related_tr.get_type_display()
                 fields = [
                     {"name": "created", "verbose_name": "Дата"},
                     {"name": "type", "verbose_name": "Тип"},

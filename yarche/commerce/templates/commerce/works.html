@@ -1,5 +1,6 @@
 {% extends "layout.html" %}
 {% load static %}
+{% load commerce_tags %}
 {% block content %}
     <div class="page-table-container" id="debtors-container">
         <div id="context-menu" class="dropdown-menu">
@@ -18,19 +19,23 @@
             <a class="dropdown-item context-action"
                id="view_order_files-button"
                data-action="view_order_files">Файлы заказа</a>
-            <a class="dropdown-item context-action"
+            {% comment %} <a class="dropdown-item context-action"
                 id="rename-order-document-button"
                 data-action="rename_order_document"
                 style="display: none;">Переименовать</a>
             <a class="dropdown-item context-action"
                 id="delete-order-document-button"
                 data-action="delete_order_document"
-                style="display: none;">Удалить</a>
+                style="display: none;">Удалить</a> {% endcomment %}
             <a class="dropdown-item context-action"
                 id="update_status-button"
                 data-action="update_status"
                 style="display: none;">Сменить статус сделки</a>
-                {% comment %} TODO: Добавить логику для смены статуса сделки {% endcomment %}
+            <a class="dropdown-item context-action"
+                id="go-to-client-button"
+                data-action="go_to_client"
+                style="display: none;">Перейти к клиенту</a>
+            
         </div>
         <div class="debtors-data">
             <ul class="debtors-office-list">
@@ -42,6 +47,25 @@
                         </div>
                         <div class="debtors-office-list__details" id="branch-{{ client.id }}">
                             <ul>
+                                {# Заказы без объектов клиента #}
+                                {% with no_object_products=products_without_object_by_client|get_item:client.id %}
+                                    {% for product_info in no_object_products %}
+                                        <li class="debtors-office-list__item">
+                                            <div class="debtors-office-list__row" 
+                                                data-target="no-object-{{ client.id }}-{{ product_info.product_id }}"
+                                                data-product-id="{{ product_info.product_id }}"
+                                                data-client-id="{{ client.id }}"
+                                                style="border-left-width: 16px; background-color: #fffacd;">
+                                                <button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
+                                                <h4>{{ product_info.product_name }} (Без объекта)</h4>
+                                            </div>
+                                            <div class="debtors-office-list__details" id="no-object-{{ client.id }}-{{ product_info.product_id }}">
+                                            </div>
+                                        </li>
+                                    {% endfor %}
+                                {% endwith %}
+                                
+                                {# Объекты клиента #}
                                 {% for obj in client.client_objects.all %}
                                     <li class="debtors-office-list__item">
                                         <div class="debtors-office-list__row" data-target="object-{{ client.id }}-{{ obj.id }}" style="border-left-width: 16px;">

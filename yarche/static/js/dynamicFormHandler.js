@@ -33,42 +33,126 @@ export class DynamicFormHandler {
 			if (modalContent) await this.openModal(modalContent)
 
 			if (Array.isArray(this.config.dataUrls)) {
-				for (const { id, url, includeValuesInSearch = false } of this.config
-					.dataUrls) {
+				for (const {
+					id,
+					url,
+					includeValuesInSearch = false,
+					parentSelect,
+					parentParam,
+				} of this.config.dataUrls) {
 					const select = document.getElementById(id)
 
 					if (select) {
 						const selectParent = select.closest('.select')
 
+						// Функция для загрузки опций
+						const loadSelectOptions = async selectUrl => {
+							console.log(
+								`[DynamicFormHandler] loadSelectOptions called with:`,
+								selectUrl,
+								{ selectParent },
+							)
+							if (Array.isArray(selectUrl)) {
+								console.log(
+									`[DynamicFormHandler] selectUrl is array, using data directly`,
+								)
+								SelectHandler.updateSelectOptions(selectParent, selectUrl)
+							} else if (typeof selectUrl === 'string') {
+								// Если это URL (строка), всегда делаем fetch
+								console.log(
+									`[DynamicFormHandler] selectUrl is string, fetching from:`,
+									selectUrl,
+								)
+								try {
+									const response = await fetch(selectUrl, {
+										headers: { 'X-Requested-With': 'XMLHttpRequest' },
+									})
+
+									if (response.ok) {
+										const data = await response.json()
+										console.log(
+											`[DynamicFormHandler] Received data from ${selectUrl}:`,
+											data,
+										)
+										SelectHandler.updateSelectOptions(selectParent, data)
+									} else {
+										console.error(
+											`[DynamicFormHandler] Failed to load from ${selectUrl}:`,
+											response.status,
+										)
+										throw new Error(
+											`Failed to load select data: ${response.status}`,
+										)
+									}
+								} catch (err) {
+									console.error(
+										`[DynamicFormHandler] Error loading select data:`,
+										err,
+									)
+									throw err
+								}
+							}
+						}
+
 						if (Array.isArray(url)) {
 							await SelectHandler.setupSelects({
 								data: url,
 								select: selectParent,
+								includeValuesInSearch,
 							})
-						} else if (
-							(this.currentEditId || this.currentEditId === 0) &&
-							url
-						) {
-							const response = await fetch(url, {
-								headers: { 'X-Requested-With': 'XMLHttpRequest' },
-							})
-
-							if (response.ok) {
-								const data = await response.json()
-								await SelectHandler.setupSelects({
-									data: data,
-									select: selectParent,
-									includeValuesInSearch,
-								})
-							} else {
-								throw new Error('Failed to load select data')
-							}
 						} else {
+							const initialUrl =
+								parentSelect && parentParam
+									? (() => {
+											const parentField = document.getElementById(parentSelect)
+											const parentValue = parentField?.value
+											return parentValue
+												? `${url}?${parentParam}=${parentValue}`
+												: url
+										})()
+									: url
+
+							const initialData =
+								await SelectHandler.fetchSelectOptions(initialUrl)
 							await SelectHandler.setupSelects({
-								url,
+								data: initialData,
 								select: selectParent,
 								includeValuesInSearch,
 							})
+						}
+
+						// Если есть parentSelect, добавляем слушатель на событие change
+						if (parentSelect && parentParam && !Array.isArray(url)) {
+							const parentField = document.getElementById(parentSelect)
+							if (parentField) {
+								console.log(
+									`[DynamicFormHandler] Adding change listener to field "${parentSelect}" for filtering "${id}"`,
+									{ parentSelect, parentParam, url },
+								)
+								parentField.addEventListener('change', async event => {
+									const parentValue = parentField.value
+									console.log(
+										`[DynamicFormHandler] Parent field "${parentSelect}" changed to:`,
+										parentValue,
+									)
+									const newUrl = parentValue
+										? `${url}?${parentParam}=${parentValue}`
+										: url
+									console.log(
+										`[DynamicFormHandler] Loading options for "${id}" from URL:`,
+										newUrl,
+									)
+									await loadSelectOptions(newUrl)
+									console.log(`[DynamicFormHandler] Options loaded for "${id}"`)
+								})
+								console.log(
+									`[DynamicFormHandler] Change listener added successfully`,
+								)
+							} else {
+								console.warn(
+									`[DynamicFormHandler] Parent field with id "${parentSelect}" not found`,
+								)
+							}
 						}
 					} else {
 						console.warn(`Select with id "${id}" not found.`)

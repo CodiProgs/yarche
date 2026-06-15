@@ -30,6 +30,7 @@
             {% render_scripts %}
             <script src="{% static 'js/scripts.js' %}"></script>
         {% endblock extra_scripts %}
+        <script>window.UNREAD_NOTIFICATIONS = {{ unread_notifications_count|default:0 }};</script>
     </head>
     <body>
         <div class="container">

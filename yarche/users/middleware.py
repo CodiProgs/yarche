@@ -2,6 +2,7 @@ from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.utils.deprecation import MiddlewareMixin
 from users.models import SiteBlock
+from commerce.note_notifications import notify_due_notes_for_user
 
 class AuthMiddleware(MiddlewareMixin):
     EXEMPT_URLS = [
@@ -30,3 +31,5 @@ class AuthMiddleware(MiddlewareMixin):
         else:
             if url_name == "login" or path in ["/login", "/login/"]:
                 return HttpResponseRedirect(reverse("index"))
+
+            notify_due_notes_for_user(request.user)

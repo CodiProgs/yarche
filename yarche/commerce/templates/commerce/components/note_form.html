@@ -1,0 +1,42 @@
+{% load static %}
+{% load components %}
+{% add_style 'css/modal-form.css' %}
+<form class="modal-form" id="note-form" method="post">
+	<div class="modal-form__content">
+		{% csrf_token %}
+		<input class="modal-form__input"
+			type="text"
+			id="note_id"
+			hidden
+			name="note_id">
+		<input class="modal-form__input"
+			type="text"
+			id="date"
+			hidden
+			name="date">
+		<div class="modal-form__group">
+			<label class="modal-form__label" for="time">Время выполнения</label>
+			<input class="modal-form__input"
+				type="time"
+				id="time"
+				name="time">
+		</div>
+		<div class="modal-form__group">
+			<div class="input-container">
+				<textarea class="modal-form__textarea"
+						  type="text"
+						  id="text"
+						  name="text"
+						  autocapitalize="off"
+						  autocorrect="off"
+						  autocomplete="off"
+						  placeholder="Заметка"></textarea>
+				<img src="{% static 'images/close.svg' %}" alt="Clear" class="clear-button">
+			</div>
+		</div>
+		<div class="modal-form__buttons">
+			<button class="button modal-form__button" type="submit">Сохранить</button>
+			<button class="button modal-form__button button--cancel" type="button">Отменить</button>
+		</div>
+	</div>
+</form>
