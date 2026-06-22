@@ -94,32 +94,8 @@ export class DynamicFormHandler {
 							}
 						}
 
-						if (Array.isArray(url)) {
-							await SelectHandler.setupSelects({
-								data: url,
-								select: selectParent,
-								includeValuesInSearch,
-							})
-						} else {
-							const initialUrl =
-								parentSelect && parentParam
-									? (() => {
-											const parentField = document.getElementById(parentSelect)
-											const parentValue = parentField?.value
-											return parentValue
-												? `${url}?${parentParam}=${parentValue}`
-												: url
-										})()
-									: url
-
-							const initialData =
-								await SelectHandler.fetchSelectOptions(initialUrl)
-							await SelectHandler.setupSelects({
-								data: initialData,
-								select: selectParent,
-								includeValuesInSearch,
-							})
-						}
+						// Загружаем опции для базового URL
+						await loadSelectOptions(url)
 
 						// Если есть parentSelect, добавляем слушатель на событие change
 						if (parentSelect && parentParam && !Array.isArray(url)) {

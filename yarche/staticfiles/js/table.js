@@ -1027,6 +1027,9 @@ class ResizableTable {
 export const TableManager = {
 	tables: new Map(),
 	tableFilters: new Map(),
+	serverFilterConfigs: new Map(),
+	serverFilterDebounceTimers: new Map(),
+	serverFilterLastPayloads: new Map(),
 
 	init() {
 		this.destroyTables()
@@ -1179,6 +1182,9 @@ export const TableManager = {
 	destroyTables() {
 		this.tables.forEach(table => table.destroy())
 		this.tables.clear()
+		this.serverFilterConfigs.clear()
+		this.serverFilterDebounceTimers.forEach(timerId => clearTimeout(timerId))
+		this.serverFilterDebounceTimers.clear()
 	},
 
 	formatCurrencyValues(tableId) {
@@ -1917,8 +1923,10 @@ export const TableManager = {
 								type: 'select',
 								value: filterText,
 							})
-							this.applyFilters(table, filters)
-							updateSummary()
+							if (!this.requestServerFilter(table, filters)) {
+								this.applyFilters(table, filters)
+								updateSummary()
+							}
 						})
 					})
 
@@ -1935,8 +1943,10 @@ export const TableManager = {
 				selectInput.value = ''
 				selectText.textContent = ''
 				filters.delete(columnIndex)
-				this.applyFilters(table, filters)
-				updateSummary()
+				if (!this.requestServerFilter(table, filters)) {
+					this.applyFilters(table, filters)
+					updateSummary()
+				}
 			})
 		} else {
 			const input = inputElement.querySelector('input')
@@ -1954,16 +1964,20 @@ export const TableManager = {
 				} else {
 					filters.delete(columnIndex)
 				}
-				this.applyFilters(table, filters)
-				updateSummary()
+				if (!this.requestServerFilter(table, filters)) {
+					this.applyFilters(table, filters)
+					updateSummary()
+				}
 			})
 
 			clearButton.addEventListener('click', () => {
 				input.value = ''
 				input.focus()
 				filters.delete(columnIndex)
-				this.applyFilters(table, filters)
-				updateSummary()
+				if (!this.requestServerFilter(table, filters)) {
+					this.applyFilters(table, filters)
+					updateSummary()
+				}
 			})
 		}
 	},
@@ -1973,6 +1987,77 @@ export const TableManager = {
 			this.tableFilters.set(tableId, new Map())
 		}
 		return this.tableFilters.get(tableId)
+	},
+
+	setServerFilterConfig(tableId, config = null) {
+		if (!tableId) return
+
+		if (!config || typeof config.onFiltersChange !== 'function') {
+			this.serverFilterConfigs.delete(tableId)
+			this.serverFilterLastPayloads.delete(tableId)
+			return
+		}
+
+		this.serverFilterConfigs.set(tableId, {
+			debounceMs:
+				typeof config.debounceMs === 'number' ? config.debounceMs : 600,
+			onFiltersChange: config.onFiltersChange,
+		})
+	},
+
+	serializeFiltersForServer(table, filters) {
+		const result = {}
+		if (!table || !filters || filters.size === 0) return result
+
+		const headers = Array.from(table.querySelectorAll('thead th'))
+		filters.forEach((filterValue, colIndex) => {
+			const header = headers[colIndex]
+			if (!header) return
+
+			const fieldName = header.dataset.name
+			if (!fieldName) return
+
+			const value =
+				typeof filterValue?.value === 'string' ? filterValue.value.trim() : ''
+			if (!value) return
+
+			result[fieldName] = value
+		})
+
+		return result
+	},
+
+	requestServerFilter(table, filters) {
+		const tableId = table?.id
+		if (!tableId) return false
+
+		const config = this.serverFilterConfigs.get(tableId)
+		if (!config || typeof config.onFiltersChange !== 'function') {
+			return false
+		}
+
+		const filterPayload = this.serializeFiltersForServer(table, filters)
+		const payloadHash = JSON.stringify(filterPayload)
+		const prevPayloadHash = this.serverFilterLastPayloads.get(tableId)
+		if (payloadHash === prevPayloadHash) {
+			return true
+		}
+		this.serverFilterLastPayloads.set(tableId, payloadHash)
+
+		const existingTimer = this.serverFilterDebounceTimers.get(tableId)
+		if (existingTimer) clearTimeout(existingTimer)
+
+		const timerId = setTimeout(async () => {
+			this.serverFilterDebounceTimers.delete(tableId)
+			try {
+				await config.onFiltersChange(filterPayload)
+			} catch (error) {
+				console.error('Server-side filter error:', error)
+			}
+		}, config.debounceMs)
+
+		this.serverFilterDebounceTimers.set(tableId, timerId)
+		return true
 	},
 
 	applyFilters(table, filters) {
@@ -2004,6 +2089,10 @@ export const TableManager = {
 		this.tables.forEach(table => table.destroy())
 		this.tables.clear()
 		this.tableFilters.clear()
+		this.serverFilterConfigs.clear()
+		this.serverFilterDebounceTimers.forEach(timerId => clearTimeout(timerId))
+		this.serverFilterDebounceTimers.clear()
+		this.serverFilterLastPayloads.clear()
 	},
 
 	calculateTableSummary(

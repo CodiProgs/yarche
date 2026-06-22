@@ -72,3 +72,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
 	observer.observe(document.body, { childList: true, subtree: true })
 })
+
+document.addEventListener('DOMContentLoaded', () => {
+	const count = window.UNREAD_NOTIFICATIONS || 0
+	if (count <= 0) return
+
+	const notifUrl =
+		document.querySelector('a[href*="notifications"]')?.getAttribute('href') ||
+		'#'
+
+	const toast = document.createElement('div')
+	toast.className = 'toast toast--notification'
+	toast.innerHTML = `
+		<img src="/static/images/notification.svg" alt="уведомления" class="toast__icon">
+		<span class="toast__message"><a href="${notifUrl}" style="color:inherit;text-decoration:underline;">У вас ${count} непрочитанн${count === 1 ? 'ое' : count < 5 ? 'ых' : 'ых'} уведомлени${count === 1 ? 'е' : count < 5 ? 'я' : 'й'}</a></span>
+		<button class="toast__close" title="Закрыть">×</button>
+	`
+	document.body.appendChild(toast)
+
+	const close = () => {
+		toast.style.opacity = '0'
+		toast.style.transform = 'translateY(-16px)'
+		setTimeout(() => toast.remove(), 300)
+	}
+
+	toast.querySelector('.toast__close').addEventListener('click', close)
+
+	setTimeout(close, 4000)
+})

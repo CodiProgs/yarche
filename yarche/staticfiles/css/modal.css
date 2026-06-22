@@ -29,7 +29,7 @@
 .modal__content {
 	background-color: var(--color-background-window);
 	position: absolute;
-	top: 40%;
+	top: 50%;
 	left: 50%;
 	transform: translate(-50%, -50%);
 	box-shadow: rgba(255, 255, 255, 0.24) 0px 3px 8px;
