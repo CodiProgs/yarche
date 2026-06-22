@@ -7,7 +7,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import connection, transaction
 from django.utils import timezone
-from commerce.models import Client, Product, Order, OrderStatus  # 👈 замените myapp на имя вашего приложения, если отличается
+from commerce.models import Client, Product, Order  # 👈 замените myapp на имя вашего приложения, если отличается
 
 class Command(BaseCommand):
     help = 'Импорт данных из MSSQL с сохранением оригинальных ID'
@@ -269,10 +269,6 @@ class Command(BaseCommand):
 
             # 3. Заказы
             self.stdout.write("📋 Импорт заказов...")
-            default_status = OrderStatus.objects.first()
-            if not default_status:
-                raise Exception("❌ Нет OrderStatus. Создайте: OrderStatus.objects.create(name='Импорт')")
-
             with self._open_csv_safely(os.path.join(csv_dir, "orders.csv")) as f:
                 reader = csv.DictReader(f, delimiter=";")
                 count = 0
@@ -309,7 +305,6 @@ class Command(BaseCommand):
                             "deadline": deadline_dt,
                             "comment": comment,
                             "additional_info": additional_info,
-                            "status": default_status,
                             "paid_amount": Decimal("0"),
                             "required_documents": required_documents,
                             "archived_at": archived_at,

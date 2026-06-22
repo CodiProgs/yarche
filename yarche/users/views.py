@@ -116,16 +116,31 @@ def notifications_mark_all_read(request):
 
 
 @login_required
+def chat_recipients(request):
+    users = (
+        User.objects.filter(is_active=True)
+        .exclude(id=request.user.id)
+        .order_by("last_name", "first_name", "username")
+    )
+    users_data = [
+        {
+            "id": user.id,
+            "name": f"{user.last_name} {user.first_name}".strip() or user.username,
+            "username": user.username,
+            "email": user.email,
+        }
+        for user in users
+    ]
+    return JsonResponse(users_data, safe=False)
+
+
+@login_required
 def department_workers(request, department_id):
     from django.shortcuts import get_object_or_404
     from commerce.models import Department
     department = get_object_or_404(Department, id=department_id)
     
-    users = set()
-    if department.worker_user_type:
-        for user in User.objects.filter(user_type=department.worker_user_type):
-            if user != request.user:
-                users.add(user)
+    users = User.objects.filter(user_type=department.worker_user_type) if department.worker_user_type else User.objects.none()
     
     users_data = [
         {

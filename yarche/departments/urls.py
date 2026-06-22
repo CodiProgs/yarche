@@ -4,14 +4,29 @@ from . import views
 app_name = "departments"
 
 urlpatterns = [
-    path('dizayn/', views.department_orders, {'department_slug': 'dizayn'}, name='dizayn'),
+    path('tekhnicheskiy-otdel/', views.department_orders, {'department_slug': 'tekhnicheskiy-otdel'}, name='tekhnicheskiy-otdel'),
+    path('bortogib/', views.department_orders, {'department_slug': 'bortogib'}, name='bortogib'),
+    path('obuchenie/', views.department_orders, {'department_slug': 'obuchenie'}, name='obuchenie'),
+    path('dostavka/', views.department_orders, {'department_slug': 'dostavka'}, name='dostavka'),
     path('montazh/', views.department_orders, {'department_slug': 'montazh'}, name='montazh'),
+    path('pokraska/', views.department_orders, {'department_slug': 'pokraska'}, name='pokraska'),
     path('sborka/', views.department_orders, {'department_slug': 'sborka'}, name='sborka'),
     path('svarka/', views.department_orders, {'department_slug': 'svarka'}, name='svarka'),
-    path('nakatka/', views.department_orders, {'department_slug': 'nakatka'}, name='nakatka'),
     path('raskroy/', views.department_orders, {'department_slug': 'raskroy'}, name='raskroy'),
+    path('nakatka/', views.department_orders, {'department_slug': 'nakatka'}, name='nakatka'),
+    path('plotter/', views.department_orders, {'department_slug': 'plotter'}, name='plotter'),
+    path('tsifrovaya-poligrafiya/', views.department_orders, {'department_slug': 'tsifrovaya-poligrafiya'}, name='tsifrovaya-poligrafiya'),
     path('pechat/', views.department_orders, {'department_slug': 'pechat'}, name='pechat'),
-	path('zamer/', views.department_orders, {'department_slug': 'zamer'}, name='zamer'),
+    path('otdel-snabzheniya/', views.department_orders, {'department_slug': 'otdel-snabzheniya'}, name='otdel-snabzheniya'),
+    path('nachalnik-proizvodstva/', views.department_orders, {'department_slug': 'nachalnik-proizvodstva'}, name='nachalnik-proizvodstva'),
+    path('ofis-menedzher/', views.department_orders, {'department_slug': 'ofis-menedzher'}, name='ofis-menedzher'),
+    path('dizayn/', views.department_orders, {'department_slug': 'dizayn'}, name='dizayn'),
+    path('otdel-prodazh/', views.department_orders, {'department_slug': 'otdel-prodazh'}, name='otdel-prodazh'),
+    path('buhgalteriya/', views.department_orders, {'department_slug': 'buhgalteriya'}, name='buhgalteriya'),
+    path('kommercheskiy-direktor/', views.department_orders, {'department_slug': 'kommercheskiy-direktor'}, name='kommercheskiy-direktor'),
+    path('generalny-direktor/', views.department_orders, {'department_slug': 'generalny-direktor'}, name='generalny-direktor'),
+
+
     
     path('users/<slug:department_slug>/', views.department_users, name='department_users'),
     path('statuses/<slug:department_slug>/', views.department_statuses, name='department_statuses'),
@@ -36,6 +51,7 @@ urlpatterns = [
     path('work-messages/delete/<int:message_id>/', views.department_work_message_delete, name='department_work_message_delete'),
 	
     path('work/create/', views.department_work_create, name='department_work_create'),
+    path('work/set-active/<int:work_id>/', views.department_work_set_active, name='department_work_set_active'),
     path('work/delete/<int:work_id>/', views.department_work_delete, name='department_work_delete'),
     path('work/<int:work_id>/', views.department_work_detail_by_id, name='department_work_detail_by_id'),
 

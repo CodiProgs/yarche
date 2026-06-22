@@ -1669,6 +1669,8 @@ body.nav-menu-open {
 	justify-content: center;
 	width: 100%;
 	flex-grow: 1;
+	padding: 0 8px 8px;
+	box-sizing: border-box;
 }
 
 .department-card__img {
@@ -1740,17 +1742,20 @@ body.nav-menu-open {
 .department-card__work-status {
 	background: #f3f4f6;
 	color: #374151;
-	padding: 2px 8px;
-	border-radius: 0 0 12px 12px;
+	padding: 4px 8px;
+	border-radius: 12px;
 	font-size: 0.75rem;
 	font-weight: 600;
-	width: min-content;
-	margin: 0 auto;
+	width: 100%;
+	max-width: 100%;
+	margin: 8px 0 0;
 	box-sizing: border-box;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+	white-space: normal;
+	word-break: break-word;
+	overflow-wrap: anywhere;
 	text-align: center;
+	line-height: 1.3;
+	width: max-content;
 }
 
 .department-card__actions {

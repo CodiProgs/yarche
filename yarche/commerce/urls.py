@@ -14,6 +14,7 @@ urlpatterns = [
 	path("orders/add/", views.order_create, name="order_add"),
 	path("orders/edit/<int:pk>/", views.order_update, name="order_edit"),
 	path("orders/status/edit/<int:pk>/", views.order_update_status, name="order_update_status"),
+	path("orders/archive/<int:pk>/", views.order_archive, name="order_archive"),
 	path("orders/delete/<int:pk>/", views.order_delete, name="order_delete"),
 	path("works/", views.works, name="works"),
 	path("product_orders/", views.product_orders, name="product_orders"),
@@ -89,5 +90,11 @@ urlpatterns = [
 	path("notes/add/", views.note_create, name="note_add"),
 	path("notes/edit/<int:pk>/", views.note_update, name="note_edit"),
 	path("notes/delete/<int:pk>/", views.note_delete, name="note_delete"),
+
+	path("messages/", views.messages_table, name="messages_table"),
+	path("messages/add/", views.chat_message_create, name="chat_message_create"),
+	path("messages/edit/<int:pk>/", views.chat_message_edit, name="chat_message_edit"),
+	path("messages/delete/<int:pk>/", views.chat_message_delete, name="chat_message_delete"),
+	path("messages/<int:pk>/", views.chat_message_detail, name="chat_message_detail"),
 ]
 

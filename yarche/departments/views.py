@@ -14,47 +14,99 @@ from users.models import Notification
 from django.forms.models import model_to_dict
 
 
+def _format_work_created(work):
+    from django.utils.timezone import localtime
+    if getattr(work, "created", None):
+        return localtime(work.created).strftime("%d.%m.%Y %H:%M")
+    return None
+
+
+def _attach_department_work_to_order(order, work):
+    order.department_status = work.get_current_status()
+    order.department_executor = work.executor
+    order.department_started = work.get_formatted_started_at()
+    order.department_completed = work.get_formatted_completed_at()
+    order.department_work_created = _format_work_created(work)
+    order.legal_name = order.client.legal_name if order.client else None
+    return order
+
+
+DEPARTMENT_ORDER_TABLE_FIELDS = [
+    {"name": "id", "verbose_name": "№ Заказа"},
+    {"name": "department_executor", "verbose_name": "Исполнитель", "is_relation": True},
+    {"name": "client", "verbose_name": "Клиент", "is_relation": True},
+    {"name": "legal_name", "verbose_name": "Юрлицо"},
+    {"name": "product", "verbose_name": "Продукт", "is_relation": True},
+    {"name": "department_status", "verbose_name": "Состояние заказа", "is_relation": True},
+    {"name": "department_work_created", "verbose_name": "Создан", "is_date": True},
+    {"name": "department_started", "verbose_name": "Начало работы"},
+    {"name": "department_completed", "verbose_name": "Завершен"},
+]
+
+
+def _order_related_users_queryset(department, order):
+    users = User.objects.none()
+    if order.manager and department.worker_user_type and order.manager.user_type_id == department.worker_user_type.id:
+        users = users | User.objects.filter(id=order.manager.id)
+    if department.worker_user_type:
+        users = users | order.viewers.filter(user_type=department.worker_user_type)
+    executors = OrderDepartmentWork.objects.filter(
+        order=order,
+        department=department,
+        executor__isnull=False,
+    ).values_list("executor_id", flat=True)
+    users = users | User.objects.filter(id__in=executors)
+    return users.distinct()
+
+
+def _department_workers_queryset(department):
+    if department.worker_user_type:
+        return User.objects.filter(user_type=department.worker_user_type).distinct()
+    return User.objects.none()
+
+
+def _user_can_be_department_executor(executor, department, order, current_user):
+    if executor.id == current_user.id:
+        return _order_related_users_queryset(department, order).filter(id=executor.id).exists()
+
+    if department.worker_user_type and executor.user_type_id == department.worker_user_type_id:
+        return True
+    if executor.user_type and executor.user_type.name == department.name:
+        return True
+    return False
+
+
+def _department_users_queryset(department, order=None):
+    workers = _department_workers_queryset(department)
+    if order is None:
+        return workers
+    return (workers | _order_related_users_queryset(department, order)).distinct()
+
+
 @login_required
 def department_orders(request, department_slug):
     department = get_object_or_404(Department, slug=department_slug)
     
     department_works = OrderDepartmentWork.objects.filter(
         department=department,
-        completed_at__isnull=True 
+        is_active=True,
     ).select_related(
         'order',
         'order__client',
         'order__product',
-        'order__status',
         'order__manager',
         'status',
         'executor'
-    ).order_by('-order__created')
+    ).order_by('-created')
     
     data = []
 
     for work in department_works:
         order = work.order
-        
-        order.department_status = work.get_current_status()
-        order.department_executor = work.executor
-        order.department_started = work.get_formatted_started_at()
-        order.department_completed = work.get_formatted_completed_at()
-        order.legal_name = order.client.legal_name if order.client else None
-
+        _attach_department_work_to_order(order, work)
         data.append(order)
     
-    fields = [
-        {"name": "id", "verbose_name": "№ Заказа"},
-        {"name": "department_executor", "verbose_name": "Исполнитель", "is_relation": True},
-        {"name": "client", "verbose_name": "Клиент", "is_relation": True},
-        {"name": "legal_name", "verbose_name": "Юрлицо"},
-        {"name": "product", "verbose_name": "Продукт", "is_relation": True},
-        {"name": "department_status", "verbose_name": f"Состояние заказа", "is_relation": True},
-        {"name": "created", "verbose_name": "Создан", "is_date": True},
-        {"name": "department_started", "verbose_name": "Начало работы"},
-        {"name": "department_completed", "verbose_name": "Завершен"},
-    ]
+    fields = DEPARTMENT_ORDER_TABLE_FIELDS
 
     is_chief = False
     user_type = getattr(request.user, "user_type", None)
@@ -89,26 +141,14 @@ def department_users(request, department_slug):
     order_work_id = request.GET.get("order_work_id")
 
     if not order_id and not order_work_id:
-        users = User.objects.filter(user_type=department.worker_user_type) if department.worker_user_type else User.objects.none()
+        users = _department_users_queryset(department)
     else:
         if order_work_id:
             order_work = get_object_or_404(OrderDepartmentWork, id=order_work_id)
             order = order_work.order
         else:
             order = get_object_or_404(Order, id=order_id)
-        users = User.objects.none()
-        if order.manager and department.worker_user_type and order.manager.user_type_id == department.worker_user_type.id:
-            users = users | User.objects.filter(id=order.manager.id)
-        if department.worker_user_type:
-            viewers = order.viewers.filter(user_type=department.worker_user_type)
-            users = users | viewers
-        executors = OrderDepartmentWork.objects.filter(
-            order=order,
-            department=department,
-            executor__isnull=False
-        ).values_list('executor_id', flat=True)
-        users = users | User.objects.filter(id__in=executors)
-        users = users.distinct()
+        users = _department_users_queryset(department, order=order)
 
     users_data = [
         {
@@ -166,16 +206,25 @@ def department_work_assign_executor(request, order_id: int, department_slug: str
                     status=400,
                 )
             
-            if not executor.user_type or executor.user_type.name != department.name:
+            if not _user_can_be_department_executor(executor, department, order, request.user):
+                if executor.id == request.user.id:
+                    message = "Вы не можете назначить себя исполнителем, так как не связаны с этим заказом"
+                else:
+                    message = f"Пользователь не принадлежит отделу {department.name}"
                 return JsonResponse(
-                    {"status": "error", "message": f"Пользователь не принадлежит отделу {department.name}"},
+                    {"status": "error", "message": message},
                     status=400,
                 )
             
+            from django.utils import timezone
+
             department_work, created = OrderDepartmentWork.objects.get_or_create(
                 order=order,
                 department=department,
-                defaults={"executor": executor}
+                defaults={
+                    "executor": executor,
+                    "started_at": timezone.now() if executor else None,
+                }
             )
 
             url = f"/departments/{department_slug}/?order_id={order.id}"
@@ -183,7 +232,11 @@ def department_work_assign_executor(request, order_id: int, department_slug: str
             if not created:
                 old_executor = department_work.executor
                 department_work.executor = executor
-                department_work.save(update_fields=["executor"])
+                update_fields = ["executor"]
+                if executor and not department_work.started_at:
+                    department_work.started_at = timezone.now()
+                    update_fields.append("started_at")
+                department_work.save(update_fields=update_fields)
 
                 Notification.objects.create(
                     user=executor,
@@ -204,23 +257,9 @@ def department_work_assign_executor(request, order_id: int, department_slug: str
                 )
                 message = f"Назначен исполнитель {executor}"
             
-            order.department_status = department_work.get_current_status()
-            order.department_executor = department_work.executor
-            order.department_started = department_work.get_formatted_started_at()
-            order.department_completed = department_work.get_formatted_completed_at()
-            order.legal_name = order.client.legal_name if order.client else None
+            _attach_department_work_to_order(order, department_work)
             
-            fields = [
-                {"name": "id", "verbose_name": "№ Заказа"},
-                {"name": "department_executor", "verbose_name": "Исполнитель", "is_relation": True},
-                {"name": "client", "verbose_name": "Клиент", "is_relation": True},
-                {"name": "legal_name", "verbose_name": "Юрлицо"},
-                {"name": "product", "verbose_name": "Продукт", "is_relation": True},
-                {"name": "department_status", "verbose_name": "Состояние заказа", "is_relation": True},
-                {"name": "created", "verbose_name": "Создан", "is_date": True},
-                {"name": "department_started", "verbose_name": "Начало работы"},
-                {"name": "department_completed", "verbose_name": "Завершен"},
-            ]
+            fields = DEPARTMENT_ORDER_TABLE_FIELDS
             
             html = render_to_string("components/table_row.html", {"item": order, "fields": fields})
             
@@ -277,28 +316,26 @@ def department_work_update_status(request, order_id: int, department_slug: str):
             department_work, created = OrderDepartmentWork.objects.get_or_create(
                 order=order,
                 department=department,
-                defaults={"status": new_status, "started_at": timezone.now() if new_status.is_initial else None}
+                defaults={"status": new_status}
             )
 
             old_status = department_work.status
             department_work.status = new_status
+            update_fields = ["status"]
 
-            # Управляем started_at на основе is_initial флага
-            if new_status.is_initial:
-                if not department_work.started_at:
-                    department_work.started_at = timezone.now()
-            
-            # Управляем completed_at на основе is_final флага
             if new_status.is_final:
                 if not department_work.completed_at:
                     department_work.completed_at = timezone.now()
-                department_work.save(update_fields=["status", "started_at", "completed_at"])
+                    update_fields.append("completed_at")
+                department_work.is_active = False
+                update_fields.append("is_active")
+                department_work.save(update_fields=update_fields)
                 message = f"Статус изменен на '{new_status}'. Работа завершена."
             else:
-                # Если это не финальный статус, очищаем completed_at
                 if department_work.completed_at:
                     department_work.completed_at = None
-                department_work.save(update_fields=["status", "started_at", "completed_at"])
+                    update_fields.append("completed_at")
+                department_work.save(update_fields=update_fields)
                 message = f"Статус изменен с '{old_status}' на '{new_status}'" if old_status else f"Установлен статус '{new_status}'"
 
             department_work.refresh_from_db()
@@ -309,27 +346,17 @@ def department_work_update_status(request, order_id: int, department_slug: str):
                 id=order.id,
                 client=order.client,
                 product=order.product,
-                created=order.created,
                 status=order.status,
                 manager=order.manager,
                 department_status=department_work.get_current_status(),
                 department_executor=department_work.executor,
                 department_started=department_work.get_formatted_started_at(),
                 department_completed=department_work.get_formatted_completed_at(),
+                department_work_created=_format_work_created(department_work),
                 legal_name=order.client.legal_name if order.client else None
             )
 
-            fields = [
-                {"name": "id", "verbose_name": "№ Заказа"},
-                {"name": "department_executor", "verbose_name": "Исполнитель", "is_relation": True},
-                {"name": "client", "verbose_name": "Клиент", "is_relation": True},
-                {"name": "legal_name", "verbose_name": "Юрлицо"},
-                {"name": "product", "verbose_name": "Продукт", "is_relation": True},
-                {"name": "department_status", "verbose_name": "Состояние заказа"},
-                {"name": "created", "verbose_name": "Создан", "is_date": True},
-                {"name": "department_started", "verbose_name": "Начало работы"},
-                {"name": "department_completed", "verbose_name": "Завершен"},
-            ]
+            fields = DEPARTMENT_ORDER_TABLE_FIELDS
 
             html = render_to_string("components/table_row.html", {"item": order_data, "fields": fields})
 
@@ -339,8 +366,10 @@ def department_work_update_status(request, order_id: int, department_slug: str):
                     "message": message,
                     "html": html,
                     "id": order.id,
+                    "status_name": new_status.name,
                     "started_at": department_work.get_formatted_started_at(),
                     "completed_at": department_work.get_formatted_completed_at(),
+                    "is_active": department_work.is_active,
                 }
             )
 
@@ -707,6 +736,12 @@ def department_work_message_edit(request, message_id: int):
                     {"status": "error", "message": "Вы можете редактировать только свои сообщения"},
                     status=403,
                 )
+
+            if message.is_read:
+                return JsonResponse(
+                    {"status": "error", "message": "Нельзя редактировать просмотренное сообщение"},
+                    status=400,
+                )
             
             if request.method in ["PUT", "PATCH"]:
                 data = json.loads(request.body)
@@ -714,7 +749,6 @@ def department_work_message_edit(request, message_id: int):
                 data = request.POST.dict()
             
             message_text = (data.get("message") or "").strip()
-            recipient_id = data.get("recipient") or data.get("recipient_id")
             
             if not message_text:
                 return JsonResponse(
@@ -723,23 +757,9 @@ def department_work_message_edit(request, message_id: int):
                 )
             
             message.message = message_text
-            
-            if recipient_id:
-                try:
-                    from users.models import User
-                    recipient = get_object_or_404(User, id=int(recipient_id))
-                    message.recipient = recipient
-                except (ValueError, TypeError):
-                    return JsonResponse(
-                        {"status": "error", "message": "Неверный ID получателя"},
-                        status=400,
-                    )
-            else:
-                message.recipient = None
-            
             message.is_read = False
             
-            message.save(update_fields=["message", "recipient", "is_read"])
+            message.save(update_fields=["message", "is_read"])
                         
             message_obj = SimpleNamespace(
                 id=message.id,
@@ -811,6 +831,12 @@ def department_work_message_delete(request, message_id: int):
                 return JsonResponse(
                     {"status": "error", "message": "Вы можете удалять только свои сообщения"},
                     status=403,
+                )
+
+            if message.is_read:
+                return JsonResponse(
+                    {"status": "error", "message": "Нельзя удалить просмотренное сообщение"},
+                    status=400,
                 )
             
             message_id = message.id
@@ -928,8 +954,14 @@ def department_work_create(request):
                     "id": work.id,
                     "order": work.order.id,
                     "department": work.department.id,
-                    "status_name": work.status.name,
+                    "department_slug": work.department.slug,
                     "department_name": work.department.name,
+                    "status_name": work.status.name if work.status else "",
+                    "is_active": work.is_active,
+                    "is_completed": False,
+                    "started_at": None,
+                    "completed_at": None,
+                    "executor_name": "",
                 })
 
             if created_works:
@@ -1142,3 +1174,41 @@ def order_work_status_detail(request, pk: int):
         data["department"] = status.department.id
         data["department_name"] = status.department.name
     return JsonResponse({"data": data})
+
+
+@login_required
+@require_POST
+def department_work_set_active(request, work_id: int):
+    """Переключает активность работы отдела (кнопки старт/стоп на странице работ)."""
+    try:
+        data = json.loads(request.body) if request.body else {}
+        action = data.get("action", "")
+
+        department_work = get_object_or_404(
+            OrderDepartmentWork.objects.select_related("status"),
+            id=work_id,
+        )
+
+        if action == "start":
+            department_work.is_active = True
+        elif action == "stop":
+            department_work.is_active = False
+        else:
+            return JsonResponse(
+                {"status": "error", "message": "Не указано действие (start/stop)"},
+                status=400,
+            )
+
+        department_work.save(update_fields=["is_active"])
+
+        return JsonResponse({
+            "status": "success",
+            "is_active": department_work.is_active,
+            "started_at": department_work.get_formatted_started_at(),
+            "completed_at": department_work.get_formatted_completed_at(),
+            "is_completed": bool(department_work.completed_at),
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({"status": "error", "message": "Неверный формат JSON"}, status=400)
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)

@@ -97,15 +97,9 @@ class OrderWorkStatus(models.Model):
         verbose_name_plural = "Статусы работ отделов"
         ordering = ['name']
 
+SALES_DEPARTMENT_NAME = "Отдел продаж"
+
 class Order(models.Model):
-    status = models.ForeignKey(
-        OrderStatus,
-        on_delete=models.PROTECT,
-        verbose_name="Статус заказа",
-        related_name="orders",
-        blank=True,
-        null=True,
-    )
     manager = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
@@ -186,6 +180,21 @@ class Order(models.Model):
     def __str__(self):
         return f"{self.id}"
 
+    def get_sales_department_work(self):
+        if hasattr(self, "sales_department_works_list"):
+            works = self.sales_department_works_list
+            return works[0] if works else None
+        return self.department_works.filter(
+            department__name=SALES_DEPARTMENT_NAME
+        ).select_related("status", "department", "executor").first()
+
+    @property
+    def status(self):
+        work = self.get_sales_department_work()
+        if work and work.status:
+            return work.status.name
+        return None
+
     class Meta:
         verbose_name = "Заказ"
         verbose_name_plural = "Заказы"
@@ -228,6 +237,10 @@ class OrderDepartmentWork(models.Model):
         verbose_name="Активна",
         default=False,
         help_text="Активна ли работа отдела по заказу (переключается кнопками старт/стоп)",
+    )
+    created = models.DateTimeField(
+        verbose_name="Создано",
+        auto_now_add=True,
     )
     status = models.ForeignKey(
         OrderWorkStatus,
@@ -463,3 +476,29 @@ class Bonus(models.Model):
     class Meta:
         verbose_name = "Бонус"
         verbose_name_plural = "Бонусы"
+
+
+def ensure_sales_department_work(order, user=None):
+    """Создаёт работу отдела продаж по заказу, если её ещё нет."""
+    department = Department.objects.filter(name=SALES_DEPARTMENT_NAME).first()
+    if not department:
+        return None
+
+    work = OrderDepartmentWork.objects.filter(order=order, department=department).first()
+    if work:
+        return work
+
+    initial_status = OrderWorkStatus.objects.filter(
+        department=department,
+        is_initial=True,
+    ).first()
+    if not initial_status:
+        initial_status = OrderWorkStatus.objects.filter(department=department).first()
+
+    return OrderDepartmentWork.objects.create(
+        order=order,
+        department=department,
+        status=initial_status,
+        executor=user,
+        started_at=timezone.now() if user else None,
+    )

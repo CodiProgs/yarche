@@ -13,6 +13,7 @@ from django.db.models import (
     ExpressionWrapper,
     Value,
     Func,
+    Prefetch,
 )
 import locale
 import datetime
@@ -26,7 +27,7 @@ from django.db.models.functions import Coalesce, Cast
 from django.template.loader import render_to_string
 from yarche.utils import get_model_fields
 from django.contrib.auth.decorators import login_required
-from .models import Product, Client, Order, OrderStatus, Contact, FileType, Document, ClientObject, OrderDepartmentWork, KanbanClientPlacement, KanbanColumn, OrderWorkStatus, EmergencyIncident, Department, ManagerNote
+from .models import Product, Client, Order, Contact, FileType, Document, ClientObject, OrderDepartmentWork, OrderDepartmentWorkMessage, KanbanClientPlacement, KanbanColumn, OrderWorkStatus, EmergencyIncident, Department, ManagerNote, SALES_DEPARTMENT_NAME, ensure_sales_department_work
 from ledger.models import Transaction, BankAccount
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.http import require_http_methods, require_POST
@@ -273,7 +274,10 @@ def apply_orders_filters(queryset, filters):
             continue
 
         if key == "status":
-            q &= Q(status__name__icontains=value)
+            q &= Q(
+                department_works__department__name=SALES_DEPARTMENT_NAME,
+                department_works__status__name__icontains=value,
+            )
             continue
 
         if key == "manager":
@@ -327,6 +331,18 @@ def apply_orders_filters(queryset, filters):
         return annotated_qs.filter(q).distinct()
     except FieldError:
         return queryset
+
+
+def prefetch_sales_department_works(queryset):
+    return queryset.prefetch_related(
+        Prefetch(
+            "department_works",
+            queryset=OrderDepartmentWork.objects.filter(
+                department__name=SALES_DEPARTMENT_NAME
+            ).select_related("status"),
+            to_attr="sales_department_works_list",
+        )
+    )
 
 def render_client_table(clients):
     excluded_fields = [
@@ -657,14 +673,16 @@ def product_orders(request):
     client_id = request.GET.get("client_id")
     object_id = request.GET.get("object_id")
     
-    orders = Order.objects.filter(
-        product_id=product_id,
-        client_id=client_id,
-        client_object_id=object_id,
-        archived_at__isnull=True,
-    ).filter(
-        Q(manager=request.user) | Q(viewers=request.user)
-    ).order_by("-created")
+    orders = prefetch_sales_department_works(
+        Order.objects.filter(
+            product_id=product_id,
+            client_id=client_id,
+            client_object_id=object_id,
+            archived_at__isnull=True,
+        ).filter(
+            Q(manager=request.user) | Q(viewers=request.user)
+        ).order_by("-created")
+    )
     
     fields = [
         {"name": "id", "verbose_name": "Заказ"},
@@ -701,11 +719,13 @@ def all_orders_without_object(request):
     """Загружает ВСЕ заказы без объектов для конкретного клиента"""
     client_id = request.GET.get("client_id")
     
-    orders = Order.objects.filter(
-        client_id=client_id,
-        client_object_id__isnull=True,
-        archived_at__isnull=True,
-    ).select_related('product').order_by("-created")
+    orders = prefetch_sales_department_works(
+        Order.objects.filter(
+            client_id=client_id,
+            client_object_id__isnull=True,
+            archived_at__isnull=True,
+        ).select_related('product').order_by("-created")
+    )
     
     fields = [
         {"name": "id", "verbose_name": "Заказ"},
@@ -742,12 +762,14 @@ def product_orders_without_object(request):
     product_id = request.GET.get("product_id")
     client_id = request.GET.get("client_id")
     
-    orders = Order.objects.filter(
-        product_id=product_id,
-        client_id=client_id,
-        client_object_id__isnull=True,
-        archived_at__isnull=True,
-    ).order_by("-created")
+    orders = prefetch_sales_department_works(
+        Order.objects.filter(
+            product_id=product_id,
+            client_id=client_id,
+            client_object_id__isnull=True,
+            archived_at__isnull=True,
+        ).order_by("-created")
+    )
     
     fields = [
         {"name": "id", "verbose_name": "Заказ"},
@@ -781,7 +803,7 @@ def product_orders_without_object(request):
 
 @login_required
 def orders(request):
-    orders_qs = Order.objects.all().order_by("-created")
+    orders_qs = prefetch_sales_department_works(Order.objects.all().order_by("-created"))
     paginator = Paginator(orders_qs, 25)
     page_obj = paginator.get_page(1)
 
@@ -801,7 +823,7 @@ def orders(request):
 
 @login_required
 def orders_paginate(request):
-    orders_qs = Order.objects.all().order_by("-created")
+    orders_qs = prefetch_sales_department_works(Order.objects.all().order_by("-created"))
     filters = parse_filters_from_request(request)
     orders_qs = apply_orders_filters(orders_qs, filters)
 
@@ -883,6 +905,9 @@ def get_order_fields():
     for pos, field in insertions:
         fields.insert(pos, field)
 
+    if not any(field["name"] == "status" for field in fields):
+        fields.insert(1, {"name": "status", "verbose_name": "Статус", "is_relation": True})
+
     return fields
 
 def prepare_orders_data(orders):
@@ -895,10 +920,14 @@ def prepare_orders_data(orders):
 
 @login_required
 def order_statuses(request):
-    statuses = [
-        {"id": acc.id, "name": acc.name} for acc in OrderStatus.objects.all()
-    ]
-    return JsonResponse(statuses, safe=False)
+    department = Department.objects.filter(name=SALES_DEPARTMENT_NAME).first()
+    if not department:
+        return JsonResponse([], safe=False)
+    statuses = OrderWorkStatus.objects.filter(department=department).order_by("name")
+    return JsonResponse(
+        [{"id": status.id, "name": status.name} for status in statuses],
+        safe=False,
+    )
 
 @login_required
 def clients_paginate(request):
@@ -2032,15 +2061,7 @@ def order_create(request):
                         status=400,
                     )
             
-            default_status = OrderStatus.objects.first()
-            if not default_status:
-                return JsonResponse(
-                    {"status": "error", "message": "В системе не настроены статусы заказов"},
-                    status=400,
-                )
-            
             order = Order.objects.create(
-                status=default_status,
                 manager=request.user,
                 client=client,
                 product=product,
@@ -2054,10 +2075,22 @@ def order_create(request):
                 required_documents=required_documents,
             )
 
+            sales_work = ensure_sales_department_work(order, request.user)
+            if not sales_work:
+                return JsonResponse(
+                    {
+                        "status": "error",
+                        "message": f'Отдел "{SALES_DEPARTMENT_NAME}" не найден или для него не настроены статусы работ',
+                    },
+                    status=400,
+                )
+
             wait_status = OrderWorkStatus.objects.filter(name__iexact="Ожидает", department__isnull=True).first()
 
             departments = product.departments.all()
             for department in departments:
+                if department.name == SALES_DEPARTMENT_NAME:
+                    continue
                 dep_status = OrderWorkStatus.objects.filter(name__iexact="Ожидает", department=department).first() or wait_status
                 OrderDepartmentWork.objects.create(
                     order=order,
@@ -2065,6 +2098,7 @@ def order_create(request):
                     status=dep_status,
                 )
             
+            order.sales_department_works_list = [sales_work]
             order.legal_name = order.client.legal_name if order.client else None
             order.paid_percent = int(order.paid_amount / order.amount * 100) if order.amount else 0
             
@@ -2224,7 +2258,7 @@ def order_detail(request, pk: int):
         item['department_slug'] = dw.department.slug if dw.department else ''
         item['status_name'] = dw.status.name if dw.status else ''
         item['is_completed'] = bool(dw.status and getattr(dw.status, "is_final", False))
-        item['is_in_progress'] = bool(dw.started_at and not dw.completed_at)
+        item['is_in_progress'] = bool(dw.is_active and not dw.completed_at)
         item['executor_name'] = ''
         
         # Добавляем фамилию исполнителя
@@ -2249,6 +2283,8 @@ def order_detail(request, pk: int):
             
         department_works.append(item)
     data = model_to_dict(order)
+    sales_work = order.get_sales_department_work()
+    data["status"] = sales_work.status_id if sales_work and sales_work.status_id else None
     if "viewers" in data:
         data["viewers"] = list(order.viewers.values_list("id", flat=True))
     if "created" in data and data["created"]:
@@ -2307,28 +2343,63 @@ def order_update_status(request, pk: int):
                     status=400,
                 )
 
+            sales_department = Department.objects.filter(name=SALES_DEPARTMENT_NAME).first()
+            if not sales_department:
+                return JsonResponse(
+                    {"status": "error", "message": f'Отдел "{SALES_DEPARTMENT_NAME}" не найден'},
+                    status=400,
+                )
+
             try:
-                status = get_object_or_404(OrderStatus, id=int(status_id))
+                new_status = get_object_or_404(
+                    OrderWorkStatus,
+                    id=int(status_id),
+                    department=sales_department,
+                )
             except (ValueError, TypeError):
                 return JsonResponse(
                     {"status": "error", "message": "Неверный ID статуса заказа"},
                     status=400,
                 )
 
-            old_status = order.status
-            order.status = status
+            sales_work = ensure_sales_department_work(order, request.user)
+            if not sales_work:
+                return JsonResponse(
+                    {"status": "error", "message": "Не удалось создать работу отдела продаж"},
+                    status=400,
+                )
 
-            update_fields = ["status"]
-            if status.name.strip().lower() == "готово":
+            old_status = sales_work.status
+            sales_work.status = new_status
+            work_update_fields = ["status"]
+
+            if new_status.is_final:
+                if not sales_work.completed_at:
+                    sales_work.completed_at = timezone.now()
+                    work_update_fields.append("completed_at")
+                sales_work.is_active = False
+                work_update_fields.append("is_active")
+            else:
+                if sales_work.completed_at:
+                    sales_work.completed_at = None
+                    work_update_fields.append("completed_at")
+
+            sales_work.save(update_fields=work_update_fields)
+
+            order_update_fields = []
+            if new_status.is_final:
                 if not order.archived_at:
                     order.archived_at = timezone.now()
-                    update_fields.append("archived_at")
+                    order_update_fields.append("archived_at")
             else:
                 if order.archived_at:
                     order.archived_at = None
-                    update_fields.append("archived_at")
+                    order_update_fields.append("archived_at")
 
-            order.save(update_fields=update_fields)
+            if order_update_fields:
+                order.save(update_fields=order_update_fields)
+
+            order.sales_department_works_list = [sales_work]
 
             fields = [
                 {"name": "id", "verbose_name": "Заказ"},
@@ -2359,9 +2430,9 @@ def order_update_status(request, pk: int):
                     "html": html,
                     "archived": order.archived_at is not None,
                     "message": (
-                        f"Статус изменен с '{old_status}' на '{status}'"
+                        f"Статус изменен с '{old_status.name if old_status else ''}' на '{new_status.name}'"
                         if old_status
-                        else f"Установлен статус '{status}'"
+                        else f"Установлен статус '{new_status.name}'"
                     ),
                 }
             )
@@ -3580,4 +3651,269 @@ def note_delete(request, pk):
     note = get_object_or_404(ManagerNote, pk=pk, user=request.user)
     note.delete()
     return JsonResponse({"ok": True})
+
+
+@login_required
+@require_POST
+def order_archive(request, pk: int):
+    try:
+        with transaction.atomic():
+            order = get_object_or_404(Order, id=pk)
+
+            user_type_name = (
+                getattr(getattr(request.user, "user_type", None), "name", "") or ""
+            ).strip().lower()
+            is_admin = user_type_name == "администратор"
+            is_manager = user_type_name == "менеджер по работе с клиентами"
+
+            if not is_admin:
+                if not is_manager or order.manager_id != request.user.id:
+                    return JsonResponse(
+                        {
+                            "status": "error",
+                            "message": "Недостаточно прав для архивации этого заказа",
+                        },
+                        status=403,
+                    )
+
+            if order.archived_at:
+                return JsonResponse(
+                    {"status": "error", "message": "Заказ уже находится в архиве"},
+                    status=400,
+                )
+
+            order.archived_at = timezone.now()
+            order.save(update_fields=["archived_at"])
+
+            return JsonResponse(
+                {
+                    "status": "success",
+                    "id": order.id,
+                    "message": "Заказ отправлен в архив",
+                }
+            )
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+
+MESSAGE_TABLE_FIELDS = [
+    {"name": "is_read", "verbose_name": "Просмотрено", "is_boolean": True},
+    {"name": "author_name", "verbose_name": "От кого"},
+    {"name": "recipient_name", "verbose_name": "Кому"},
+    {"name": "created", "verbose_name": "Создано"},
+    {"name": "order_display", "verbose_name": "Заказ"},
+    {"name": "message", "verbose_name": "Сообщение"},
+]
+
+
+def _user_chat_messages_queryset(user):
+    return (
+        OrderDepartmentWorkMessage.objects.filter(
+            Q(author=user) | Q(recipient=user)
+        )
+        .select_related("author", "recipient", "order", "order_work", "order_work__order")
+        .order_by("-created")
+    )
+
+
+def _message_order_id(message):
+    if message.order_id:
+        return message.order_id
+    if message.order_work_id:
+        return message.order_work.order_id
+    return None
+
+
+def _message_to_table_row(message):
+    from types import SimpleNamespace
+
+    order_id = _message_order_id(message)
+    return SimpleNamespace(
+        id=message.id,
+        author_id=message.author_id,
+        recipient_id=message.recipient_id,
+        is_read=message.is_read,
+        author_name=str(message.author),
+        recipient_name=str(message.recipient) if message.recipient else "Всем",
+        created=message.get_formatted_created(),
+        order_id=order_id or "",
+        order_display=str(order_id) if order_id else "",
+        message=message.message,
+    )
+
+
+def _render_message_table_row(message):
+    return render_to_string(
+        "components/message_table_row.html",
+        {"item": _message_to_table_row(message), "fields": MESSAGE_TABLE_FIELDS},
+    )
+
+
+def _user_can_access_message(user, message):
+    return message.author_id == user.id or message.recipient_id == user.id
+
+
+@login_required
+def messages_table(request):
+    messages_qs = _user_chat_messages_queryset(request.user)
+    rows = [_message_to_table_row(msg) for msg in messages_qs]
+    ids = [msg.id for msg in messages_qs]
+    return render(
+        request,
+        "commerce/messages_table.html",
+        {
+            "fields": MESSAGE_TABLE_FIELDS,
+            "data": rows,
+            "ids": ids,
+            "current_user_id": request.user.id,
+        },
+    )
+
+
+@login_required
+@require_POST
+def chat_message_create(request):
+    try:
+        message_text = (request.POST.get("message") or "").strip()
+        recipient_id = request.POST.get("recipient") or request.POST.get("recipient_id")
+
+        if request.POST.get("order") or request.POST.get("order_id"):
+            return JsonResponse(
+                {"status": "error", "message": "Нельзя создавать сообщение по заказу на этой странице"},
+                status=400,
+            )
+        if request.POST.get("order_work") or request.POST.get("order_work_id"):
+            return JsonResponse(
+                {"status": "error", "message": "Нельзя создавать сообщение по заказу на этой странице"},
+                status=400,
+            )
+        if not message_text:
+            return JsonResponse(
+                {"status": "error", "message": "Сообщение не может быть пустым"},
+                status=400,
+            )
+        if not recipient_id:
+            return JsonResponse(
+                {"status": "error", "message": "Укажите получателя"},
+                status=400,
+            )
+
+        recipient = get_object_or_404(User, id=int(recipient_id))
+        message = OrderDepartmentWorkMessage.objects.create(
+            author=request.user,
+            recipient=recipient,
+            message=message_text,
+        )
+
+        return JsonResponse(
+            {
+                "status": "success",
+                "id": message.id,
+                "html": _render_message_table_row(message),
+            }
+        )
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+
+@login_required
+@require_http_methods(["POST", "PUT", "PATCH"])
+def chat_message_edit(request, pk):
+    try:
+        message = get_object_or_404(OrderDepartmentWorkMessage, id=pk)
+
+        if not _user_can_access_message(request.user, message):
+            return JsonResponse(
+                {"status": "error", "message": "У вас нет доступа к этому сообщению"},
+                status=403,
+            )
+        if message.author != request.user:
+            return JsonResponse(
+                {"status": "error", "message": "Вы можете редактировать только свои сообщения"},
+                status=403,
+            )
+        if message.is_read:
+            return JsonResponse(
+                {"status": "error", "message": "Нельзя редактировать просмотренное сообщение"},
+                status=400,
+            )
+
+        if request.method in ["PUT", "PATCH"]:
+            data = json.loads(request.body)
+        else:
+            data = request.POST.dict()
+
+        message_text = (data.get("message") or "").strip()
+        if not message_text:
+            return JsonResponse(
+                {"status": "error", "message": "Сообщение не может быть пустым"},
+                status=400,
+            )
+
+        message.message = message_text
+        message.save(update_fields=["message"])
+
+        return JsonResponse(
+            {
+                "status": "success",
+                "id": message.id,
+                "html": _render_message_table_row(message),
+            }
+        )
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {"status": "error", "message": "Неверный формат JSON"},
+            status=400,
+        )
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+
+@login_required
+@require_http_methods(["POST", "DELETE"])
+def chat_message_delete(request, pk):
+    try:
+        message = get_object_or_404(OrderDepartmentWorkMessage, id=pk)
+
+        if message.author != request.user:
+            return JsonResponse(
+                {"status": "error", "message": "Вы можете удалять только свои сообщения"},
+                status=403,
+            )
+        if message.is_read:
+            return JsonResponse(
+                {"status": "error", "message": "Нельзя удалить просмотренное сообщение"},
+                status=400,
+            )
+
+        message_id = message.id
+        message.delete()
+        return JsonResponse({"status": "success", "id": message_id})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+
+@login_required
+@require_http_methods(["GET"])
+def chat_message_detail(request, pk):
+    message = get_object_or_404(
+        OrderDepartmentWorkMessage.objects.select_related("author", "recipient"),
+        id=pk,
+    )
+    if not _user_can_access_message(request.user, message):
+        return JsonResponse(
+            {"status": "error", "message": "У вас нет доступа к этому сообщению"},
+            status=403,
+        )
+
+    return JsonResponse(
+        {
+            "data": {
+                "recipient": message.recipient_id,
+                "message": message.message,
+                "is_read": message.is_read,
+                "author": message.author_id,
+            }
+        }
+    )
 

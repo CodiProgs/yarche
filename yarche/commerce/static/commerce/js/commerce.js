@@ -186,6 +186,22 @@ const configs = {
 		},
 		dataUrls: [{ id: 'user_type', url: '/users/types/' }],
 	},
+	messages: {
+		containerId: 'messages-container',
+		tableId: 'messages-table',
+		formId: 'message-form',
+		getUrl: '/commerce/messages/',
+		addUrl: '/commerce/messages/add/',
+		editUrl: '/commerce/messages/edit/',
+		deleteUrl: '/commerce/messages/delete/',
+		modalConfig: {
+			addModalUrl: '/components/departments/message',
+			editModalUrl: '/components/departments/message',
+			addModalTitle: 'Новое сообщение',
+			editModalTitle: 'Редактировать сообщение',
+		},
+		dataUrls: [{ id: 'recipient', url: '/users/chat-recipients/' }],
+	},
 }
 
 function addSwapButtonToModalHeader() {
@@ -1692,6 +1708,10 @@ const addMenuHandler = () => {
 	const goToClientButton = document.getElementById('go-to-client-button')
 	const assignExecutorButton = document.getElementById('assign_executor-button')
 	const updateStatusButton = document.getElementById('update_status-button')
+	const updateDepartmentWorkStatusButton = document.getElementById(
+		'update_department_work_status-button',
+	)
+	const archiveOrderButton = document.getElementById('archive_order-button')
 	const viewCorrespondenceButton = document.getElementById(
 		'view_correspondence-button',
 	)
@@ -1763,6 +1783,52 @@ const addMenuHandler = () => {
 
 			if (goToClientButton) {
 				goToClientButton.style.display = 'none'
+			}
+
+			if (updateDepartmentWorkStatusButton) {
+				updateDepartmentWorkStatusButton.style.display = 'none'
+			}
+			if (archiveOrderButton) {
+				archiveOrderButton.style.display = 'none'
+			}
+
+			if (urlName === 'works') {
+				const deptCard = e.target.closest(
+					'.department-card:not(.department-card--add)',
+				)
+				if (deptCard) {
+					e.preventDefault()
+
+					document
+						.querySelectorAll('.department-card--context-selected')
+						.forEach(card => {
+							card.classList.remove('department-card--context-selected')
+						})
+					deptCard.classList.add('department-card--context-selected')
+
+					if (addButton) addButton.style.display = 'none'
+					if (editButton) editButton.style.display = 'none'
+					if (deleteButton) deleteButton.style.display = 'none'
+					if (paymentButton) paymentButton.style.display = 'none'
+					if (hideButton) hideButton.style.display = 'none'
+					if (updateStatusButton) updateStatusButton.style.display = 'none'
+					if (archiveOrderButton) archiveOrderButton.style.display = 'none'
+					if (updateDepartmentWorkStatusButton) {
+						updateDepartmentWorkStatusButton.style.display = 'block'
+					}
+
+					const viewOrderFilesBtn = document.getElementById(
+						'view_order_files-button',
+					)
+					if (viewOrderFilesBtn) viewOrderFilesBtn.style.display = 'none'
+					if (assignExecutorButton) assignExecutorButton.style.display = 'none'
+					if (viewCorrespondenceButton) {
+						viewCorrespondenceButton.style.display = 'none'
+					}
+
+					showMenu(e.pageX, e.pageY)
+					return
+				}
 			}
 
 			const table = e.target.closest('table')
@@ -1992,6 +2058,12 @@ const addMenuHandler = () => {
 				const refreshMessagesBtn = document.getElementById(
 					'refresh_messages-button',
 				)
+				const markMessageReadBtn = document.getElementById(
+					'mark_message_read-button',
+				)
+				const viewOrderCorrespondenceBtn = document.getElementById(
+					'view_order_correspondence-button',
+				)
 
 				if (
 					table.id.startsWith('order-documents-') ||
@@ -2002,6 +2074,12 @@ const addMenuHandler = () => {
 					if (emergencyButton) emergencyButton.style.display = 'none'
 					if (updateStatusBtn) updateStatusBtn.style.display = 'none'
 					if (assignExecutorBtn) assignExecutorBtn.style.display = 'none'
+					if (viewCorrespondenceBtn)
+						viewCorrespondenceBtn.style.display = 'none'
+					if (viewOrderCorrespondenceBtn)
+						viewOrderCorrespondenceBtn.style.display = 'none'
+				} else if (table.id === 'messages-table') {
+					if (viewOrderFilesBtn) viewOrderFilesBtn.style.display = 'none'
 					if (viewCorrespondenceBtn)
 						viewCorrespondenceBtn.style.display = 'none'
 				} else {
@@ -2021,6 +2099,42 @@ const addMenuHandler = () => {
 					if (editMessageBtn) editMessageBtn.style.display = 'block'
 					if (deleteMessageBtn) deleteMessageBtn.style.display = 'block'
 					if (refreshMessagesBtn) refreshMessagesBtn.style.display = 'block'
+					if (addButton) addButton.style.display = 'none'
+					if (editButton) editButton.style.display = 'none'
+					if (deleteButton) deleteButton.style.display = 'none'
+					if (markMessageReadBtn) markMessageReadBtn.style.display = 'none'
+				} else if (table.id === 'messages-table') {
+					const currentUserId = getChatCurrentUserId()
+					const authorId = row.dataset.authorId
+					const isRead = row.dataset.isRead === 'true'
+					const orderId = row.dataset.orderId
+					const recipientId = row.dataset.recipientId
+
+					if (addButton) addButton.style.display = 'block'
+					if (editButton) {
+						editButton.style.display =
+							authorId === String(currentUserId) && !isRead ? 'block' : 'none'
+					}
+					if (deleteButton) {
+						deleteButton.style.display =
+							authorId === String(currentUserId) && !isRead ? 'block' : 'none'
+					}
+					if (markMessageReadBtn) {
+						markMessageReadBtn.style.display =
+							recipientId === String(currentUserId) && !isRead
+								? 'block'
+								: 'none'
+					}
+					if (viewOrderCorrespondenceBtn) {
+						viewOrderCorrespondenceBtn.style.display = orderId ? 'block' : 'none'
+					}
+					if (viewOrderFilesBtn) {
+						viewOrderFilesBtn.style.display = orderId ? 'block' : 'none'
+					}
+					if (newMessageBtn) newMessageBtn.style.display = 'none'
+					if (editMessageBtn) editMessageBtn.style.display = 'none'
+					if (deleteMessageBtn) deleteMessageBtn.style.display = 'none'
+					if (refreshMessagesBtn) refreshMessagesBtn.style.display = 'none'
 				} else {
 					if (newMessageBtn) newMessageBtn.style.display = 'none'
 					if (editMessageBtn) editMessageBtn.style.display = 'none'
@@ -2045,6 +2159,10 @@ const addMenuHandler = () => {
 					if (deleteButton) {
 						deleteButton.style.display = 'block'
 						deleteButton.textContent = 'Удалить расчет'
+					}
+
+					if (urlName === 'works' && archiveOrderButton) {
+						archiveOrderButton.style.display = 'block'
 					}
 				}
 
@@ -2222,6 +2340,20 @@ const addMenuHandler = () => {
 				if (editMessageBtn) editMessageBtn.style.display = 'none'
 				if (deleteMessageBtn) deleteMessageBtn.style.display = 'none'
 				if (refreshMessagesBtn) refreshMessagesBtn.style.display = 'none'
+
+				const markMessageReadBtn = document.getElementById(
+					'mark_message_read-button',
+				)
+				const viewOrderCorrespondenceBtn = document.getElementById(
+					'view_order_correspondence-button',
+				)
+				if (markMessageReadBtn) markMessageReadBtn.style.display = 'none'
+				if (viewOrderCorrespondenceBtn)
+					viewOrderCorrespondenceBtn.style.display = 'none'
+
+				if (urlName === 'messages' && hideButton) {
+					hideButton.style.display = 'block'
+				}
 
 				const addViewerButton = document.getElementById('add-viewer-button')
 				if (addViewerButton) addViewerButton.style.display = 'none'
@@ -2450,12 +2582,96 @@ async function deleteDepartmentWork(workId, card) {
 	)
 }
 
+function getDepartmentIcon(departmentName) {
+	const depIconByName = {
+		дизайн: 'dizayn.png',
+		монтаж: 'montazh.png',
+		накатка: 'nakatka.png',
+		'печать ифп': 'pechat.png',
+		печать: 'pechat.png',
+		раскрой: 'raskroy.png',
+		сборка: 'sborka.png',
+		сварка: 'svarka.png',
+		замер: 'zamer.png',
+		бортогиб: 'bortogib.png',
+		доставка: 'dostavka.png',
+		покраска: 'pokraska.png',
+		plotter: 'plotter.png',
+		плоттер: 'plotter.png',
+	}
+	const key = String(departmentName || '').trim().toLowerCase()
+	return depIconByName[key] || 'dizayn.png'
+}
+
+function buildDepartmentWorkCard(dw, orderId) {
+	const depImg = getDepartmentIcon(dw.department_name)
+
+	const card = document.createElement('div')
+	card.className = 'department-card'
+	card.dataset.id = dw.id
+	card.dataset.departmentId = String(dw.department)
+	card.dataset.departmentSlug = dw.department_slug || ''
+	card.dataset.orderId = orderId || ''
+	card.dataset.executorName = dw.executor_name || ''
+	card.dataset.startedAt = dw.started_at || ''
+	card.dataset.completedAt = dw.completed_at || ''
+	card.dataset.isActive = dw.is_active ? '1' : '0'
+
+	const actionButtons = `
+		${!dw.is_active ? `<button class="department-card__action-btn department-card__action-btn--start" title="Начать работу" data-action="start"><img src="/static/images/play.svg" alt="Начать"></button>` : ''}
+		${dw.is_active ? `<button class="department-card__action-btn department-card__action-btn--stop" title="Остановить работу" data-action="stop"><img src="/static/images/stop.svg" alt="Остановить"></button>` : ''}
+	`
+
+	const workInfo = `
+		${dw.started_at ? `<div class="department-card__info"><span class="info-label">Начало:</span> <span class="info-value">${dw.started_at}</span></div>` : ''}
+		${dw.completed_at ? `<div class="department-card__info"><span class="info-label">Конец:</span> <span class="info-value">${dw.completed_at}</span></div>` : ''}
+		${dw.executor_name ? `<div class="department-card__info"><span class="info-label">Исполнитель:</span> <span class="info-value">${dw.executor_name}</span></div>` : ''}
+	`
+
+	card.innerHTML = `
+		<div class="department-card__body">
+			<button class="department-card__delete" title="Удалить отдел">&times;</button>
+			<img src="/static/images/departments/${depImg}" alt="${dw.department_name || 'Отдел'}" class="department-card__img">
+			<div class="department-card__title">${dw.department_name || 'Отдел'}</div>
+			<p class="department-card__work-status">${dw.status_name || ''}</p>
+			<div class="department-card__actions">
+				${actionButtons}
+			</div>
+		</div>
+		<div class="department-card__details">
+			${workInfo}
+		</div>
+	`
+
+	card.querySelector('.department-card__delete').onclick = () => {
+		deleteDepartmentWork(dw.id, card)
+	}
+
+	const startBtn = card.querySelector('[data-action="start"]')
+	if (startBtn) {
+		startBtn.onclick = async e => {
+			e.stopPropagation()
+			await updateDepartmentWorkStatus(dw.id, 'start', card)
+		}
+	}
+
+	const stopBtn = card.querySelector('[data-action="stop"]')
+	if (stopBtn) {
+		stopBtn.onclick = async e => {
+			e.stopPropagation()
+			await updateDepartmentWorkStatus(dw.id, 'stop', card)
+		}
+	}
+
+	return card
+}
+
 async function updateDepartmentWorkStatus(workId, action, card) {
 	try {
 		const loader = createLoader()
 		document.body.appendChild(loader)
 
-		// Получаем данные работы отдела
+		// Получаем карточку работы отдела
 		if (!card) {
 			card = document.querySelector(`.department-card[data-id="${workId}"]`)
 		}
@@ -2465,91 +2681,89 @@ async function updateDepartmentWorkStatus(workId, action, card) {
 			return
 		}
 
-		// Получаем номер заказа из dataset карточки
-		const orderId = card.dataset.orderId
-
-		if (!orderId) {
-			showError('Не удалось определить номер заказа')
-			loader.remove()
-			return
-		}
-
-		const departmentId = card.dataset.departmentId
-		if (!departmentId) {
-			showError('Не удалось определить отдел')
-			loader.remove()
-			return
-		}
-
-		// Получаем все доступные статусы для этого отдела
-		const statusResponse = await fetch(
-			`/departments/statuses/by-id/${departmentId}/`,
-		)
-		if (!statusResponse.ok) {
-			throw new Error('Ошибка при получении статусов')
-		}
-		const statusData = await statusResponse.json()
-		const statuses = statusData.statuses || []
-
-		// Находим нужный статус
-		let targetStatus = null
-		if (action === 'start') {
-			// Ищем статус с is_initial=true
-			targetStatus = statuses.find(s => s.is_initial)
-		} else if (action === 'stop') {
-			// Ищем статус с is_final=true
-			targetStatus = statuses.find(s => s.is_final)
-		}
-
-		if (!targetStatus) {
-			showError(`Не найден статус для действия "${action}"`)
-			loader.remove()
-			return
-		}
-
-		// Получаем slug отдела для URL
-		const departmentSlug = card.dataset.departmentSlug || ''
-
-		// Отправляем запрос на обновление статуса
-		const resp = await fetch(
-			`/departments/${departmentSlug}/orders/update-status/${orderId}/`,
-			{
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'X-CSRFToken': getCSRFToken(),
-				},
-				body: JSON.stringify({
-					status: targetStatus.id,
-					status_id: targetStatus.id,
-				}),
-				credentials: 'same-origin',
+		// Отправляем запрос на переключение активности (только is_active)
+		const resp = await fetch(`/departments/work/set-active/${workId}/`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'X-CSRFToken': getCSRFToken(),
 			},
-		)
+			credentials: 'same-origin',
+			body: JSON.stringify({ action: action }),
+		})
 
 		const data = await resp.json()
 		loader.remove()
 
 		if (!resp.ok || data.status !== 'success') {
-			showError(data.message || 'Ошибка при обновлении статуса')
+			showError(data.message || 'Ошибка при переключении активности работы')
 			return
 		}
 
-		// Обновляем интерфейс
-		showSuccess('Статус работы обновлен')
+		showSuccess(
+			data.is_active
+				? 'Работа помечена как активная'
+				: 'Работа помечена как неактивная',
+		)
 
-		// Перезагружаем данные о работах отдела
-		if (orderId) {
-			const detailResp = await fetch(`/commerce/order/${orderId}/`)
-			const detailData = await detailResp.json()
-			if (detailData.department_works) {
-				renderDepartmentsCarousel(detailData.department_works)
-			}
-		}
+		updateDepartmentWorkCardActions(card, {
+			is_active: data.is_active,
+			is_completed: data.is_completed,
+			started_at: data.started_at,
+			completed_at: data.completed_at,
+		})
 	} catch (err) {
 		const loader = document.querySelector('.loader')
 		if (loader) loader.remove()
-		showError(err.message || 'Ошибка при обновлении статуса')
+		showError(err.message || 'Ошибка при переключении активности работы')
+	}
+}
+
+function updateDepartmentWorkCardActions(card, dw) {
+	const actionsEl = card.querySelector('.department-card__actions')
+	if (!actionsEl) return
+
+	let html = ''
+	if (!dw.is_active) {
+		html += `<button class="department-card__action-btn department-card__action-btn--start" title="Начать работу" data-action="start"><img src="/static/images/play.svg" alt="Начать"></button>`
+	}
+	if (dw.is_active) {
+		html += `<button class="department-card__action-btn department-card__action-btn--stop" title="Остановить работу" data-action="stop"><img src="/static/images/stop.svg" alt="Остановить"></button>`
+	}
+	actionsEl.innerHTML = html
+
+	const workId = card.dataset.id
+	const startBtn = actionsEl.querySelector('[data-action="start"]')
+	if (startBtn) {
+		startBtn.onclick = async e => {
+			e.stopPropagation()
+			await updateDepartmentWorkStatus(workId, 'start', card)
+		}
+	}
+	const stopBtn = actionsEl.querySelector('[data-action="stop"]')
+	if (stopBtn) {
+		stopBtn.onclick = async e => {
+			e.stopPropagation()
+			await updateDepartmentWorkStatus(workId, 'stop', card)
+		}
+	}
+
+	if (dw.started_at !== undefined) {
+		card.dataset.startedAt = dw.started_at || ''
+	}
+	if (dw.completed_at !== undefined) {
+		card.dataset.completedAt = dw.completed_at || ''
+	}
+	card.dataset.isActive = dw.is_active ? '1' : '0'
+
+	const detailsEl = card.querySelector('.department-card__details')
+	if (detailsEl) {
+		const executorName = card.dataset.executorName || ''
+		detailsEl.innerHTML = `
+			${dw.started_at ? `<div class="department-card__info"><span class="info-label">Начало:</span> <span class="info-value">${dw.started_at}</span></div>` : ''}
+			${dw.completed_at ? `<div class="department-card__info"><span class="info-label">Конец:</span> <span class="info-value">${dw.completed_at}</span></div>` : ''}
+			${executorName ? `<div class="department-card__info"><span class="info-label">Исполнитель:</span> <span class="info-value">${executorName}</span></div>` : ''}
+		`
 	}
 }
 
@@ -3553,75 +3767,7 @@ const initWorksPage = () => {
 					}
 
 					departmentWorks.forEach(dw => {
-						const dep = departments.find(
-							d => d.name === dw.department_name,
-						) || {
-							name: dw.department_name || 'Отдел',
-							img: 'dizayn.png',
-						}
-						const card = document.createElement('div')
-						card.className = 'department-card'
-						card.dataset.id = dw.id
-						card.dataset.departmentId = String(dw.department)
-						card.dataset.departmentSlug = dw.department_slug || ''
-						card.dataset.orderId = carouselOrderId
-						card.dataset.executorName = dw.executor_name || ''
-						card.dataset.startedAt = dw.started_at || ''
-						card.dataset.completedAt = dw.completed_at || ''
-
-						const statusIndicator = dw.is_completed
-							? `<span style="position:absolute;top:10px;right:10px;display:inline-block;width:14px;height:14px;background:#4caf50;border-radius:50%;border:2px solid #fff;" title="Готово${dw.completed_at ? ' — ' + dw.completed_at : ''}"></span>`
-							: ''
-
-						// Кнопки управления статусом работы с иконками
-						const actionButtons = `
-							${!dw.started_at ? `<button class="department-card__action-btn department-card__action-btn--start" title="Начать работу" data-action="start"><img src="/static/images/play.svg" alt="Начать"></button>` : ''}
-							${dw.started_at && !dw.completed_at ? `<button class="department-card__action-btn department-card__action-btn--stop" title="Завершить работу" data-action="stop"><img src="/static/images/stop.svg" alt="Остановить"></button>` : ''}
-						`
-
-						// Информация о сроках и исполнителе
-						const workInfo = `
-							${dw.started_at ? `<div class="department-card__info"><span class="info-label">Начало:</span> <span class="info-value">${dw.started_at}</span></div>` : ''}
-							${dw.completed_at ? `<div class="department-card__info"><span class="info-label">Конец:</span> <span class="info-value">${dw.completed_at}</span></div>` : ''}
-							${dw.executor_name ? `<div class="department-card__info"><span class="info-label">Исполнитель:</span> <span class="info-value">${dw.executor_name}</span></div>` : ''}
-						`
-
-						card.innerHTML = `
-							<div class="department-card__body">
-								<button class="department-card__delete" title="Удалить отдел">&times;</button>
-								<img src="/static/images/departments/${dep.img}" alt="${dep.name}" class="department-card__img">
-								<div class="department-card__title">${dep.name}</div>
-								<p class="department-card__work-status">${dw.status_name}</p>
-								<div class="department-card__actions">
-									${actionButtons}
-								</div>
-								${statusIndicator}
-							</div>
-							<div class="department-card__details">
-								${workInfo}
-							</div>
-						`
-						card.querySelector('.department-card__delete').onclick = () => {
-							deleteDepartmentWork(dw.id, card)
-						}
-
-						// Обработчики кнопок управления статусом
-						const startBtn = card.querySelector('[data-action="start"]')
-						if (startBtn) {
-							startBtn.onclick = async e => {
-								e.stopPropagation()
-								await updateDepartmentWorkStatus(dw.id, 'start', card)
-							}
-						}
-
-						const stopBtn = card.querySelector('[data-action="stop"]')
-						if (stopBtn) {
-							stopBtn.onclick = async e => {
-								e.stopPropagation()
-								await updateDepartmentWorkStatus(dw.id, 'stop', card)
-							}
-						}
-
+						const card = buildDepartmentWorkCard(dw, carouselOrderId)
 						carousel.insertBefore(card, addCard)
 					})
 
@@ -3789,27 +3935,17 @@ const initWorksPage = () => {
 										}
 
 										result.created.forEach(createdWork => {
-											const dep = departments.find(
-												d => d.name === createdWork.department_name,
-											) || {
-												name: createdWork.department_name || 'Отдел',
-												img: 'dizayn.png',
-											}
-
-											const card = document.createElement('div')
-											card.className = 'department-card'
-											card.dataset.id = createdWork.id
-											card.dataset.departmentId = String(createdWork.department)
-											card.innerHTML = `
-												<button class="department-card__delete" title="Удалить отдел">&times;</button>
-												<img src="/static/images/departments/${dep.img}" alt="${dep.name}" class="department-card__img">
-												<div class="department-card__title">${createdWork.department_name}</div>
-												<p class="department-card__work-status">${createdWork.status_name}</p>
-											`
-											card.querySelector('.department-card__delete').onclick =
-												() => {
-													deleteDepartmentWork(createdWork.id, card)
-												}
+											const card = buildDepartmentWorkCard(
+												{
+													...createdWork,
+													is_active: createdWork.is_active ?? false,
+													is_completed: createdWork.is_completed ?? false,
+													started_at: createdWork.started_at ?? null,
+													completed_at: createdWork.completed_at ?? null,
+													executor_name: createdWork.executor_name ?? '',
+												},
+												orderId,
+											)
 
 											const addCard = carousel.querySelector(
 												'.department-card--add',
@@ -4256,6 +4392,114 @@ const initWorksPage = () => {
 
 			const formHandler = new DynamicFormHandler(config)
 			await formHandler.init(orderId)
+		})
+	}
+
+	const updateDepartmentWorkStatusButton = document.getElementById(
+		'update_department_work_status-button',
+	)
+	if (updateDepartmentWorkStatusButton) {
+		updateDepartmentWorkStatusButton.addEventListener('click', async () => {
+			const card = document.querySelector('.department-card--context-selected')
+			if (!card) {
+				showError('Выберите работу отдела')
+				return
+			}
+
+			const orderId = card.dataset.orderId
+			const departmentSlug = card.dataset.departmentSlug
+			if (!orderId || !departmentSlug) {
+				showError('Не удалось определить работу отдела')
+				return
+			}
+
+			const config = {
+				submitUrl: `/departments/${departmentSlug}/orders/update-status/${orderId}/`,
+				getUrl: `/departments/${departmentSlug}/orders/`,
+				formId: 'update-status-form',
+				modalConfig: {
+					url: '/components/departments/update_status',
+					title: 'Сменить статус работы отдела',
+				},
+				dataUrls: [
+					{
+						id: 'status',
+						url: `/departments/statuses/${departmentSlug}/`,
+					},
+				],
+				onSuccess: async result => {
+					if (result.status === 'success') {
+						const statusEl = card.querySelector('.department-card__work-status')
+						if (statusEl && result.status_name) {
+							statusEl.textContent = result.status_name
+						}
+						updateDepartmentWorkCardActions(card, {
+							is_active: result.is_active,
+							started_at: result.started_at,
+							completed_at: result.completed_at,
+						})
+						showSuccess(result.message || 'Статус успешно изменен')
+					}
+				},
+			}
+
+			const formHandler = new DynamicFormHandler(config)
+			await formHandler.init(orderId)
+		})
+	}
+
+	const archiveOrderButton = document.getElementById('archive_order-button')
+	if (archiveOrderButton) {
+		archiveOrderButton.addEventListener('click', async () => {
+			const selectedRow = document.querySelector('.table__row--selected')
+			const table = selectedRow?.closest('table')
+			const tableId = table?.id
+
+			if (
+				!selectedRow ||
+				!tableId ||
+				(!tableId.startsWith('product-orders-') &&
+					!tableId.startsWith('orders-no-object-'))
+			) {
+				showError('Выберите заказ для архивации.')
+				return
+			}
+
+			const orderId = TableManager.getSelectedRowId(tableId)
+			if (!orderId) {
+				showError('Не удалось определить ID заказа.')
+				return
+			}
+
+			showQuestion(
+				'Отправить заказ в архив?',
+				'Архивация',
+				async () => {
+					const loader = createLoader()
+					document.body.appendChild(loader)
+					try {
+						const resp = await fetch(`/commerce/orders/archive/${orderId}/`, {
+							method: 'POST',
+							headers: {
+								'Content-Type': 'application/json',
+								'X-CSRFToken': getCSRFToken(),
+							},
+							credentials: 'same-origin',
+						})
+						const data = await resp.json()
+						loader.remove()
+						if (!resp.ok || data.status !== 'success') {
+							showError(data.message || 'Ошибка архивации заказа')
+							return
+						}
+						selectedRow.remove()
+						showSuccess(data.message || 'Заказ отправлен в архив')
+					} catch (err) {
+						loader.remove()
+						showError(err.message || 'Ошибка архивации заказа')
+					}
+				},
+			)
 		})
 	}
 
@@ -5787,7 +6031,7 @@ const initDepartmentPage = departmentSlug => {
 			name: 'department_status',
 			url: `/departments/statuses/${departmentSlug}/`,
 		},
-		{ name: 'created' },
+		{ name: 'department_work_created' },
 		{ name: 'department_started' },
 		{ name: 'department_completed' },
 		{ name: 'legal_name' },
@@ -7612,6 +7856,509 @@ async function loadManagerOrders(managerId, page = 1, details = null) {
 	}
 }
 
+function getChatCurrentUserId() {
+	const container = document.getElementById('messages-page-container')
+	return container ? Number(container.dataset.currentUserId) : null
+}
+
+function getSelectedMessageRow(tableId = 'messages-table') {
+	const table = document.getElementById(tableId)
+	if (!table) return null
+	return (
+		table.querySelector('tbody tr.table__row--selected') ||
+		table.querySelector('tbody tr td.table__cell--selected')?.closest('tr') ||
+		null
+	)
+}
+
+function disableMessageRecipientField() {
+	const recipientInput = document.getElementById('recipient')
+	if (!recipientInput) return
+	const group = recipientInput.closest('.modal-form__group')
+	if (group) group.style.display = 'none'
+	recipientInput.disabled = true
+}
+
+function updateMessageReadCell(row, isRead) {
+	if (!row) return
+	const isReadCell = row.querySelector('td.table__cell')
+	if (!isReadCell) return
+	const label = isRead ? 'Да' : 'Нет'
+	const checkbox = isReadCell.querySelector('input[type="checkbox"]')
+	if (checkbox) checkbox.checked = isRead
+	const labelEl = isReadCell.querySelector('label')
+	if (labelEl) labelEl.textContent = label
+	row.dataset.isRead = isRead ? 'true' : 'false'
+}
+
+async function openChatOrderMessagesModal(orderId) {
+	const loader = createLoader()
+	document.body.appendChild(loader)
+
+	try {
+		const messagesResp = await fetch(
+			`/departments/work-messages/0/?order_id=${orderId}`,
+			{ headers: { 'X-Requested-With': 'XMLHttpRequest' } },
+		)
+		if (!messagesResp.ok) {
+			showError('Не удалось загрузить переписку по заказу')
+			return
+		}
+
+		const messagesData = await messagesResp.json()
+		let messagesHtml = messagesData.html || ''
+		if (messagesHtml) {
+			const tbodyMatch = messagesHtml.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i)
+			if (tbodyMatch) {
+				const tbodyContent = tbodyMatch[1].trim()
+				const isEmpty = !/<tr[\s\S]*?>[\s\S]*?<\/tr>/i.test(tbodyContent)
+				if (isEmpty) {
+					messagesHtml = messagesHtml.replace(
+						/<tbody[^>]*>[\s\S]*?<\/tbody>/i,
+						`<tbody>
+                            <tr class="table__row--empty">
+                                <td colspan="100%" style="text-align: center; padding: 20px;">
+                                    Нет сообщений
+                                </td>
+                            </tr>
+                        </tbody>`,
+					)
+				}
+			}
+		}
+
+		const modal = new Modal()
+		await modal.open(
+			`<div class="correspondence-container" id="messages-container">${messagesHtml}</div>`,
+			`Переписка по заказу №${orderId}`,
+		)
+
+		const table = document.querySelector('#messages-container table')
+		if (table) {
+			table.id = `order-messages-${orderId}`
+			try {
+				TableManager.init()
+			} catch (e) {
+				console.warn('Не удалось инициализировать таблицу сообщений:', e)
+			}
+			if (messagesData.messages_id_list) {
+				setIds(messagesData.messages_id_list, table.id)
+			}
+		}
+	} catch (err) {
+		showError(err.message || 'Ошибка загрузки переписки')
+	} finally {
+		loader.remove()
+	}
+}
+
+function setupChatOrderMessageModalHandlers() {
+	const newMessageBtn = document.getElementById('new_message-button')
+	const editMessageBtn = document.getElementById('edit_message-button')
+	const deleteMessageBtn = document.getElementById('delete_message-button')
+
+	if (newMessageBtn && !newMessageBtn.dataset.chatHandlersAttached) {
+		newMessageBtn.dataset.chatHandlersAttached = '1'
+		newMessageBtn.addEventListener('click', async () => {
+			const messagesContainer = document.getElementById('messages-container')
+			if (!messagesContainer) {
+				showError('Сначала откройте переписку по заказу')
+				return
+			}
+
+			const messagesTable = messagesContainer.querySelector('table')
+			if (!messagesTable || !messagesTable.id) {
+				showError('Не удалось определить таблицу сообщений')
+				return
+			}
+
+			const tableIdOrderMatch = messagesTable.id.match(/order-messages-(\d+)/)
+			const orderId = tableIdOrderMatch ? tableIdOrderMatch[1] : null
+			if (!orderId) {
+				showError('Не удалось определить ID заказа')
+				return
+			}
+
+			const config = {
+				getUrl: `${DEPARTMENTS_BASE_URL}work-messages/detail/`,
+				submitUrl: `/departments/work-messages/create/`,
+				tableId: messagesTable.id,
+				formId: 'message-form',
+				modalConfig: {
+					url: '/components/departments/message',
+					title: 'Новое сообщение',
+				},
+				dataUrls: [
+					{
+						id: 'recipient',
+						url: `/users/orders/${orderId}/users/`,
+					},
+				],
+				onSuccess: async result => {
+					if (result.status === 'success' && result.html) {
+						const tbody = messagesTable.querySelector('tbody')
+						if (tbody) {
+							const emptyRow = tbody.querySelector('.table__row--empty')
+							if (emptyRow) emptyRow.remove()
+							tbody.insertAdjacentHTML('afterbegin', result.html)
+							const newRow = tbody.firstElementChild
+							if (newRow && result.id) {
+								newRow.setAttribute('data-id', String(result.id))
+							}
+							if (newRow) {
+								TableManager.attachRowCellHandlers(newRow)
+								TableManager.applyColumnWidthsForRow(messagesTable.id, newRow)
+							}
+							showSuccess('Сообщение успешно отправлено')
+						}
+					}
+				},
+			}
+
+			const formHandler = new DynamicFormHandler(config)
+			await formHandler.init()
+
+			const messageForm = document.getElementById('message-form')
+			if (messageForm) {
+				let orderInput = messageForm.querySelector('#order')
+				if (!orderInput) {
+					orderInput = document.createElement('input')
+					orderInput.type = 'hidden'
+					orderInput.id = 'order'
+					orderInput.name = 'order'
+					messageForm.appendChild(orderInput)
+				}
+				orderInput.value = orderId
+			}
+		})
+	}
+
+	if (editMessageBtn && !editMessageBtn.dataset.chatHandlersAttached) {
+		editMessageBtn.dataset.chatHandlersAttached = '1'
+		editMessageBtn.addEventListener('click', async () => {
+			const messagesContainer = document.getElementById('messages-container')
+			if (!messagesContainer) return
+
+			const messagesTable = messagesContainer.querySelector('table')
+			if (!messagesTable) return
+
+			const selectedRow = getSelectedMessageRow(messagesTable.id)
+			if (!selectedRow) {
+				showError('Выберите сообщение для редактирования')
+				return
+			}
+
+			const messageId = selectedRow.dataset.id
+			if (!messageId) {
+				showError('Не удалось определить ID сообщения')
+				return
+			}
+
+			const config = {
+				getUrl: `${DEPARTMENTS_BASE_URL}work-messages/detail/`,
+				submitUrl: `/departments/work-messages/edit/`,
+				tableId: messagesTable.id,
+				formId: 'message-form',
+				modalConfig: {
+					url: '/components/departments/message',
+					title: 'Редактировать сообщение',
+				},
+				onSuccess: async result => {
+					if (result.status === 'success' && result.html) {
+						selectedRow.outerHTML = result.html
+						const newRow = messagesTable.querySelector(
+							`tbody tr[data-id="${messageId}"]`,
+						)
+						if (newRow) {
+							TableManager.attachRowCellHandlers(newRow)
+							TableManager.applyColumnWidthsForRow(messagesTable.id, newRow)
+						}
+						showSuccess('Сообщение успешно обновлено')
+					}
+				},
+			}
+
+			const formHandler = new DynamicFormHandler(config)
+			await formHandler.init(messageId)
+			disableMessageRecipientField()
+		})
+	}
+
+	if (deleteMessageBtn && !deleteMessageBtn.dataset.chatHandlersAttached) {
+		deleteMessageBtn.dataset.chatHandlersAttached = '1'
+		deleteMessageBtn.addEventListener('click', async () => {
+			const messagesContainer = document.getElementById('messages-container')
+			if (!messagesContainer) return
+
+			const messagesTable = messagesContainer.querySelector('table')
+			if (!messagesTable) return
+
+			const selectedRow = getSelectedMessageRow(messagesTable.id)
+			if (!selectedRow) {
+				showError('Выберите сообщение для удаления')
+				return
+			}
+
+			const messageId = selectedRow.dataset.id
+			if (!messageId) {
+				showError('Не удалось определить ID сообщения')
+				return
+			}
+
+			showQuestion(
+				'Вы действительно хотите удалить это сообщение?',
+				'Удаление сообщения',
+				async () => {
+					const loader = createLoader()
+					document.body.appendChild(loader)
+					try {
+						const resp = await fetch(
+							`${DEPARTMENTS_BASE_URL}work-messages/delete/${messageId}/`,
+							{
+								method: 'POST',
+								headers: {
+									'Content-Type': 'application/json',
+									'X-CSRFToken': getCSRFToken(),
+								},
+								credentials: 'same-origin',
+							},
+						)
+						const data = await resp.json()
+						loader.remove()
+						if (!resp.ok || data.status !== 'success') {
+							showError(
+								data.message || data.error || 'Ошибка при удалении сообщения',
+							)
+							return
+						}
+						selectedRow.remove()
+						showSuccess('Сообщение успешно удалено')
+					} catch (err) {
+						loader.remove()
+						showError(err.message || 'Ошибка при удалении сообщения')
+					}
+				},
+			)
+		})
+	}
+}
+
+function initMessagesPage() {
+	const config = configs.messages
+	if (!config) return
+
+	const idsScript = document.getElementById('message-ids')
+	if (idsScript) {
+		try {
+			const ids = JSON.parse(idsScript.textContent)
+			setIds(ids, config.tableId)
+		} catch (e) {
+			console.warn('Не удалось установить ID сообщений:', e)
+		}
+	}
+
+	setupChatOrderMessageModalHandlers()
+
+	const addButton = document.getElementById('add-button')
+	if (addButton) {
+		const addFormHandler = new DynamicFormHandler({
+			dataUrls: config.dataUrls,
+			submitUrl: config.addUrl,
+			tableId: config.tableId,
+			formId: config.formId,
+			modalConfig: {
+				url: config.modalConfig.addModalUrl,
+				title: config.modalConfig.addModalTitle,
+			},
+			onSuccess: result => {
+				TableManager.addTableRow(result, config.tableId)
+				const tbody = document.querySelector(`#${config.tableId} tbody`)
+				const newRow = tbody?.firstElementChild
+				if (newRow && result.id) {
+					newRow.setAttribute('data-id', String(result.id))
+					const currentUserId = getChatCurrentUserId()
+					if (currentUserId) {
+						newRow.dataset.authorId = String(currentUserId)
+						newRow.dataset.isRead = 'false'
+						newRow.dataset.orderId = ''
+					}
+				}
+			},
+		})
+		addButton.addEventListener('click', () => addFormHandler.init())
+	}
+
+	const editButton = document.getElementById('edit-button')
+	if (editButton) {
+		editButton.addEventListener('click', async () => {
+			const selectedRow = getSelectedMessageRow(config.tableId)
+			if (!selectedRow) {
+				showError('Выберите сообщение для редактирования')
+				return
+			}
+
+			const currentUserId = getChatCurrentUserId()
+			if (selectedRow.dataset.authorId !== String(currentUserId)) {
+				showError('Вы можете редактировать только свои сообщения')
+				return
+			}
+			if (selectedRow.dataset.isRead === 'true') {
+				showError('Нельзя редактировать просмотренное сообщение')
+				return
+			}
+
+			const messageId = selectedRow.dataset.id
+			if (!messageId) {
+				showError('Не удалось определить ID сообщения')
+				return
+			}
+
+			const editFormHandler = new DynamicFormHandler({
+				dataUrls: config.dataUrls,
+				submitUrl: config.editUrl,
+				tableId: config.tableId,
+				formId: config.formId,
+				getUrl: config.getUrl,
+				modalConfig: {
+					url: config.modalConfig.editModalUrl,
+					title: config.modalConfig.editModalTitle,
+				},
+				onSuccess: result => {
+					TableManager.updateTableRow(result, config.tableId)
+					const updatedRow = document.querySelector(
+						`#${config.tableId} tbody tr[data-id="${messageId}"]`,
+					)
+					if (updatedRow) {
+						updatedRow.dataset.authorId = String(currentUserId)
+						updatedRow.dataset.isRead = selectedRow.dataset.isRead
+						updatedRow.dataset.orderId = selectedRow.dataset.orderId || ''
+						updatedRow.dataset.recipientId =
+							selectedRow.dataset.recipientId || ''
+					}
+				},
+			})
+			await editFormHandler.init(messageId)
+			disableMessageRecipientField()
+		})
+	}
+
+	const deleteButton = document.getElementById('delete-button')
+	if (deleteButton) {
+		deleteButton.addEventListener('click', async () => {
+			const selectedRow = getSelectedMessageRow(config.tableId)
+			if (!selectedRow) {
+				showError('Выберите сообщение для удаления')
+				return
+			}
+
+			const currentUserId = getChatCurrentUserId()
+			if (selectedRow.dataset.authorId !== String(currentUserId)) {
+				showError('Вы можете удалять только свои сообщения')
+				return
+			}
+			if (selectedRow.dataset.isRead === 'true') {
+				showError('Нельзя удалить просмотренное сообщение')
+				return
+			}
+
+			const messageId = selectedRow.dataset.id
+			if (!messageId) {
+				showError('Не удалось определить ID сообщения')
+				return
+			}
+
+			showQuestion(
+				'Вы действительно хотите удалить это сообщение?',
+				'Удаление сообщения',
+				async () => {
+					await TableManager.sendDeleteRequest(
+						messageId,
+						config.deleteUrl,
+						config.tableId,
+					)
+				},
+			)
+		})
+	}
+
+	const markReadButton = document.getElementById('mark_message_read-button')
+	if (markReadButton) {
+		markReadButton.addEventListener('click', async () => {
+			const selectedRow = getSelectedMessageRow(config.tableId)
+			if (!selectedRow) {
+				showError('Выберите сообщение')
+				return
+			}
+
+			const currentUserId = getChatCurrentUserId()
+			if (selectedRow.dataset.recipientId !== String(currentUserId)) {
+				showError('Отметить просмотренным может только получатель')
+				return
+			}
+			if (selectedRow.dataset.isRead === 'true') {
+				showError('Сообщение уже просмотрено')
+				return
+			}
+
+			const messageId = selectedRow.dataset.id
+			const loader = createLoader()
+			document.body.appendChild(loader)
+			try {
+				const resp = await fetch(
+					`/departments/work-messages/${messageId}/mark-read/`,
+					{
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json',
+							'X-CSRFToken': getCSRFToken(),
+						},
+						credentials: 'same-origin',
+					},
+				)
+				const data = await resp.json()
+				loader.remove()
+				if (!resp.ok || data.status !== 'success') {
+					showError(data.message || 'Не удалось отметить сообщение')
+					return
+				}
+				updateMessageReadCell(selectedRow, true)
+				showSuccess('Сообщение отмечено как просмотренное')
+			} catch (err) {
+				loader.remove()
+				showError(err.message || 'Не удалось отметить сообщение')
+			}
+		})
+	}
+
+	const viewOrderCorrespondenceBtn = document.getElementById(
+		'view_order_correspondence-button',
+	)
+	if (viewOrderCorrespondenceBtn) {
+		viewOrderCorrespondenceBtn.addEventListener('click', async () => {
+			const selectedRow = getSelectedMessageRow(config.tableId)
+			if (!selectedRow) {
+				showError('Выберите сообщение')
+				return
+			}
+			const orderId = selectedRow.dataset.orderId
+			if (!orderId) {
+				showError('У сообщения нет заказа')
+				return
+			}
+			await openChatOrderMessagesModal(orderId)
+		})
+	}
+
+	const viewOrderFilesBtn = document.getElementById('view_order_files-button')
+	if (viewOrderFilesBtn) {
+		setupOrderFilesButton2(viewOrderFilesBtn, () => {
+			const selectedRow = getSelectedMessageRow(config.tableId)
+			if (!selectedRow || !selectedRow.dataset.orderId) return null
+			return parseInt(selectedRow.dataset.orderId, 10)
+		})
+	}
+}
+
 function initNotesPage() {
 	const notesContainer = document.getElementById('notes-container')
 	const calendarGrid = document.getElementById('calendar-grid')
@@ -8484,6 +9231,8 @@ document.addEventListener('DOMContentLoaded', () => {
 			} else {
 				console.error('Config not found for generic page: filetypes')
 			}
+		} else if (urlName === 'messages') {
+			initMessagesPage()
 		} else if (urlName === 'enterprise_balance_report') {
 			initEnterpriseBalanceReportPage()
 		} else if (urlName === 'salary_calculation') {

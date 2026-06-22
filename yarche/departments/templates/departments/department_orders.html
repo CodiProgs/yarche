@@ -6,14 +6,14 @@
         <div id="context-menu"
             class="dropdown-menu"
             data-is-admin="{% if is_chief %}true{% else %}false{% endif %}">
-            {% if is_chief %}
+            {% comment %} {% if is_chief %} {% endcomment %}
             <a class="dropdown-item context-action"
                id="assign_executor-button"
                data-action="assign_executor">Назначить исполнителя</a>
             <a class="dropdown-item context-action"
                id="update_status-button"
                data-action="update_status">Сменить статус</a>
-            {% endif %}
+            {% comment %} {% endif %} {% endcomment %}
             <a class="dropdown-item context-action"
                id="view_correspondence-button"
                data-action="view_correspondence">Переписка по заказу</a>
