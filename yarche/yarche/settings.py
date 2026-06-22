@@ -12,8 +12,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-!-6%7^-jv5o212#!^n)e9p8n$p*(htyxt^+u^l=5l0()=*kvq&"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-# DEBUG = False
+#DEBUG = True
+DEBUG = False
 
 # ALLOWED_HOSTS = [
 #     "CodiProgs.mysql.pythonanywhere-services.com",
@@ -24,8 +24,11 @@ DEBUG = True
 #     "Yarche.mysql.pythonanywhere-services.com",
 #     "Yarche.pythonanywhere.com",
 # ]
-ALLOWED_HOSTS = ["*"]
-
+#ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = [
+    "157-22-188-188.nip.io",
+    "157.22.188.188",
+]
 
 # Application definition
 
@@ -82,12 +85,50 @@ WSGI_APPLICATION = "yarche.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+#DATABASES = {
+#    "default": {
+#        "ENGINE": "django.db.backends.mysql",
+#        "NAME": "yarche2",
+#        "USER": "root",
+#        "PASSWORD": "root",
+#        "HOST": "localhost",
+#        "PORT": "3306",
+#        "OPTIONS": {
+#            "charset": "utf8mb4",
+#            "init_command": "SET foreign_key_checks = 0;",
+#        },
+#    }
+#}
+#DATABASES = {
+#    'default': {
+#        'ENGINE': 'django.db.backends.mysql',
+#        'NAME': 'mydb',
+#        'USER': 'myuser',
+#        'PASSWORD': 'StrongPassword123',
+#        'HOST': 'localhost',
+#        'PORT': '3306',
+#    }
+#}
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.mysql",
+#         "NAME": "Yarche$tables2",
+#         "USER": "Yarche",
+#         "PASSWORD": "zPD1XNMlrK",
+#         "HOST": "localhost",
+#         "PORT": "3306",
+#         "OPTIONS": {
+#             "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+#             "charset": "utf8mb4",
+#         },
+#     }
+# }
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
         "NAME": "yarche2",
-        "USER": "root",
-        "PASSWORD": "root",
+        "USER": "yarche",
+        "PASSWORD": "zPD1XNMlrK",
         "HOST": "localhost",
         "PORT": "3306",
         "OPTIONS": {
@@ -96,21 +137,6 @@ DATABASES = {
         },
     }
 }
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.mysql",
-#         "NAME": "Yarche$tables2",
-#         "USER": "Yarche",
-#         "PASSWORD": "zPD1XNMlrK",
-#         "HOST": "Yarche.mysql.pythonanywhere-services.com",
-#         "PORT": "3306",
-#         "OPTIONS": {
-#             "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
-#             "charset": "utf8mb4",
-#         },
-#     }
-# }
-
 
 
 # Password validation
@@ -171,6 +197,10 @@ LOGOUT_REDIRECT_URL = "login"
 
 MEDIA_URL = "/uploads/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "uploads")
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://157-22-188-188.nip.io",
+]
 
 # Отчет Баланс. 
 
