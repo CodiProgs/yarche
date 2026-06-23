@@ -1,0 +1,19 @@
+<ul>
+    {% for product in products %}
+        <li class="debtors-office-list__item">
+            <div class="debtors-office-list__row"
+                 data-target="product-{{ client_id }}-{{ object_id }}-{{ product.id }}"
+                 data-product-id="{{ product.id }}"
+                 data-client-id="{{ client_id }}"
+                 data-object-id="{{ object_id }}"
+                 style="border-left-width: 32px;">
+                <button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
+                <span class="debtors-office-list__title">{{ product.name }}</span>
+            </div>
+            <div class="debtors-office-list__details"
+                 id="product-{{ client_id }}-{{ object_id }}-{{ product.id }}"></div>
+        </li>
+    {% empty %}
+        <li class="debtors-office-list__row" style="border-left-width: 32px;">Нет продукции</li>
+    {% endfor %}
+</ul>

@@ -2767,54 +2767,352 @@ function updateDepartmentWorkCardActions(card, dw) {
 	}
 }
 
+const WORKS_CLIENTS_LIST_URL = `${BASE_URL}works/clients/list/`
+const WORKS_CLIENT_TREE_URL = `${BASE_URL}works/client-tree/`
+const WORKS_OBJECT_PRODUCTS_URL = `${BASE_URL}works/object-products/`
+
+const WORKS_ORDER_TABLE_COLUMNS = [
+	{ name: 'id' },
+	{ name: 'status', url: '/commerce/orders/statuses/' },
+	{ name: 'created' },
+	{ name: 'deadline' },
+	{ name: 'required_documents' },
+	{ name: 'unit_price' },
+	{ name: 'quantity' },
+	{ name: 'amount' },
+	{ name: 'paid_amount' },
+	{ name: 'comment' },
+	{ name: 'additional_info' },
+]
+
+function initWorksOrdersTable(details, data, orderIdFromQuery) {
+	details.innerHTML = `<div>${data.html}</div>`
+	details.dataset.loaded = '1'
+
+	const table = details.querySelector('table')
+	if (!table) return
+
+	TableManager.initTable(data.table_id)
+	TableManager.createColumnsForTable(data.table_id, WORKS_ORDER_TABLE_COLUMNS)
+
+	if (!orderIdFromQuery) return
+
+	const tableId = data.table_id
+	const observer = new MutationObserver(() => {
+		const idInput = document.querySelector(`#${tableId} thead input[name="id"]`)
+		if (idInput) {
+			idInput.value = orderIdFromQuery
+			idInput.dispatchEvent(new Event('input', { bubbles: true }))
+			idInput.dispatchEvent(new Event('change', { bubbles: true }))
+			observer.disconnect()
+		}
+	})
+	observer.observe(document.getElementById(tableId), {
+		childList: true,
+		subtree: true,
+	})
+}
+
+async function loadWorksProductOrders(row, details, orderIdFromQuery) {
+	const productId = row.dataset.productId
+	const clientId = row.dataset.clientId
+	const objectId = row.dataset.objectId
+	if (!productId || !clientId || !objectId) return
+
+	const loader = createLoader()
+	document.body.appendChild(loader)
+	try {
+		const resp = await fetch(
+			`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`,
+		)
+		const data = await resp.json()
+		loader.remove()
+
+		if (!resp.ok) {
+			showError(data.error || 'Ошибка загрузки данных')
+			return
+		}
+
+		initWorksOrdersTable(details, data, orderIdFromQuery)
+	} catch (err) {
+		loader.remove()
+		showError(err.message || 'Ошибка загрузки данных')
+	}
+}
+
+async function loadWorksNoObjectOrders(row, details, orderIdFromQuery) {
+	const parts = row.dataset.target.replace('no-object-', '').split('-')
+	const rowClientId = parts[0]
+	const rowProductId = parts[1]
+	if (!rowProductId || !rowClientId) return
+
+	const loader = createLoader()
+	document.body.appendChild(loader)
+	try {
+		const resp = await fetch(
+			`/commerce/product_orders_without_object/?product_id=${rowProductId}&client_id=${rowClientId}`,
+		)
+		const data = await resp.json()
+		loader.remove()
+
+		if (!resp.ok) {
+			showError(data.error || 'Ошибка загрузки данных')
+			return
+		}
+
+		initWorksOrdersTable(details, data, orderIdFromQuery)
+	} catch (err) {
+		loader.remove()
+		showError(err.message || 'Ошибка загрузки данных')
+	}
+}
+
+async function loadWorksObjectProducts(row, details) {
+	const clientId = row.dataset.clientId
+	const objectId = row.dataset.objectId
+	if (!clientId || !objectId) return
+
+	const loader = createLoader()
+	document.body.appendChild(loader)
+	try {
+		const resp = await fetch(
+			`${WORKS_OBJECT_PRODUCTS_URL}?client_id=${clientId}&object_id=${objectId}`,
+		)
+		const data = await resp.json()
+		loader.remove()
+
+		if (!resp.ok) {
+			showError(data.error || 'Ошибка загрузки данных')
+			return
+		}
+
+		details.innerHTML = data.html
+		details.dataset.loaded = '1'
+
+		const productsList = details.querySelector('ul')
+		if (productsList && !details.querySelector('.debtors-search-input')) {
+			addSearchInput(
+				productsList,
+				'Поиск продукции...',
+				'.debtors-office-list__title',
+				'32px',
+				'products',
+			)
+		}
+	} catch (err) {
+		loader.remove()
+		showError(err.message || 'Ошибка загрузки данных')
+	}
+}
+
+async function loadWorksClientTree(clientId, details) {
+	const loader = createLoader()
+	document.body.appendChild(loader)
+	try {
+		const resp = await fetch(`${WORKS_CLIENT_TREE_URL}?client_id=${clientId}`)
+		const data = await resp.json()
+		loader.remove()
+
+		if (!resp.ok) {
+			showError(data.error || 'Ошибка загрузки данных')
+			return
+		}
+
+		details.innerHTML = data.html
+		details.dataset.loaded = '1'
+
+		const objectsList = details.querySelector('ul')
+		if (objectsList && !details.querySelector('.debtors-search-input')) {
+			addSearchInput(objectsList, 'Поиск объекта...', 'h4', '16px', 'objects')
+		}
+	} catch (err) {
+		loader.remove()
+		showError(err.message || 'Ошибка загрузки данных')
+	}
+}
+
+async function handleWorksRowClick(row, orderIdFromQuery) {
+	const targetId = row.getAttribute('data-target')
+	if (!targetId) return
+
+	const details = document.getElementById(targetId)
+	if (!details) return
+
+	const btn = row.querySelector('.debtors-office-list__toggle')
+	if (btn) btn.classList.toggle('open')
+	details.classList.toggle('open')
+
+	if (targetId.startsWith('branch-') && !details.dataset.loaded) {
+		const branchClientId = targetId.replace('branch-', '')
+		await loadWorksClientTree(branchClientId, details)
+		return
+	}
+
+	if (
+		targetId.startsWith('object-') &&
+		!details.dataset.loaded &&
+		!details.querySelector('ul')
+	) {
+		await loadWorksObjectProducts(row, details)
+		return
+	}
+
+	if (targetId.startsWith('product-') && !details.dataset.loaded) {
+		await loadWorksProductOrders(row, details, orderIdFromQuery)
+		return
+	}
+
+	if (targetId.startsWith('no-object-') && !details.dataset.loaded) {
+		await loadWorksNoObjectOrders(row, details, orderIdFromQuery)
+	}
+}
+
 const initWorksPage = () => {
 	let clientId = null
 	let objectId = null
 	let productId = null
 
-	const clientsList = document.querySelector('.debtors-office-list')
-	addSearchInput(clientsList, 'Поиск клиента...', '.debtors-office-list__title')
+	const clientsList = document.getElementById('works-clients-list')
+	const searchInput = document.getElementById('works-client-search')
+	const firstPageButton = document.getElementById('works-first-page')
+	const prevPageButton = document.getElementById('works-prev-page')
+	const nextPageButton = document.getElementById('works-next-page')
+	const lastPageButton = document.getElementById('works-last-page')
+	const currentPageInput = document.getElementById('works-current-page')
+	const totalPagesSpan = document.getElementById('works-total-pages')
 
-	clientsList.addEventListener('click', function (e) {
-		const clientRow = e.target.closest(
-			'.debtors-office-list__row[data-target^="branch-"]',
-		)
-		if (clientRow) {
-			const branchId = clientRow.getAttribute('data-target')
-			const details = document.getElementById(branchId)
-			if (details && !details.querySelector('.debtors-search-input')) {
-				const objectsList = details.querySelector('ul')
-				if (objectsList) {
-					addSearchInput(
-						objectsList,
-						'Поиск объекта...',
-						'h4',
-						'16px',
-						'objects',
-					)
-				}
+	let currentPage = 1
+	let totalPages = 1
+	let currentSearch = ''
+	let searchDebounceTimer = null
+	let activeClientsRequest = null
+	let clientsRequestSeq = 0
+
+	const updatePaginationButtons = () => {
+		const isFirstPage = currentPage <= 1
+		const isLastPage = currentPage >= totalPages
+
+		if (firstPageButton) firstPageButton.disabled = isFirstPage
+		if (prevPageButton) prevPageButton.disabled = isFirstPage
+		if (nextPageButton) nextPageButton.disabled = isLastPage
+		if (lastPageButton) lastPageButton.disabled = isLastPage
+		if (currentPageInput) currentPageInput.value = String(currentPage)
+		if (totalPagesSpan) totalPagesSpan.textContent = String(totalPages)
+	}
+
+	const fetchWorksClients = async (page = 1, search = currentSearch) => {
+		if (!clientsList) return
+
+		if (activeClientsRequest) {
+			activeClientsRequest.abort()
+		}
+		const requestController = new AbortController()
+		activeClientsRequest = requestController
+		const requestId = ++clientsRequestSeq
+
+		const loader = createLoader()
+		document.body.appendChild(loader)
+
+		try {
+			const query = new URLSearchParams({ page: String(page) })
+			if (search.trim()) {
+				query.set('q', search.trim())
+			}
+
+			const resp = await fetch(`${WORKS_CLIENTS_LIST_URL}?${query.toString()}`, {
+				signal: requestController.signal,
+				headers: { 'X-Requested-With': 'XMLHttpRequest' },
+			})
+			const data = await resp.json()
+			loader.remove()
+
+			if (requestId !== clientsRequestSeq) return
+
+			if (!resp.ok) {
+				showError(data.error || 'Ошибка загрузки клиентов')
+				return
+			}
+
+			clientsList.innerHTML = data.html || ''
+			currentPage = data.current_page || 1
+			totalPages = Math.max(1, data.total_pages || 1)
+			updatePaginationButtons()
+		} catch (err) {
+			loader.remove()
+			if (requestId !== clientsRequestSeq) return
+			if (err.name !== 'AbortError') {
+				showError(err.message || 'Ошибка загрузки клиентов')
 			}
 		}
-		const objectRow = e.target.closest(
-			'.debtors-office-list__row[data-target^="object-"]',
+	}
+
+	const ensureWorksClientRow = async clientIdToLoad => {
+		let clientRow = document.querySelector(
+			`.debtors-office-list__row[data-target="branch-${clientIdToLoad}"]`,
 		)
-		if (objectRow) {
-			const objectIdAttr = objectRow.getAttribute('data-target')
-			const details = document.getElementById(objectIdAttr)
-			if (details && !details.querySelector('.debtors-search-input')) {
-				const productsList = details.querySelector('ul')
-				if (productsList) {
-					addSearchInput(
-						productsList,
-						'Поиск продукции...',
-						'.debtors-office-list__title',
-						'32px',
-						'products',
-					)
-				}
+		if (clientRow) return clientRow
+
+		const loader = createLoader()
+		document.body.appendChild(loader)
+		try {
+			const resp = await fetch(
+				`${WORKS_CLIENTS_LIST_URL}?client_id=${clientIdToLoad}`,
+			)
+			const data = await resp.json()
+			loader.remove()
+
+			if (resp.ok && data.html && clientsList && !currentSearch.trim()) {
+				clientsList.insertAdjacentHTML('beforeend', data.html)
 			}
+		} catch (err) {
+			loader.remove()
 		}
-	})
+
+		return document.querySelector(
+			`.debtors-office-list__row[data-target="branch-${clientIdToLoad}"]`,
+		)
+	}
+
+	if (searchInput) {
+		searchInput.addEventListener('input', () => {
+			clearTimeout(searchDebounceTimer)
+			searchDebounceTimer = setTimeout(() => {
+				currentSearch = searchInput.value
+				currentPage = 1
+				fetchWorksClients(1, currentSearch)
+			}, 300)
+		})
+	}
+
+	if (firstPageButton) {
+		firstPageButton.addEventListener('click', () => {
+			if (currentPage > 1) fetchWorksClients(1, currentSearch)
+		})
+	}
+	if (prevPageButton) {
+		prevPageButton.addEventListener('click', () => {
+			if (currentPage > 1) fetchWorksClients(currentPage - 1, currentSearch)
+		})
+	}
+	if (nextPageButton) {
+		nextPageButton.addEventListener('click', () => {
+			if (currentPage < totalPages) fetchWorksClients(currentPage + 1, currentSearch)
+		})
+	}
+	if (lastPageButton) {
+		lastPageButton.addEventListener('click', () => {
+			if (currentPage < totalPages) fetchWorksClients(totalPages, currentSearch)
+		})
+	}
+	if (currentPageInput) {
+		currentPageInput.addEventListener('change', () => {
+			const pageNum = Math.max(
+				1,
+				Math.min(totalPages, Number(currentPageInput.value) || 1),
+			)
+			fetchWorksClients(pageNum, currentSearch)
+		})
+	}
 
 	function getQueryParam(name) {
 		const url = new URL(window.location.href)
@@ -2825,6 +3123,15 @@ const initWorksPage = () => {
 	const clientIdFromQuery = getQueryParam('client_id')
 	const productIdFromQuery = getQueryParam('product_id')
 	const objectIdFromQuery = getQueryParam('client_object_id')
+
+	if (clientsList) {
+		clientsList.addEventListener('click', async function (e) {
+			const row = e.target.closest('.debtors-office-list__row')
+			if (!row || !clientsList.contains(row)) return
+
+			await handleWorksRowClick(row, orderIdFromQuery)
+		})
+	}
 
 	const getRowTitle = row => {
 		if (!row) return ''
@@ -2897,151 +3204,6 @@ const initWorksPage = () => {
 		}
 	}
 
-	document.querySelectorAll('.debtors-office-list__row').forEach(row => {
-		row.addEventListener('click', async function (e) {
-			const targetId = row.getAttribute('data-target')
-			if (!targetId) return
-			const details = document.getElementById(targetId)
-			if (!details) return
-
-			const btn = row.querySelector('.debtors-office-list__toggle')
-			if (btn) btn.classList.toggle('open')
-			details.classList.toggle('open')
-
-			if (
-				row.dataset.target.startsWith('product-') &&
-				!details.dataset.loaded
-			) {
-				const loader = createLoader()
-				document.body.appendChild(loader)
-
-				productId = row.dataset.productId
-				clientId = row.dataset.clientId
-				objectId = row.dataset.objectId
-				if (!productId || !clientId || !objectId) return
-
-				const resp = await fetch(
-					`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`,
-				)
-				const data = await resp.json()
-				loader.remove()
-
-				if (!resp.ok) {
-					showError(data.error || 'Ошибка загрузки данных')
-					return
-				}
-
-				details.innerHTML = `<div>${data.html}</div>`
-				details.dataset.loaded = '1'
-
-				const table = details.querySelector('table')
-				if (!table) return
-
-				TableManager.initTable(data.table_id)
-				TableManager.createColumnsForTable(data.table_id, [
-					{ name: 'id' },
-					{ name: 'status', url: '/commerce/orders/statuses/' },
-					{ name: 'created' },
-					{ name: 'deadline' },
-					{ name: 'required_documents' },
-					{ name: 'unit_price' },
-					{ name: 'quantity' },
-					{ name: 'amount' },
-					{ name: 'paid_amount' },
-					{ name: 'comment' },
-					{ name: 'additional_info' },
-				])
-
-				if (orderIdFromQuery) {
-					const tableId = data.table_id
-					const observer = new MutationObserver(() => {
-						const idInput = document.querySelector(
-							`#${tableId} thead input[name="id"]`,
-						)
-						if (idInput) {
-							idInput.value = orderIdFromQuery
-							idInput.dispatchEvent(new Event('input', { bubbles: true }))
-							idInput.dispatchEvent(new Event('change', { bubbles: true }))
-							observer.disconnect()
-						}
-					})
-					observer.observe(document.getElementById(tableId), {
-						childList: true,
-						subtree: true,
-					})
-				}
-			} else if (
-				row.dataset.target.startsWith('no-object-') &&
-				!details.dataset.loaded
-			) {
-				// Заказы без объекта клиента
-				const loader = createLoader()
-				document.body.appendChild(loader)
-
-				const parts = row.dataset.target.replace('no-object-', '').split('-')
-				clientId = parts[0]
-				productId = parts[1]
-				objectId = null
-
-				if (!productId || !clientId) {
-					loader.remove()
-					return
-				}
-
-				const resp = await fetch(
-					`/commerce/product_orders_without_object/?product_id=${productId}&client_id=${clientId}`,
-				)
-				const data = await resp.json()
-				loader.remove()
-
-				if (!resp.ok) {
-					showError(data.error || 'Ошибка загрузки данных')
-					return
-				}
-
-				details.innerHTML = `<div>${data.html}</div>`
-				details.dataset.loaded = '1'
-
-				const table = details.querySelector('table')
-				if (!table) return
-
-				TableManager.initTable(data.table_id)
-				TableManager.createColumnsForTable(data.table_id, [
-					{ name: 'id' },
-					{ name: 'status', url: '/commerce/orders/statuses/' },
-					{ name: 'created' },
-					{ name: 'deadline' },
-					{ name: 'required_documents' },
-					{ name: 'unit_price' },
-					{ name: 'quantity' },
-					{ name: 'amount' },
-					{ name: 'paid_amount' },
-					{ name: 'comment' },
-					{ name: 'additional_info' },
-				])
-
-				if (orderIdFromQuery) {
-					const tableId = data.table_id
-					const observer = new MutationObserver(() => {
-						const idInput = document.querySelector(
-							`#${tableId} thead input[name="id"]`,
-						)
-						if (idInput) {
-							idInput.value = orderIdFromQuery
-							idInput.dispatchEvent(new Event('input', { bubbles: true }))
-							idInput.dispatchEvent(new Event('change', { bubbles: true }))
-							observer.disconnect()
-						}
-					})
-					observer.observe(document.getElementById(tableId), {
-						childList: true,
-						subtree: true,
-					})
-				}
-			}
-		})
-	})
-
 	document.addEventListener('contextmenu', e => {
 		const row = e.target.closest('.debtors-office-list__row')
 		if (row) {
@@ -3083,31 +3245,29 @@ const initWorksPage = () => {
 	const openLevels = async () => {
 		if (!clientIdFromQuery || !objectIdFromQuery || !productIdFromQuery) return
 
-		const clientRow = document.querySelector(
-			`.debtors-office-list__row[data-target="branch-${clientIdFromQuery}"]`,
-		)
+		const clientRow = await ensureWorksClientRow(clientIdFromQuery)
 		if (clientRow) {
-			clientRow.click()
-			await new Promise(resolve => setTimeout(resolve, 100))
+			await handleWorksRowClick(clientRow, orderIdFromQuery)
+			await new Promise(resolve => setTimeout(resolve, 150))
 		}
 
 		const objectRow = document.querySelector(
 			`.debtors-office-list__row[data-target="object-${clientIdFromQuery}-${objectIdFromQuery}"]`,
 		)
 		if (objectRow) {
-			objectRow.click()
-			await new Promise(resolve => setTimeout(resolve, 100))
+			await handleWorksRowClick(objectRow, orderIdFromQuery)
+			await new Promise(resolve => setTimeout(resolve, 150))
 		}
 
 		const productRow = document.querySelector(
 			`.debtors-office-list__row[data-target="product-${clientIdFromQuery}-${objectIdFromQuery}-${productIdFromQuery}"]`,
 		)
 		if (productRow) {
-			productRow.click()
+			await handleWorksRowClick(productRow, orderIdFromQuery)
 		}
 	}
 
-	openLevels()
+	fetchWorksClients(1, '').then(() => openLevels())
 
 	const addButton = document.getElementById('add-button')
 	const editButton = document.getElementById('edit-button')
@@ -3140,7 +3300,6 @@ const initWorksPage = () => {
 							if (branchDetails) {
 								let ul = branchDetails.querySelector('ul')
 
-								// Удаляем заглушку "Нет объектов" если она есть
 								if (ul) {
 									const noObjectsLis = ul.querySelectorAll('li')
 									noObjectsLis.forEach(li => {
@@ -3159,110 +3318,7 @@ const initWorksPage = () => {
 								}
 
 								ul.insertAdjacentHTML('beforeend', result.html)
-
-								const newItem = ul.lastElementChild
-								if (newItem) {
-									const newRow = newItem.querySelector(
-										'.debtors-office-list__row',
-									)
-									if (newRow) {
-										newRow.addEventListener('click', async function (e) {
-											const targetId = newRow.getAttribute('data-target')
-											if (!targetId) return
-											const details = document.getElementById(targetId)
-											if (!details) return
-
-											const btn = newRow.querySelector(
-												'.debtors-office-list__toggle',
-											)
-											if (btn) btn.classList.toggle('open')
-											details.classList.toggle('open')
-
-											if (
-												newRow.dataset.target.startsWith('product-') &&
-												!details.dataset.loaded
-											) {
-												const loader = createLoader()
-												document.body.appendChild(loader)
-
-												const productId = newRow.dataset.productId
-												const clientId = newRow.dataset.clientId
-												const objectId = newRow.dataset.objectId
-
-												if (productId && clientId && objectId) {
-													try {
-														const resp = await fetch(
-															`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`,
-														)
-														const data = await resp.json()
-														loader.remove()
-
-														if (resp.ok) {
-															details.innerHTML = `<ul>${data.html}</ul>`
-															details.dataset.loaded = '1'
-														} else {
-															showError(data.error || 'Ошибка загрузки данных')
-														}
-													} catch (err) {
-														loader.remove()
-														showError(err.message || 'Ошибка загрузки данных')
-													}
-												}
-											}
-										})
-									}
-
-									const productRows = newItem.querySelectorAll(
-										'.debtors-office-list__row[data-target^="product-"]',
-									)
-									productRows.forEach(row => {
-										row.addEventListener('click', async function (e) {
-											const targetId = row.getAttribute('data-target')
-											if (!targetId) return
-											const details = document.getElementById(targetId)
-											if (!details) return
-
-											const btn = row.querySelector(
-												'.debtors-office-list__toggle',
-											)
-											if (btn) btn.classList.toggle('open')
-											details.classList.toggle('open')
-
-											if (
-												row.dataset.target.startsWith('product-') &&
-												!details.dataset.loaded
-											) {
-												const loader = createLoader()
-												document.body.appendChild(loader)
-
-												const productId = row.dataset.productId
-												const clientId = row.dataset.clientId
-												const objectId = row.dataset.objectId
-
-												if (productId && clientId && objectId) {
-													try {
-														const resp = await fetch(
-															`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`,
-														)
-														const data = await resp.json()
-														loader.remove()
-
-														if (resp.ok) {
-															details.innerHTML = `<ul>${data.html}</ul>`
-															details.dataset.loaded = '1'
-														} else {
-															showError(data.error || 'Ошибка загрузки данных')
-														}
-													} catch (err) {
-														loader.remove()
-														showError(err.message || 'Ошибка загрузки данных')
-													}
-												}
-											}
-										})
-									})
-								}
-
+								branchDetails.dataset.loaded = '1'
 								showSuccess('Объект успешно добавлен')
 							}
 						}
@@ -3568,83 +3624,6 @@ const initWorksPage = () => {
 
 							if (existingObjectItem) {
 								existingObjectItem.outerHTML = result.html
-
-								const newItem = document
-									.querySelector(
-										`[data-target="object-${result.client_id}-${result.id}"]`,
-									)
-									?.closest('li')
-
-								if (newItem) {
-									const newRow = newItem.querySelector(
-										'.debtors-office-list__row',
-									)
-									if (newRow) {
-										newRow.addEventListener('click', async function (e) {
-											const targetId = newRow.getAttribute('data-target')
-											if (!targetId) return
-											const details = document.getElementById(targetId)
-											if (!details) return
-
-											const btn = newRow.querySelector(
-												'.debtors-office-list__toggle',
-											)
-											if (btn) btn.classList.toggle('open')
-											details.classList.toggle('open')
-										})
-									}
-
-									const productRows = newItem.querySelectorAll(
-										'.debtors-office-list__row[data-target^="product-"]',
-									)
-									productRows.forEach(row => {
-										row.addEventListener('click', async function (e) {
-											const targetId = row.getAttribute('data-target')
-											if (!targetId) return
-											const details = document.getElementById(targetId)
-											if (!details) return
-
-											const btn = row.querySelector(
-												'.debtors-office-list__toggle',
-											)
-											if (btn) btn.classList.toggle('open')
-											details.classList.toggle('open')
-
-											if (
-												row.dataset.target.startsWith('product-') &&
-												!details.dataset.loaded
-											) {
-												const loader = createLoader()
-												document.body.appendChild(loader)
-
-												const productId = row.dataset.productId
-												const clientId = row.dataset.clientId
-												const objectId = row.dataset.objectId
-
-												if (productId && clientId && objectId) {
-													try {
-														const resp = await fetch(
-															`/commerce/product_orders/?product_id=${productId}&client_id=${clientId}&object_id=${objectId}`,
-														)
-														const data = await resp.json()
-														loader.remove()
-
-														if (resp.ok) {
-															details.innerHTML = `<ul>${data.html}</ul>`
-															details.dataset.loaded = '1'
-														} else {
-															showError(data.error || 'Ошибка загрузки данных')
-														}
-													} catch (err) {
-														loader.remove()
-														showError(err.message || 'Ошибка загрузки данных')
-													}
-												}
-											}
-										})
-									})
-								}
-
 								showSuccess('Объект успешно обновлен')
 							}
 						}

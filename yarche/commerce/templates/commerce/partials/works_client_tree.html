@@ -1,0 +1,35 @@
+<ul>
+    {% for product_info in no_object_products %}
+        <li class="debtors-office-list__item">
+            <div class="debtors-office-list__row"
+                 data-target="no-object-{{ client_id }}-{{ product_info.product_id }}"
+                 data-product-id="{{ product_info.product_id }}"
+                 data-client-id="{{ client_id }}"
+                 style="border-left-width: 16px; background-color: #fffacd;">
+                <button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
+                <h4>{{ product_info.product_name }} (Без объекта)</h4>
+            </div>
+            <div class="debtors-office-list__details"
+                 id="no-object-{{ client_id }}-{{ product_info.product_id }}"></div>
+        </li>
+    {% endfor %}
+
+    {% for obj in objects %}
+        <li class="debtors-office-list__item">
+            <div class="debtors-office-list__row"
+                 data-target="object-{{ client_id }}-{{ obj.id }}"
+                 data-client-id="{{ client_id }}"
+                 data-object-id="{{ obj.id }}"
+                 style="border-left-width: 16px;">
+                <button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
+                <h4>{{ obj.name }}</h4>
+            </div>
+            <div class="debtors-office-list__details"
+                 id="object-{{ client_id }}-{{ obj.id }}"></div>
+        </li>
+    {% empty %}
+        {% if not no_object_products %}
+            <li class="debtors-office-list__row" style="border-left-width: 16px;">Нет объектов</li>
+        {% endif %}
+    {% endfor %}
+</ul>

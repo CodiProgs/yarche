@@ -23,7 +23,7 @@ import zipfile
 from django.apps import apps
 from django.db import transaction
 from django.core.paginator import Paginator
-from django.db.models.functions import Coalesce, Cast
+from django.db.models.functions import Coalesce, Cast, NullIf
 from django.template.loader import render_to_string
 from yarche.utils import get_model_fields
 from django.contrib.auth.decorators import login_required
@@ -633,39 +633,125 @@ def client_balances(request):
 
 # endregion
 
+WORKS_CLIENTS_PAGE_SIZE = 50
+
+
+def _works_client_display_name(client):
+    return client.legal_name or client.name
+
+
+def _get_no_object_products_for_client(client_id):
+    rows = (
+        Order.objects.filter(
+            client_id=client_id,
+            client_object__isnull=True,
+            archived_at__isnull=True,
+        )
+        .values("product_id", "product__name")
+        .distinct()
+        .order_by("product__name")
+    )
+    return [
+        {"product_id": row["product_id"], "product_name": row["product__name"]}
+        for row in rows
+    ]
+
+
 @login_required
 def works(request):
-    clients = Client.objects.prefetch_related('client_objects').all()
-    products = Product.objects.all()
-    
-    # Получаем уникальные пары (client_id, product_id) для заказов без объектов
-    orders_without_objects = Order.objects.filter(
-        client_object__isnull=True,
-        archived_at__isnull=True,
-    ).select_related('product').order_by('client_id', 'product_id')
-    
-    # Создаём словарь: {client_id: [{'product_id': ..., 'product_name': ...}, ...]}
-    products_without_object_by_client = {}
-    processed_pairs = set()  # Отслеживаем обработанные пары
-    
-    for order in orders_without_objects:
-        pair = (order.client_id, order.product_id)
-        if pair not in processed_pairs:
-            processed_pairs.add(pair)
-            if order.client_id not in products_without_object_by_client:
-                products_without_object_by_client[order.client_id] = []
-            products_without_object_by_client[order.client_id].append({
-                'product_id': order.product_id,
-                'product_name': order.product.name,
-            })
+    return render(request, "commerce/works.html")
 
-    context = {
-        "clients": clients,
-        "products": products,
-        "products_without_object_by_client": products_without_object_by_client,
-    }
 
-    return render(request, "commerce/works.html", context)
+@login_required
+def works_clients_list(request):
+    q = (request.GET.get("q") or "").strip()
+    client_id = request.GET.get("client_id")
+    page = request.GET.get("page", 1)
+
+    clients_qs = Client.objects.all().order_by("legal_name", "name", "id")
+
+    if client_id:
+        try:
+            clients_qs = clients_qs.filter(id=int(client_id))
+        except (ValueError, TypeError):
+            clients_qs = clients_qs.none()
+    elif q:
+        clients_qs = clients_qs.annotate(
+            search_name=Coalesce(NullIf("legal_name", Value("")), "name"),
+        ).filter(search_name__icontains=q)
+
+    paginator = Paginator(clients_qs, WORKS_CLIENTS_PAGE_SIZE)
+    page_obj = paginator.get_page(page)
+
+    html = render_to_string(
+        "commerce/partials/works_client_rows.html",
+        {"clients": page_obj.object_list},
+    )
+
+    return JsonResponse(
+        {
+            "html": html,
+            "current_page": page_obj.number,
+            "total_pages": paginator.num_pages,
+            "total_count": paginator.count,
+            "is_search": bool(q),
+        }
+    )
+
+
+@login_required
+def works_client_tree(request):
+    client_id = request.GET.get("client_id")
+    if not client_id:
+        return JsonResponse({"error": "Не указан client_id"}, status=400)
+
+    try:
+        client = Client.objects.get(id=int(client_id))
+    except (Client.DoesNotExist, ValueError, TypeError):
+        return JsonResponse({"error": "Клиент не найден"}, status=404)
+
+    objects = list(client.client_objects.all().order_by("name"))
+    no_object_products = _get_no_object_products_for_client(client.id)
+
+    html = render_to_string(
+        "commerce/partials/works_client_tree.html",
+        {
+            "client_id": client.id,
+            "objects": objects,
+            "no_object_products": no_object_products,
+        },
+    )
+
+    return JsonResponse({"html": html})
+
+
+@login_required
+def works_object_products(request):
+    client_id = request.GET.get("client_id")
+    object_id = request.GET.get("object_id")
+    if not client_id or not object_id:
+        return JsonResponse({"error": "Не указаны client_id или object_id"}, status=400)
+
+    try:
+        client_object = ClientObject.objects.get(
+            id=int(object_id),
+            client_id=int(client_id),
+        )
+    except (ClientObject.DoesNotExist, ValueError, TypeError):
+        return JsonResponse({"error": "Объект не найден"}, status=404)
+
+    products = Product.objects.all().order_by("name")
+
+    html = render_to_string(
+        "commerce/partials/works_object_products.html",
+        {
+            "client_id": client_object.client_id,
+            "object_id": client_object.id,
+            "products": products,
+        },
+    )
+
+    return JsonResponse({"html": html})
 
 @login_required
 def product_orders(request):
@@ -1811,34 +1897,10 @@ def client_object_create(request):
 
             obj = ClientObject.objects.create(client=client, name=name)
 
-            products = Product.objects.all()
-            
-            products_html = ""
-            for product in products:
-                products_html += f'''
-                    <li class="debtors-office-list__item">
-                        <div class="debtors-office-list__row" data-target="product-{client_id}-{obj.id}-{product.id}" data-product-id="{product.id}" data-client-id="{client_id}" data-object-id="{obj.id}" style="border-left-width: 24px;">
-                            <button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
-                            <span class="debtors-office-list__title">{product.name}</span>
-                        </div>
-                        <div class="debtors-office-list__details" id="product-{client_id}-{obj.id}-{product.id}">
-                        </div>
-                    </li>
-                '''
-            
-            object_html = f'''
-                <li class="debtors-office-list__item">
-                    <div class="debtors-office-list__row" data-target="object-{client_id}-{obj.id}" style="border-left-width: 16px;">
-                        <button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
-                        <h4>{obj.name}</h4>
-                    </div>
-                    <div class="debtors-office-list__details" id="object-{client_id}-{obj.id}">
-                        <ul>
-                            {products_html}
-                        </ul>
-                    </div>
-                </li>
-            '''
+            object_html = render_to_string(
+                "commerce/partials/works_object_item.html",
+                {"client_id": client_id, "obj": obj},
+            )
 
             return JsonResponse(
                 {
@@ -1906,35 +1968,12 @@ def client_object_update(request, pk: int):
 
             client_object.save()
 
-            products = Product.objects.all()
             client_id = client_object.client.id
-            
-            products_html = ""
-            for product in products:
-                products_html += f'''
-                    <li class="debtors-office-list__item">
-                        <div class="debtors-office-list__row" data-target="product-{client_id}-{client_object.id}-{product.id}" data-product-id="{product.id}" data-client-id="{client_id}" data-object-id="{client_object.id}" style="border-left-width: 24px;">
-                            <button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
-                            <span class="debtors-office-list__title">{product.name}</span>
-                        </div>
-                        <div class="debtors-office-list__details" id="product-{client_id}-{client_object.id}-{product.id}">
-                        </div>
-                    </li>
-                '''
-            
-            object_html = f'''
-                <li class="debtors-office-list__item">
-                    <div class="debtors-office-list__row" data-target="object-{client_id}-{client_object.id}" style="border-left-width: 16px;">
-                        <button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
-                        <h4>{client_object.name}</h4>
-                    </div>
-                    <div class="debtors-office-list__details" id="object-{client_id}-{client_object.id}">
-                        <ul>
-                            {products_html}
-                        </ul>
-                    </div>
-                </li>
-            '''
+
+            object_html = render_to_string(
+                "commerce/partials/works_object_item.html",
+                {"client_id": client_id, "obj": client_object},
+            )
 
             return JsonResponse(
                 {

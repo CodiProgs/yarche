@@ -1,0 +1,11 @@
+{% for client in clients %}
+    <li class="debtors-office-list__item">
+        <div class="debtors-office-list__row" data-target="branch-{{ client.id }}">
+            <button class="debtors-office-list__toggle" type="button" aria-label="Подробнее">+</button>
+            <span class="debtors-office-list__title">{{ client.legal_name|default:client.name }}</span>
+        </div>
+        <div class="debtors-office-list__details" id="branch-{{ client.id }}"></div>
+    </li>
+{% empty %}
+    <li class="debtors-office-list__row">Клиенты не найдены</li>
+{% endfor %}
